@@ -1,6 +1,6 @@
 """The engenia command line (PROJECT.md section 6, CLI commands).
 
-lint, run, gate, matrix and measure work; plan and status print "not implemented".
+lint, run, gate, matrix, measure and doctor work; plan and status print "not implemented".
 """
 
 from __future__ import annotations
@@ -376,3 +376,13 @@ def measure(
 def status(project: str) -> None:
     """Show run state and open change requests."""
     typer.echo("not implemented")
+
+
+@app.command()
+def doctor() -> None:
+    """Check the environment: model config, model calls and local tools. Exits 1 on failure."""
+    from engenia.evidence.doctor import run_doctor
+
+    result = run_doctor(find_root())
+    typer.echo(result.text)
+    raise typer.Exit(result.exit_code)
