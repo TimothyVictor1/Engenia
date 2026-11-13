@@ -1,0 +1,5 @@
+.env
+.venv
+.engenia/
+projects/*/build/
+__pycache__

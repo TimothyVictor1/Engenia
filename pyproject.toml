@@ -1,0 +1,35 @@
+[project]
+name = "engenia"
+version = "0.1.0"
+description = "Engenia: from a written product request to a verified design."
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2",
+    "typer",
+    "pyyaml",
+    "pytest",
+    "ruff",
+    "httpx",
+]
+
+[project.scripts]
+engenia = "engenia.core.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.11.2,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "engenia"
+module-root = ""
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
