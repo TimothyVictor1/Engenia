@@ -1,0 +1,78 @@
+{
+  "source": "project",
+  "contract": {
+    "version": 1,
+    "budgets": {
+      "mechanical": {
+        "mass_g": 300,
+        "outer_envelope_mm": [
+          160,
+          160,
+          220
+        ]
+      },
+      "electronics": {
+        "mass_g": 60,
+        "bay_mm": [
+          70,
+          40,
+          22
+        ],
+        "energy_mwh_per_day": 180
+      },
+      "firmware": {
+        "flash_kb": 512,
+        "ram_kb": 64
+      }
+    },
+    "interfaces": {
+      "pin_map": {
+        "HYDROPHONE_ADC": "GPIO34",
+        "LORA_CS": "GPIO5"
+      },
+      "mounts": {
+        "board_holes_mm": [
+          [
+            3,
+            3
+          ],
+          [
+            67,
+            3
+          ],
+          [
+            3,
+            37
+          ],
+          [
+            67,
+            37
+          ]
+        ]
+      }
+    },
+    "totals": {
+      "mass_g_max": 400
+    }
+  },
+  "facts": {
+    "mechanical": {
+      "dry_mass_g": 318.4,
+      "buoyancy_margin": 0.17
+    }
+  },
+  "change_requests": [
+    {
+      "id": "CR-001",
+      "from_stage": "electronics",
+      "path": "budgets.electronics.bay_mm",
+      "requested": [
+        70,
+        40,
+        26
+      ],
+      "reason": "Battery height is 24 mm; 2 mm clearance is needed.",
+      "status": "open"
+    }
+  ]
+}
