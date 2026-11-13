@@ -76,7 +76,14 @@ def plan(project: str) -> None:
 @app.command()
 def gate(project: str) -> None:
     """Run all checks, reproduction and coverage."""
-    typer.echo("not implemented")
+    from engenia.gate.gate import format_report, run_gate
+
+    root = find_root()
+    _project_dir(project)
+    result = run_gate(project, root)
+    for line in format_report(result):
+        typer.echo(line)
+    raise typer.Exit(result.exit_code)
 
 
 @app.command()
