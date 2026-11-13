@@ -26,13 +26,23 @@ class MissingInput(Exception):
     """A required build input is absent, unreadable, or not usable."""
 
 
-def _read_json(path: Path, label: str) -> Any:
+def _read_json(path: Path, label: str, shown: str | None = None) -> Any:
+    """Read one JSON file, raising :class:`MissingInput` that names it as ``shown``."""
+    where = shown if shown is not None else str(path)
     if not path.is_file():
-        raise MissingInput(f"missing {label}: {path}")
+        raise MissingInput(f"missing {label}: {where}")
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise MissingInput(f"cannot read {label} {path}: {exc}") from exc
+        raise MissingInput(f"cannot read {label} {where}: {exc}") from exc
+
+
+def _shown_path(ctx: CheckContext, path: Path) -> str:
+    """Paths in messages are project-relative, so the text does not change between roots."""
+    try:
+        return str(path.relative_to(ctx.root))
+    except ValueError:
+        return str(path)
 
 
 def read_interface(ctx: CheckContext, stage: str | None = None) -> dict[str, Any]:
@@ -43,7 +53,7 @@ def read_interface(ctx: CheckContext, stage: str | None = None) -> dict[str, Any
     """
     name = stage or ctx.stage
     path = ctx.stage_interface_path(name)
-    data = _read_json(path, f"{name} interface")
+    data = _read_json(path, f"{name} interface", _shown_path(ctx, path))
     if not isinstance(data, dict):
         raise MissingInput(f"{name} interface {path} must contain a JSON object")
     facts = data.get("facts")
@@ -62,7 +72,9 @@ def try_read_interface(ctx: CheckContext, stage: str | None = None) -> dict[str,
 
 def read_contract(ctx: CheckContext) -> dict[str, Any]:
     """Read and return ``contract/contract.json`` for the current project."""
-    data = _read_json(ctx.contract_path, "contract.json")
+    data = _read_json(
+        ctx.contract_path, "contract.json", _shown_path(ctx, ctx.contract_path)
+    )
     if not isinstance(data, dict):
         raise MissingInput(f"contract.json {ctx.contract_path} must contain a JSON object")
     return data

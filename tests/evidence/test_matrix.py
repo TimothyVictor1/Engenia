@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -164,6 +165,19 @@ def test_markdown_escapes_pipes_in_a_statement(scratch_root: Path) -> None:
     row = row_of(payload, "R-002")
     assert row["statement"] == "The hull wall shall stay thick | and intact."
     assert "| The hull wall shall stay thick \\| and intact. |" in render_markdown(payload)
+
+
+def test_matrix_is_identical_in_a_copied_root(
+    scratch_root: Path, write_checks, tmp_path: Path
+) -> None:
+    """G3 rebuilds the report stage in another root: the matrix text must not move."""
+    write_checks()
+    first = build_matrix("demo", scratch_root)
+    other = tmp_path / "elsewhere"
+    shutil.copytree(scratch_root, other)
+    second = build_matrix("demo", other)
+    assert second == first
+    assert render_markdown(second) == render_markdown(first)
 
 
 # --- files and the stage ------------------------------------------------------------------------
