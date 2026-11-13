@@ -1,0 +1,1 @@
+{"stage": "mechanical", "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "facts": {"dry_mass_g": 280.0, "battery_bay_mm": [70.0, 40.0, 22.0], "battery_bay_centre_mm": [0.0, 0.0, 20.0], "centre_of_mass_mm": [0.0, 0.0, 60.0], "displaced_volume_cm3": 900.0, "contract_version": 1}}

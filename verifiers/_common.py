@@ -239,6 +239,27 @@ def comparison_message(measured: float, limit: Limit | Mapping[str, Any] | Any) 
     return f"measured {measured} " + ", ".join(reasons)
 
 
+def _verdict_with_level(
+    ctx: CheckContext,
+    measured: float | None,
+    result: VerdictResult,
+    evidence_level: EvidenceLevel,
+    *,
+    limit: Limit | None = None,
+    message: str | None = None,
+) -> Verdict:
+    """Build a verdict using ``ctx`` for the check identity."""
+    return Verdict(
+        check=ctx.check,
+        requirement=ctx.requirement,
+        measured=None if measured is None else float(measured),
+        limit=limit if limit is not None else ctx.limit,
+        result=result,
+        evidence_level=evidence_level,
+        message=message,
+    )
+
+
 def calculated_verdict(
     ctx: CheckContext,
     measured: float | None,
@@ -248,14 +269,22 @@ def calculated_verdict(
     message: str | None = None,
 ) -> Verdict:
     """Build a ``calculated`` verdict using ``ctx`` for the check identity."""
-    return Verdict(
-        check=ctx.check,
-        requirement=ctx.requirement,
-        measured=None if measured is None else float(measured),
-        limit=limit if limit is not None else ctx.limit,
-        result=result,
-        evidence_level=EvidenceLevel.CALCULATED,
-        message=message,
+    return _verdict_with_level(
+        ctx, measured, result, EvidenceLevel.CALCULATED, limit=limit, message=message
+    )
+
+
+def simulated_verdict(
+    ctx: CheckContext,
+    measured: float | None,
+    result: VerdictResult,
+    *,
+    limit: Limit | None = None,
+    message: str | None = None,
+) -> Verdict:
+    """Build a ``simulated`` verdict: the measured value comes from a simulation job."""
+    return _verdict_with_level(
+        ctx, measured, result, EvidenceLevel.SIMULATED, limit=limit, message=message
     )
 
 
@@ -270,6 +299,19 @@ def checked_verdict(
     result = compare(measured, selected)
     message = None if result == VerdictResult.PASS else comparison_message(measured, selected)
     return calculated_verdict(ctx, measured, result, limit=selected, message=message)
+
+
+def checked_simulated_verdict(
+    ctx: CheckContext,
+    measured: float,
+    *,
+    limit: Limit | None = None,
+) -> Verdict:
+    """Like :func:`checked_verdict`, but with ``evidence_level`` "simulated"."""
+    selected = limit if limit is not None else ctx.limit
+    result = compare(measured, selected)
+    message = None if result == VerdictResult.PASS else comparison_message(measured, selected)
+    return simulated_verdict(ctx, measured, result, limit=selected, message=message)
 
 
 def error_verdict(ctx: CheckContext, message: str) -> Verdict:

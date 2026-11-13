@@ -1,6 +1,6 @@
 """The engenia command line (PROJECT.md section 6, CLI commands).
 
-lint and run work; plan, gate, matrix and status print "not implemented".
+lint, run, gate and matrix work; plan and status print "not implemented".
 """
 
 from __future__ import annotations
@@ -88,8 +88,23 @@ def gate(project: str) -> None:
 
 @app.command()
 def matrix(project: str) -> None:
-    """Write the trace matrix."""
-    typer.echo("not implemented")
+    """Write the trace matrix (build/report/trace_matrix.md and .json) and print it."""
+    from engenia.core.errors import CoreError
+    from engenia.core.spec import SpecError
+    from engenia.evidence.report import write_matrix
+
+    root = find_root()
+    _project_dir(project)
+    try:
+        _, text = write_matrix(project, root)
+    except SpecError as exc:
+        for problem in exc.problems:
+            typer.echo(f"error: {problem}", err=True)
+        raise typer.Exit(1) from None
+    except CoreError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from None
+    typer.echo(text)
 
 
 @app.command()

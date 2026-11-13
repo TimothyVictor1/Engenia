@@ -1,0 +1,1 @@
+{"stage": "firmware", "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "facts": {"pins_used": {"HYDROPHONE_ADC": "GPIO34", "LORA_CS": "GPIO6"}, "contract_version": 1}}
