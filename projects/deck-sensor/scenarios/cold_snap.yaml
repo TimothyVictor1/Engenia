@@ -1,0 +1,12 @@
+name: cold_snap
+wave_height_m: 0.0
+wave_period_s: 0.0
+water_temp_c: -20.0
+water_density: 1000.0
+depth_m: 0.0
+extra: {air_temp_c: -20.0}
+rationale: Winter night on an exposed deck at -20 C. Lithium-polymer capacity drops sharply
+  at low temperature, so the endurance minimum must still hold, and the printed enclosure
+  must not crack. The wave fields are unused for a deck-mounted box and are kept at zero
+  immersion because the scenario model requires them.
+targets: [R-003]

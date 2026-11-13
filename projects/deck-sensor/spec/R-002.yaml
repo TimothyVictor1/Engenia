@@ -1,0 +1,10 @@
+id: R-002
+statement: The printed enclosure shall fit within the 220 x 220 x 250 mm print bed.
+value: 1
+unit: fits
+verify:
+  method: analysis
+  check: print_bed_fit
+  limit: {equals: 1}
+affects: [mechanical]
+status: approved

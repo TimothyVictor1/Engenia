@@ -1,0 +1,10 @@
+id: R-003
+statement: The deck sensor shall operate for at least 14 days on one battery charge.
+value: 14
+unit: day
+verify:
+  method: analysis
+  check: battery_capacity
+  limit: {min: 14}
+affects: [electronics, mechanical]
+status: approved
