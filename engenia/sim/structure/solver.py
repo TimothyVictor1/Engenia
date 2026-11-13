@@ -69,6 +69,8 @@ def _tetra_volumes(mesh: MeshTet) -> np.ndarray:
 
 def _material(ctx) -> dict:
     path = Path(ctx.root) / "packs/buoy/pack.yaml"
+    if not path.is_file():
+        path = Path(__file__).resolve().parents[3] / "packs/buoy/pack.yaml"
     return yaml.safe_load(path.read_text())["structure"]
 
 
