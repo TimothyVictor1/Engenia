@@ -4,6 +4,10 @@ Sprint 1: propose_scenarios() returns four fixed scenarios and makes no model ca
 pipeline runs end to end. The harness may replace propose_scenarios() later; generate()
 resolves it through the module namespace, so a monkeypatch takes effect.
 
+A project can also own its scenarios: when projects/<p>/scenarios/ holds *.yaml files,
+generate() uses those instead of the fixed proposal (project_scenarios). A project file
+that does not validate is an error, never a silent fallback to the buoy scenarios.
+
 Scenario files live at src/redteam/scenarios/<name>.yaml and are validated and copied to
 build/redteam/scenarios/ by build(). Units: wave_height_m is significant wave height in
 metres, wave_period_s in seconds, water_temp_c in degrees Celsius, water_density in kg/m3,
@@ -102,6 +106,30 @@ def propose_scenarios() -> list[Scenario]:
     ]
 
 
+def project_scenarios(ctx: StageContext) -> list[Scenario]:
+    """Scenarios owned by the project: projects/<p>/scenarios/*.yaml.
+
+    Empty when the project ships none, so generate() falls back to the fixed proposal.
+    A file that does not validate raises: a broken project scenario must not quietly
+    become a buoy scenario.
+    """
+    directory = ctx.project_dir / SCENARIOS_DIRNAME
+    paths = sorted(directory.glob("*.yaml")) if directory.is_dir() else []
+    scenarios: list[Scenario] = []
+    for path in paths:
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+            scenario = Scenario.model_validate(data)
+        except (yaml.YAMLError, ValidationError) as exc:
+            raise ValueError(f"{path.name}: {exc}") from exc
+        if scenario.name != path.stem:
+            raise ValueError(
+                f"{path.name}: scenario name {scenario.name} does not match file name"
+            )
+        scenarios.append(scenario)
+    return scenarios
+
+
 def _scenario_path(src_dir: Path, name: str) -> Path:
     return src_dir / SCENARIOS_DIRNAME / f"{name}.yaml"
 
@@ -115,12 +143,16 @@ class RedteamStage:
     checks: list[str] = []
 
     def generate(self, ctx: StageContext) -> None:
-        """Write the proposed scenarios to src/redteam/scenarios/*.yaml."""
+        """Write the proposed scenarios to src/redteam/scenarios/*.yaml.
+
+        The project's own scenarios (projects/<p>/scenarios/) win when present; the fixed
+        proposal is the fallback.
+        """
         scenarios_dir = ctx.src_dir / SCENARIOS_DIRNAME
         if scenarios_dir.is_dir():
             shutil.rmtree(scenarios_dir)
         scenarios_dir.mkdir(parents=True, exist_ok=True)
-        for scenario in propose_scenarios():
+        for scenario in project_scenarios(ctx) or propose_scenarios():
             payload = scenario.model_dump(mode="json")
             _scenario_path(ctx.src_dir, scenario.name).write_text(
                 yaml.safe_dump(payload, sort_keys=True, default_flow_style=False),

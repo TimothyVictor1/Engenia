@@ -1,0 +1,10 @@
+id: R-001
+statement: The assembled deck sensor shall have a total mass of at most 400 g.
+value: 400
+unit: g
+verify:
+  method: analysis
+  check: mass_budget
+  limit: {max: 400}
+affects: [mechanical, electronics]
+status: approved

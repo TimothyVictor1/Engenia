@@ -1,0 +1,52 @@
+- check: mass_budget
+  id: C-001
+  limit:
+    max: 400.0
+  params: {}
+  requirement: R-001
+- check: print_bed_fit
+  id: C-002
+  limit:
+    equals: 1.0
+  params:
+    bed_mm:
+    - 220
+    - 220
+    - 250
+  requirement: R-002
+- check: battery_capacity
+  id: C-003
+  limit:
+    min: 14.0
+  params: {}
+  requirement: R-003
+- check: wall_thickness_min
+  id: C-004
+  limit:
+    min: 3.0
+  params: {}
+  requirement: R-004
+- check: power_budget
+  id: C-005
+  limit:
+    max: 25.0
+  params: {}
+  requirement: R-005
+- check: erc_clean
+  id: C-006
+  limit:
+    max: 0.0
+  params: {}
+  requirement: R-006
+- check: bay_fit
+  id: C-007
+  limit:
+    equals: 1.0
+  params: {}
+  requirement: R-007
+- check: detection_rate
+  id: C-008
+  limit:
+    min: 0.9
+  params: {}
+  requirement: R-008

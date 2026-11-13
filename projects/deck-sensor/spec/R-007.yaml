@@ -1,0 +1,10 @@
+id: R-007
+statement: The electronics assembly shall fit inside the mechanical battery bay.
+value: 1
+unit: fits
+verify:
+  method: analysis
+  check: bay_fit
+  limit: {equals: 1}
+affects: [electronics, mechanical]
+status: approved
