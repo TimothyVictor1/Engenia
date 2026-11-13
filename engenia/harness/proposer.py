@@ -397,3 +397,56 @@ def propose_electronics_selection(
         fallback=lambda: fallback(contract, requirements, facts),
         **kwargs,
     )
+
+
+# --- firmware ----------------------------------------------------------------------------------
+
+FIRMWARE_TASK = """\
+Stage: firmware. Propose the tone detector's settings as a JSON object with exactly these keys:
+frequency_hz (the tone to detect), threshold (amplitude, relative to full scale), hold_s
+(seconds the tone must continue before an event fires). The audio is mono, sampled at 2000 Hz.
+Scripts check the ranges: frequency_hz from 20 to 900, threshold above 0 and below 1, hold_s from
+0.01 to 5. The firmware is then built and its detection and false-alarm checks run on your numbers.
+
+{requirements}
+"""
+
+FIRMWARE_KEYS = ("frequency_hz", "threshold", "hold_s")
+
+
+def firmware_validator() -> Validator:
+    def validate(proposal: dict[str, Any]) -> list[Verdict]:
+        if set(proposal) != set(FIRMWARE_KEYS):
+            return [_failure("detector_fields", f"keys must be exactly {list(FIRMWARE_KEYS)}")]
+        try:
+            frequency, threshold, hold = (float(proposal[key]) for key in FIRMWARE_KEYS)
+        except (TypeError, ValueError):
+            return [_failure("detector_fields", "every value must be a number")]
+        return [
+            _number("detector_frequency_hz", frequency, Limit(min=20, max=900),
+                    f"frequency {frequency} Hz is outside 20 to 900 Hz"),
+            _number("detector_threshold", threshold, Limit(min=1e-6, max=0.999999),
+                    f"threshold {threshold} must be above 0 and below 1"),
+            _number("detector_hold_s", hold, Limit(min=0.01, max=5),
+                    f"hold {hold} s is outside 0.01 to 5 s"),
+        ]
+
+    return validate
+
+
+def propose_firmware_detector(
+    ctx: StageContext,
+    requirements: list[Requirement],
+    fallback: Callable[[], dict[str, Any]],
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """The firmware stage's hook: returns what `fallback()` would (the default detector
+    settings) unless the design model proposes settings that pass the scripted range checks."""
+    return propose(
+        ctx,
+        task=FIRMWARE_TASK.format(requirements=_requirement_lines(requirements)),
+        validate=firmware_validator(),
+        finish=lambda proposal: {key: float(proposal[key]) for key in FIRMWARE_KEYS},
+        fallback=fallback,
+        **kwargs,
+    )
