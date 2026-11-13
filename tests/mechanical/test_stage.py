@@ -13,7 +13,7 @@ from build123d import Align, Box, CenterOf, Cylinder, Pos, import_step
 
 from engenia.agents.mechanical.builder import ARTIFACTS, STEP_TIMESTAMP
 from engenia.agents.mechanical.stage import CHECKS, REPO, MechanicalStage, propose_params
-from engenia.contracts.models import Contract, Interface, StageContext
+from engenia.contracts.models import Contract, Interface, Requirement, StageContext
 from engenia.stages.base import Stage
 from packs.buoy.templates.hull import HullParams, build_hull
 
@@ -22,6 +22,7 @@ from packs.buoy.templates.hull import HullParams, build_hull
 def built(tmp_path_factory):
     root = tmp_path_factory.mktemp("mechanical")
     ctx = StageContext(root=root, project="buoy", stage="mechanical")
+    shutil.copytree(REPO / "projects" / "harbour-listener" / "spec", ctx.spec_dir)
     stage = MechanicalStage()
     stage.generate(ctx)
     stage.build(ctx)
@@ -78,6 +79,7 @@ def test_two_builds_from_same_source_have_identical_hashes(built, caplog):
     assert not (clone.build_dir / "stale-artifact.txt").exists()
     for check in CHECKS:
         assert f"Skipping missing mechanical verifier: {check}" in caplog.text
+    assert not any("pack.yaml" in record.getMessage() for record in caplog.records)
     for name in ("hull", "lid"):
         step = (clone.build_dir / f"{name}.step").read_text()
         assert STEP_TIMESTAMP in step
@@ -112,6 +114,7 @@ def test_wall_min_matches_source_params_and_actual_shell(built):
     stage, ctx = built
     params = yaml.safe_load((ctx.src_dir / "params.yaml").read_text())
     wall = params["wall_thickness_mm"]
+    assert wall == 3.0  # harbour-listener R-004's approved verify.limit.min
     assert stage.interface(ctx)["wall_min_mm"] == wall
     # Probe the ordinary sidewall away from the battery well and sealing rim.
     r = params["outer_diameter_mm"] / 2
@@ -162,11 +165,11 @@ def test_build_respects_edited_source_wall_without_regenerating(built):
     custom = clone_source(ctx, "thicker-wall")
     path = custom.src_dir / "params.yaml"
     params = yaml.safe_load(path.read_text())
-    params.update(wall_thickness_mm=3.0, lid_thickness_mm=4.2)
+    params.update(wall_thickness_mm=3.5, lid_thickness_mm=4.7)
     path.write_text(yaml.safe_dump(params))
     stage.build(custom)
     facts = stage.interface(custom)
-    assert facts["wall_min_mm"] == 3.0
+    assert facts["wall_min_mm"] == 3.5
     assert facts["dry_mass_g"] > stage.interface(ctx)["dry_mass_g"]
     assert path.read_text() == yaml.safe_dump(params)
 
@@ -242,6 +245,34 @@ def test_too_small_envelope_is_rejected():
     contract["budgets"]["mechanical"]["outer_envelope_mm"] = [50, 50, 30]
     with pytest.raises(ValueError, match="envelope"):
         propose_params(contract, [])
+
+
+@pytest.mark.parametrize(("status", "check", "minimum", "expected"), [
+    ("approved", "wall_thickness_min", 2.0, 2.0),
+    ("approved", "wall_thickness_min", 4.0, 4.0),
+    ("draft", "wall_thickness_min", 4.0, 3.0),
+    ("approved", "mass_budget", 4.0, 3.0),
+])
+def test_proposal_uses_only_approved_wall_limits(status, check, minimum, expected):
+    requirement = Requirement.model_validate({
+        "id": "R-004", "statement": "The hull shall meet the wall minimum.",
+        "value": 99, "unit": "mm",  # The proposal must read limit.min, not value.
+        "verify": {"method": "analysis", "check": check, "limit": {"min": minimum}},
+        "affects": ["mechanical"], "status": status,
+    })
+    params = propose_params(default_contract(), [requirement])
+    assert params["wall_thickness_mm"] == expected
+    assert propose_params(default_contract(), [])["wall_thickness_mm"] == 3.0
+
+
+def test_requirement_wall_still_respects_contract_envelope():
+    requirement = Requirement.model_validate(yaml.safe_load(
+        (REPO / "projects/harbour-listener/spec/R-004.yaml").read_text()
+    ))
+    contract = default_contract().model_dump(mode="json")
+    contract["budgets"]["mechanical"]["outer_envelope_mm"] = [110, 110, 220]
+    with pytest.raises(ValueError, match="envelope"):
+        propose_params(contract, [requirement])
 
 
 @pytest.mark.parametrize("updates", [

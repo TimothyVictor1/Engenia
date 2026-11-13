@@ -31,14 +31,26 @@ hull, lid = build_hull(params)
 
 
 def propose_params(contract: Contract | dict, requirements: list[Requirement]) -> dict:
-    """Replaceable proposal seam for T2; this sprint uses only contract budgets.
+    """Replaceable proposal seam using budgets and approved wall requirements.
 
-    Requirements are passed for future harness proposals. Envelope dimensions
-    are ceilings, not targets. The frozen contract cannot be overridden here.
+    Approved wall minima set the wall thickness (strongest minimum wins).
+    Envelope dimensions are ceilings, not targets; requirements cannot override
+    the frozen contract's envelope.
     """
     c = contract if isinstance(contract, Contract) else Contract.model_validate(contract)
     x, y, z = c.budgets.electronics.bay_mm
-    wall, groove, standoff = 2.4, 2.0, 6.0
+    wall_limits = []
+    for requirement in requirements:
+        if requirement.status != "approved" or requirement.verify.check != "wall_thickness_min":
+            continue
+        limit = requirement.verify.limit
+        if limit is None or limit.min is None:
+            raise ValueError(f"{requirement.id}: wall_thickness_min requires verify.limit.min")
+        if not math.isfinite(limit.min) or limit.min <= 0:
+            raise ValueError(f"{requirement.id}: wall minimum must be finite and positive")
+        wall_limits.append(limit.min)
+    wall = max(wall_limits, default=3.0)
+    groove, standoff = 2.0, 6.0
     boss_radius = 1.5 + wall
     holes = c.interfaces.mounts.board_holes_mm
     extent = max(

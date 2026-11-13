@@ -5,8 +5,10 @@ Mechanical stage (T3-S1)
 project requirements and reads the project contract, falling back to
 `packs/buoy/default_contract.json` (PROJECT.md section 6). The replaceable
 `propose_params(contract, requirements)` function sizes the hull around the bay
-and mount holes, rejecting dimensions outside the contract envelope. This sprint
-uses no model calls and does not infer new obligations from requirements.
+and mount holes, rejecting dimensions outside the contract envelope. Approved
+requirements whose check is `wall_thickness_min` supply their `verify.limit.min`
+as the wall thickness; if several apply, the strongest minimum wins. Without
+such a requirement the wall defaults to 3.0 mm. This sprint uses no model calls.
 
 Generated `src/mechanical/model.py` imports `packs.buoy.templates.hull` and reads
 its adjacent `params.yaml`. `build()` executes that source in a fresh Python
@@ -32,7 +34,7 @@ floor, bay wall, blind-hole floor and material above the groove. This does not
 replace A2's independent wall-thickness verification. The centre of mass comes
 from the CAD solids at uniform effective density.
 
-Dry mass = combined solid volume in cm3 × density × infill factor. If present,
+Dry mass = combined solid volume in cm3 × density × infill factor.
 `packs/buoy/pack.yaml` supplies:
 
 ```yaml
@@ -41,12 +43,14 @@ materials:
     density_g_cm3: 1.27
 printing:
   infill_factor: 1.0
+  bed_mm: [220, 220, 250]
 ```
 
-Until the pack configuration lands, missing `pack.yaml` warns and uses PETG
-1.27 g/cm3. Infill defaults to 1.0 (conservative fully solid material); the factor
-is written to source parameters during generation. It represents an effective
-material fraction, not a slicer prediction. Density is read during each build.
+Infill 1.0 means solid walls; the factor is written to source parameters during
+generation. It represents an effective material fraction, not a slicer prediction.
+Density is read during each build. The committed pack provides PETG 1.27 g/cm3
+and a 220 × 220 × 250 mm print bed. If no pack file is available, the stage
+retains the PETG density fallback with a warning.
 
 The four check names are declared for the scheduler. Missing verifier files
 produce explicit warnings and are skipped; the stage neither implements nor
@@ -67,16 +71,11 @@ workers, different directories, and repeated builds without regenerating source.
 Byte identity is tested within one kernel/platform version; cross-version or
 cross-architecture kernel identity is not claimed.
 
-Validation (without changing the shared lockfile)
-------------------------------------------------
+Validation
+----------
 
 ```sh
-uv pip install -e .
-UV_FROZEN=true UV_NO_SYNC=true uv run ruff check .
-UV_FROZEN=true UV_NO_SYNC=true uv run pytest tests/mechanical/ -q
+uv sync --locked
+uv run ruff check .
+uv run pytest -q
 ```
-
-`uv.lock` is outside this seat's permitted edits and needs refreshing by its
-owner after the dependency change. The step-0 registry smoke test in
-`tests/smoke/` still requires every stage to declare no checks; its owner must
-update that expectation for real stages.
