@@ -1,0 +1,85 @@
+# Deterministic intake for the buoy pack (used when no design model is configured).
+# The request is split into clauses at ".", ";" and line breaks. A rule matches a clause when its
+# `pattern` (case-insensitive) matches; its first matching group is the number. First clause wins.
+# A rule with no match is left out: intake never invents a number the request did not give.
+requirements:
+  - name: mass
+    pattern: '(?:mass|weigh\w*)\D{0,60}?(\d+(?:\.\d+)?)\s*(?:g|grams?)\b'
+    statement: The total mass of the buoy shall not exceed {value} g.
+    unit: g
+    method: analysis
+    check: mass_budget
+    bound: max
+    affects: [mechanical, electronics]
+  - name: endurance
+    pattern: '(?:operat\w*|run|last|endurance|battery)\D{0,60}?(\d+(?:\.\d+)?)\s*days?\b'
+    statement: The buoy shall operate for at least {value} days on one battery charge.
+    unit: day
+    method: analysis
+    check: battery_capacity
+    bound: min
+    affects: [electronics, mechanical]
+  - name: wall_thickness
+    pattern: 'wall\D{0,60}?(\d+(?:\.\d+)?)\s*mm\b'
+    statement: The hull shall have a minimum wall thickness of at least {value} mm.
+    unit: mm
+    method: analysis
+    check: wall_thickness_min
+    bound: min
+    affects: [mechanical]
+  - name: buoyancy_margin
+    pattern: 'buoyancy\D{0,60}?(\d*\.?\d+)'
+    statement: The buoy shall have a buoyancy margin of at least {value}.
+    unit: ratio
+    method: analysis
+    check: buoyancy_margin
+    bound: min
+    affects: [mechanical]
+  - name: metacentric_height
+    pattern: '(?:metacentric|upright)\D{0,60}?(\d+(?:\.\d+)?)\s*mm\b'
+    statement: The buoy shall float upright with a metacentric height of at least {value} mm.
+    unit: mm
+    method: analysis
+    check: metacentric_height
+    bound: min
+    affects: [mechanical]
+  - name: power
+    pattern: '(?:power|draw)\D{0,60}?(\d+(?:\.\d+)?)\s*mw\b'
+    statement: The electronics shall draw an average power of at most {value} mW.
+    unit: mW
+    method: analysis
+    check: power_budget
+    bound: max
+    affects: [electronics]
+  - name: detection_rate
+    pattern: 'detect\w*\D{0,60}?(0?\.\d+|1(?:\.0+)?)(?![\d.]*\s*(?:hz|khz|mm|g\b|s\b))'
+    statement: The firmware shall detect the target tone in the recorded test audio with a detection rate of at least {value}.
+    unit: ratio
+    method: analysis
+    check: detection_rate
+    bound: min
+    affects: [firmware]
+  - name: false_alarms
+    pattern: '(\d+(?:\.\d+)?)\s*false alarms?|false alarms?\D{0,40}?(\d+(?:\.\d+)?)\s*(?:per hour|/\s*h\b|an hour|each hour)'
+    statement: The firmware shall raise at most {value} false alarms per hour on the quiet recording.
+    unit: 1/h
+    method: analysis
+    check: false_alarm_rate
+    bound: max
+    affects: [firmware]
+  - name: tilt
+    pattern: 'tilt\D{0,60}?(\d+(?:\.\d+)?)\s*(?:deg\w*|°)'
+    statement: The buoy shall keep its tilt within {value} degrees in the simulated wave conditions.
+    unit: deg
+    method: simulation
+    check: wave_tilt
+    bound: max
+    affects: [simulation]
+  - name: stress_safety_factor
+    pattern: 'safety factor\D{0,60}?(\d+(?:\.\d+)?)'
+    statement: The hull shall keep a stress safety factor of at least {value} at the design depth.
+    unit: ratio
+    method: simulation
+    check: stress_safety_factor
+    bound: min
+    affects: [simulation]
