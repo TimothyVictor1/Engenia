@@ -76,7 +76,7 @@ def test_lint_errors_are_sent_back_and_fixed(root, requirement_text):
     lint_report = llm.calls[2].messages[-1]["content"]
     assert "engenia lint" in lint_report
     assert "R-001.yaml" in lint_report
-    assert 'must contain "shall"' in lint_report
+    assert "L1" in lint_report and '"shall"' in lint_report
     assert len(llm.calls) == 4
 
 
@@ -101,7 +101,8 @@ def test_agent_can_run_lint_itself_through_run_build(root, requirement_text):
     run(llm)
     (_, lint_run) = tool_results(llm, 1)
     assert lint_run["exit_code"] == 1
-    assert "FAIL R-001.yaml" in lint_run["stderr"]
+    report = lint_run["stdout"] + lint_run["stderr"]
+    assert "R-001.yaml" in report and "L1" in report and '"shall"' in report
 
 
 def test_intake_never_writes_approved_status(root, requirement_text):
@@ -181,7 +182,8 @@ def test_empty_spec_dir_failure_is_fed_back_from_lint(root, requirement_text):
         ]
     )
     run(llm)
-    assert "no spec files" in llm.calls[1].messages[-1]["content"]
+    report = llm.calls[1].messages[-1]["content"]
+    assert "S0" in report and "R-*.yaml" in report
 
 
 def test_creates_the_spec_directory_for_a_new_project(root, requirement_text):

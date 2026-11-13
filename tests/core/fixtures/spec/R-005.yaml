@@ -1,0 +1,10 @@
+id: R-005
+statement: The buoy shall have a buoyancy margin of at least 0.20.
+value: 0.20
+unit: ratio
+verify:
+  method: analysis
+  check: buoyancy_margin
+  limit: {min: 0.20}
+affects: [mechanical]
+status: approved

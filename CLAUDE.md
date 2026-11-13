@@ -32,6 +32,8 @@ A seat may only create or edit files inside its own folders. This is what makes 
 | `containers/`, `infra/`, `.github/`, `engenia/sim/`, `packs/buoy/sim/` | B1 |
 | `tests/<lane>/` | Same seat as the lane |
 
+Tests use their own fixture projects. Never assert on the contents of `projects/harbour-listener` or on another lane's exact output wording.
+
 Seats: T1 Claude A (core), T2 Claude B (harness, agents, gate), T3 Codex (mechanical and integration), T4 OpenCode (independent agents and example specs), A1 Codex (electronics and firmware), A2 OpenCode (checks and evidence), B1 OpenCode (infrastructure, then simulation).
 
 ---

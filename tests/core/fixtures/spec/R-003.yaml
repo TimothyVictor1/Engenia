@@ -1,0 +1,10 @@
+id: R-003
+statement: The buoy shall operate for at least 7 days on one battery charge.
+value: 7
+unit: day
+verify:
+  method: analysis
+  check: battery_capacity
+  limit: {min: 7}
+affects: [electronics, mechanical]
+status: approved

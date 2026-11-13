@@ -141,6 +141,12 @@ VERIFIER_USING_HELPER = """
 """
 
 
+def write_helper(root, text=HELPER):
+    """Shared helper module, in a package of its own so the real repository's cannot win."""
+    (root / "verifiers" / "__init__.py").write_text("")
+    (root / "verifiers" / "_common.py").write_text(text)
+
+
 def without_root_on_sys_path(monkeypatch, root):
     """Make the repository root absent from sys.path, as under the `engenia` console script."""
     wanted = root.resolve()
@@ -159,7 +165,7 @@ def without_root_on_sys_path(monkeypatch, root):
 def test_verifier_can_import_shared_helpers_when_root_is_not_on_sys_path(
     root, ctx, make_stage, monkeypatch, import_line
 ):
-    (root / "verifiers" / "_common.py").write_text(HELPER)
+    write_helper(root)
     write_verifier(root, "demo", VERIFIER_USING_HELPER.format(import_line=import_line))
     plan(root, item("demo"))
     without_root_on_sys_path(monkeypatch, root)
@@ -174,7 +180,7 @@ def test_verifier_can_import_shared_helpers_when_root_is_not_on_sys_path(
 
 
 def test_root_already_on_sys_path_is_not_added_twice(root, ctx, make_stage, monkeypatch):
-    (root / "verifiers" / "_common.py").write_text(HELPER)
+    write_helper(root)
     import_line = "from verifiers._common import helper"
     write_verifier(root, "demo", VERIFIER_USING_HELPER.format(import_line=import_line))
     plan(root, item("demo"))
@@ -187,12 +193,12 @@ def test_root_already_on_sys_path_is_not_added_twice(root, ctx, make_stage, monk
 
 def test_an_edited_helper_is_picked_up_on_the_next_run(root, ctx, make_stage, monkeypatch):
     import_line = "from verifiers._common import helper"
-    (root / "verifiers" / "_common.py").write_text(HELPER)
+    write_helper(root)
     write_verifier(root, "demo", VERIFIER_USING_HELPER.format(import_line=import_line))
     plan(root, item("demo"))
     without_root_on_sys_path(monkeypatch, root)
     stage = make_stage(checks=["demo"])
     assert run_stage_checks(stage, ctx)[0].measured == 42.0
 
-    (root / "verifiers" / "_common.py").write_text(HELPER.replace("42.0", "7.0"))
+    write_helper(root, HELPER.replace("42.0", "7.0"))
     assert run_stage_checks(stage, ctx)[0].measured == 7.0  # an edited helper is picked up
