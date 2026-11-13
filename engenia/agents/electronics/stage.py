@@ -17,6 +17,12 @@ from engenia.agents.electronics.selection import assembly_size, power_facts, pro
 from engenia.contracts.models import ChangeRequest, Contract, Requirement, StageContext
 
 
+def _pack_file(ctx: StageContext, name: str) -> Path:
+    local = ctx.root / "packs" / "buoy" / name
+    repo = Path(__file__).resolve().parents[3]
+    return local if local.is_file() else repo / "packs" / "buoy" / name
+
+
 def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -70,12 +76,15 @@ class ElectronicsStage:
     checks = ["power_budget", "battery_capacity", "erc_clean", "mass_budget", "bay_fit"]
 
     def generate(self, ctx: StageContext) -> None:
-        contract = Contract.model_validate_json(ctx.contract_path.read_text(encoding="utf-8"))
+        contract_path = ctx.contract_path
+        if not contract_path.is_file():
+            contract_path = _pack_file(ctx, "default_contract.json")
+        contract = Contract.model_validate_json(contract_path.read_text(encoding="utf-8"))
         requirements = [
             Requirement.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
             for path in sorted(ctx.spec_dir.glob("R-*.yaml"))
         ]
-        facts = load_facts(ctx.root / "packs" / "buoy" / "parts" / "facts.toml")
+        facts = load_facts(_pack_file(ctx, "parts/facts.toml"))
         selection = propose_selection(contract, requirements, facts)
         selection["pins_used"] = dict(sorted(contract.interfaces.pin_map.items()))
         # Snapshot catalogue/profile: build never reselects against changed inputs.

@@ -223,3 +223,26 @@ def test_declares_required_checks():
         "mass_budget",
         "bay_fit",
     ]
+
+
+@pytest.mark.parametrize("local_default", [False, True])
+def test_build_without_project_contract(tmp_path, local_default):
+    ctx = make_context(tmp_path)
+    shutil.rmtree(ctx.contract_path.parent)
+    shutil.rmtree(ctx.root / "packs/buoy/parts")
+    if local_default:
+        default = ctx.root / "packs/buoy/default_contract.json"
+        default.write_text(
+            contract(pins={"HYDROPHONE_ADC": "GPIO35", "LORA_CS": "GPIO14"}).model_dump_json(),
+            encoding="utf-8",
+        )
+    stage = ElectronicsStage()
+    stage.generate(ctx)
+    stage.build(ctx)
+    interface = stage.interface(ctx)
+    assert interface["erc_errors"] == 0
+    assert interface["endurance_days"] >= 7
+    assert (ctx.build_dir / "circuit.net").is_file()
+    assert not ctx.contract_path.exists()
+    if local_default:
+        assert interface["pins_used"] == {"HYDROPHONE_ADC": "GPIO35", "LORA_CS": "GPIO14"}
