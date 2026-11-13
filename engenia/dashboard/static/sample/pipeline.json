@@ -1,0 +1,99 @@
+{
+  "project": "harbour-listener",
+  "updated": "2026-11-13T09:41:07+00:00",
+  "stages": [
+    {
+      "name": "verify_plan",
+      "needs": [],
+      "status": "done",
+      "key": "sha256:0101010101010101010101010101010101010101010101010101010101010101"
+    },
+    {
+      "name": "architect",
+      "needs": [
+        "verify_plan"
+      ],
+      "status": "done",
+      "key": "sha256:0202020202020202020202020202020202020202020202020202020202020202"
+    },
+    {
+      "name": "mechanical",
+      "needs": [
+        "architect"
+      ],
+      "status": "done",
+      "key": "sha256:0303030303030303030303030303030303030303030303030303030303030303"
+    },
+    {
+      "name": "electronics",
+      "needs": [
+        "architect"
+      ],
+      "status": "failed",
+      "key": "sha256:0404040404040404040404040404040404040404040404040404040404040404"
+    },
+    {
+      "name": "firmware",
+      "needs": [
+        "architect"
+      ],
+      "status": "running",
+      "key": null
+    },
+    {
+      "name": "redteam",
+      "needs": [],
+      "status": "done",
+      "key": "sha256:0606060606060606060606060606060606060606060606060606060606060606"
+    },
+    {
+      "name": "testplan",
+      "needs": [],
+      "status": "not_run",
+      "key": null
+    },
+    {
+      "name": "simprep",
+      "needs": [],
+      "status": "stub",
+      "key": null
+    },
+    {
+      "name": "integration",
+      "needs": [
+        "mechanical",
+        "electronics",
+        "firmware"
+      ],
+      "status": "blocked",
+      "key": null
+    },
+    {
+      "name": "simulation",
+      "needs": [
+        "integration",
+        "redteam",
+        "simprep"
+      ],
+      "status": "blocked",
+      "key": null
+    },
+    {
+      "name": "final",
+      "needs": [
+        "simulation",
+        "testplan"
+      ],
+      "status": "blocked",
+      "key": null
+    },
+    {
+      "name": "report",
+      "needs": [
+        "final"
+      ],
+      "status": "blocked",
+      "key": null
+    }
+  ]
+}

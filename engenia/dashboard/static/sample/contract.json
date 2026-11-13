@@ -1,0 +1,113 @@
+{
+  "source": "project",
+  "contract": {
+    "version": 1,
+    "budgets": {
+      "mechanical": {
+        "mass_g": 300,
+        "outer_envelope_mm": [
+          160,
+          160,
+          220
+        ]
+      },
+      "electronics": {
+        "mass_g": 60,
+        "bay_mm": [
+          70,
+          40,
+          22
+        ],
+        "energy_mwh_per_day": 180
+      },
+      "firmware": {
+        "flash_kb": 512,
+        "ram_kb": 64
+      }
+    },
+    "interfaces": {
+      "pin_map": {
+        "HYDROPHONE_ADC": "GPIO34",
+        "LORA_CS": "GPIO5"
+      },
+      "mounts": {
+        "board_holes_mm": [
+          [
+            3,
+            3
+          ],
+          [
+            67,
+            3
+          ],
+          [
+            3,
+            37
+          ],
+          [
+            67,
+            37
+          ]
+        ]
+      }
+    },
+    "totals": {
+      "mass_g_max": 400
+    }
+  },
+  "facts": {
+    "mechanical": {
+      "dry_mass_g": 318.4,
+      "outer_envelope_mm": [
+        152,
+        152,
+        214
+      ],
+      "wall_thickness_min_mm": 3.2,
+      "displaced_mass_g": 372.6,
+      "metacentric_height_mm": 8.4,
+      "print_bed_fit": true
+    },
+    "electronics": {
+      "mass_g": 58.2,
+      "bay_mm": [
+        70,
+        40,
+        24
+      ],
+      "energy_mwh_per_day": 176,
+      "erc_errors": 3,
+      "battery_capacity_mah": 2000
+    }
+  },
+  "change_requests": [
+    {
+      "id": "CR-001",
+      "from_stage": "electronics",
+      "path": "budgets.electronics.bay_mm",
+      "requested": [
+        70,
+        40,
+        26
+      ],
+      "reason": "battery height 24 mm",
+      "status": "open"
+    },
+    {
+      "id": "CR-002",
+      "from_stage": "mechanical",
+      "path": "budgets.mechanical.mass_g",
+      "requested": 330,
+      "reason": "3.2 mm walls needed for R-004 add 18 g",
+      "status": "accepted"
+    },
+    {
+      "id": "CR-003",
+      "from_stage": "firmware",
+      "path": "budgets.firmware.ram_kb",
+      "requested": 128,
+      "reason": "FFT buffers at 4096 points",
+      "status": "rejected"
+    }
+  ]
+}

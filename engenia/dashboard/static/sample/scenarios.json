@@ -1,0 +1,71 @@
+{
+  "scenarios": [
+    {
+      "name": "calm_harbour",
+      "wave_height_m": 0.1,
+      "wave_period_s": 3.0,
+      "water_temp_c": 15.0,
+      "water_density": 1005.0,
+      "depth_m": 3.0,
+      "extra": {
+        "shipping_traffic": false
+      },
+      "rationale": "Baseline sheltered-harbour conditions: upright floating and the tilt limit must hold in light chop.",
+      "targets": [
+        "R-006",
+        "R-011"
+      ]
+    },
+    {
+      "name": "baltic_winter",
+      "wave_height_m": 0.5,
+      "wave_period_s": 4.5,
+      "water_temp_c": 2.0,
+      "water_density": 1003.0,
+      "depth_m": 5.0,
+      "extra": {
+        "air_temp_c": -10.0
+      },
+      "rationale": "Cold brackish water with short winter chop: the power budget and the metacentric height must hold at low temperature and density.",
+      "targets": [
+        "R-006",
+        "R-007",
+        "R-011"
+      ]
+    },
+    {
+      "name": "storm",
+      "wave_height_m": 2.0,
+      "wave_period_s": 8.0,
+      "water_temp_c": 12.0,
+      "water_density": 1005.0,
+      "depth_m": 6.0,
+      "extra": {
+        "wind_speed_ms": 20.0
+      },
+      "rationale": "Design storm in open water: the worst case for tilt limits and hull stress at depth.",
+      "targets": [
+        "R-006",
+        "R-011",
+        "R-012"
+      ]
+    },
+    {
+      "name": "flooded_bay",
+      "wave_height_m": 0.4,
+      "wave_period_s": 3.5,
+      "water_temp_c": 14.0,
+      "water_density": 1000.0,
+      "depth_m": 3.0,
+      "extra": {
+        "hull_flood_percent": 10.0
+      },
+      "rationale": "Hull partially flooded after a seal failure in a rain-swollen bay of fresh water: buoyancy margin, upright floating and hull stress degrade.",
+      "targets": [
+        "R-005",
+        "R-006",
+        "R-012"
+      ]
+    }
+  ]
+}

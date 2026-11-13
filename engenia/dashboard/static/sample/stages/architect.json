@@ -1,0 +1,12 @@
+{
+  "name": "architect",
+  "status": "done",
+  "facts": {
+    "budgets_written": true,
+    "pin_map": {
+      "HYDROPHONE_ADC": "GPIO34",
+      "LORA_CS": "GPIO5"
+    }
+  },
+  "verdicts": []
+}
