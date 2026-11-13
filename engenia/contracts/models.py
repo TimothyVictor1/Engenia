@@ -183,15 +183,21 @@ class Interface(_Model):
 
 
 class Verdict(_Model):
-    """One entry of build/<stage>/verdict.json (a list)."""
+    """One entry of build/<stage>/verdict.json (a list).
+
+    `requirement` is None for an internal consistency check that is not tied to one
+    requirement, such as an integration check or the gate canary.
+    `message` is a human-readable reason, used for fail and error results.
+    """
 
     check: str
-    requirement: str = Field(pattern=REQUIREMENT_ID_PATTERN)
+    requirement: str | None = Field(default=None, pattern=REQUIREMENT_ID_PATTERN)
     measured: float | None
     limit: Limit
     result: VerdictResult
     evidence_level: EvidenceLevel
     artifact: str | None = Field(default=None, pattern=SHA256_PATTERN)
+    message: str | None = None
 
 
 class CheckPlanItem(_Model):

@@ -199,3 +199,32 @@ def test_section_6_examples_validate():
 def test_contract_rejects_unknown_fields():
     with pytest.raises(ValidationError):
         Contract.model_validate({"version": 1, "surprise": True})
+
+
+VERDICT = {
+    "check": "buoyancy_margin",
+    "requirement": "R-005",
+    "measured": 0.27,
+    "limit": {"min": 0.20},
+    "result": "pass",
+    "evidence_level": "calculated",
+}
+
+
+def test_verdict_with_message_validates():
+    verdict = Verdict.model_validate(
+        {**VERDICT, "result": "fail", "measured": 0.1, "message": "margin 0.10 below min 0.20"}
+    )
+    assert verdict.message == "margin 0.10 below min 0.20"
+    assert Verdict.model_validate(VERDICT).message is None
+
+
+def test_verdict_without_requirement_validates():
+    data = {k: v for k, v in VERDICT.items() if k != "requirement"}
+    assert Verdict.model_validate(data).requirement is None
+    assert Verdict.model_validate({**VERDICT, "requirement": None}).requirement is None
+
+
+def test_verdict_rejects_bad_requirement():
+    with pytest.raises(ValidationError):
+        Verdict.model_validate({**VERDICT, "requirement": "X-1"})

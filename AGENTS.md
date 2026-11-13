@@ -96,10 +96,12 @@ Status values: `open`, `accepted`, `rejected`.
 ```json
 {"check": "buoyancy_margin", "requirement": "R-005", "measured": 0.27,
  "limit": {"min": 0.20}, "result": "pass", "evidence_level": "calculated",
- "artifact": "sha256:..."}
+ "artifact": "sha256:...", "message": null}
 ```
 
 `result` is `pass`, `fail` or `error`. `evidence_level` is `calculated`, `simulated` or `measured`.
+
+`message` is an optional human-readable reason, used for `fail` and `error` results. `requirement` is optional: `null` means an internal consistency check not tied to one requirement, such as an integration check or the gate canary.
 
 ### Stage contract (`engenia/stages/base.py`)
 
