@@ -96,7 +96,7 @@ def test_taller_battery_bay_increases_internal_volume(built):
     stage.generate(changed)
     stage.build(changed)
     original, taller = stage.interface(ctx), stage.interface(changed)
-    assert taller["battery_bay_mm"] == [70, 40, 26]
+    assert taller["battery_bay_mm"] == contract["budgets"]["electronics"]["bay_mm"]
     assert taller["internal_volume_cm3"] > original["internal_volume_cm3"]
     assert taller["bbox_mm"][2] == pytest.approx(original["bbox_mm"][2] + 4)
     assert hashes(changed) != hashes(ctx)
@@ -287,10 +287,12 @@ def test_invalid_parameters_fail_before_cad(updates):
         replace(params, **updates)
 
 
-@pytest.mark.parametrize("source,version", [("project", 9), ("default", 7), ("packaged", 1)])
+@pytest.mark.parametrize("source,version", [("project", 9), ("default", 7), ("packaged", None)])
 def test_interface_records_contract_version_used_for_generation(tmp_path, source, version):
     ctx = StageContext(root=tmp_path, project="version-fixture", stage="mechanical")
     contract = default_contract().model_dump(mode="json")
+    if source == "packaged":
+        version = contract["version"]
     contract["version"] = version
     path = ctx.contract_path if source == "project" else (
         tmp_path / "packs/buoy/default_contract.json"
