@@ -262,7 +262,7 @@ def test_old_outputs_do_not_survive_into_a_new_build(run, project_dir, edit):
 
 
 @pytest.mark.parametrize("phase", ["generate", "build"])
-def test_a_failing_stage_stops_the_run_and_is_not_cached(
+def test_a_failing_stage_blocks_its_dependants_and_is_not_cached(
     run, recorder, project_dir, fake_registry, phase
 ):
     registry = fake_registry({"mechanical": {"fail_in": phase}})
@@ -270,14 +270,15 @@ def test_a_failing_stage_stops_the_run_and_is_not_cached(
     with pytest.raises(PipelineError, match=f"stage mechanical failed in {phase}"):
         run(registry, on_result=seen.append)
     done = {r.stage for r in seen}
-    assert "architect" in done and "mechanical" not in done
-    assert not recorder.stages("build") & {"integration", "simulation", "final", "report"}
+    dependants = {"integration", "simulation", "final", "report"}
+    assert done == ALL - {"mechanical"} - dependants  # everything independent still ran
+    assert not recorder.stages("build") & dependants
 
     recorder.reset()
     registry = fake_registry()  # fixed
     results = run(registry)
     assert {r.stage for r in results} == ALL
-    assert recorder.count("build", "mechanical") == 1
+    assert recorder.stages("build") == {"mechanical"} | dependants
     assert recorder.count("build", "architect") == 0  # finished work stayed cached
 
 

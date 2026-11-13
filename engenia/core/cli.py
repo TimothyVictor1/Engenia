@@ -9,7 +9,8 @@ from pathlib import Path
 
 import typer
 
-from engenia.core.engine import StageResult, Status, run_pipeline
+from engenia.core.board import BoardError
+from engenia.core.engine import StageResult, Status, default_workers, execute
 from engenia.core.errors import CoreError
 from engenia.core.lint import Severity, lint_spec_dir, report_lines
 from engenia.core.paths import find_root
@@ -46,8 +47,15 @@ def lint(project: str) -> None:
 
 
 @app.command()
-def run(project: str) -> None:
-    """Run every stage serially in dependency order, rerunning only what changed."""
+def run(
+    project: str,
+    workers: int = typer.Option(
+        default_workers(), "--workers", "-j", min=1,
+        help="Stages to run at the same time. 1 runs them one by one.",
+    ),
+) -> None:
+    """Run every stage in dependency order, independent stages in parallel, rerunning only what
+    changed. A failed stage blocks only the stages that need it."""
     _project_dir(project)
 
     def show(result: StageResult) -> None:
@@ -55,16 +63,32 @@ def run(project: str) -> None:
         typer.echo(f"{label} {result.stage}")
 
     try:
-        results = run_pipeline(project, find_root(), on_result=show)
+        report = execute(project, find_root(), on_result=show, workers=workers)
     except SpecError as exc:
         for problem in exc.problems:
             typer.echo(f"error: {problem}", err=True)
         raise typer.Exit(1) from None
-    except CoreError as exc:
+    except (CoreError, BoardError) as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from None
-    ran = sum(r.status is Status.RAN for r in results)
-    typer.echo(f"done: {ran} ran, {len(results) - ran} from cache")
+    for decision in report.decisions:
+        typer.echo(f"{decision.status.value} {decision.id} ({decision.path}): {decision.reason}")
+    for name, why in report.failed.items():
+        typer.echo(f"FAIL {name}: {why}", err=True)
+    for name, causes in report.blocked.items():
+        typer.echo(f"blocked {name}: needs failed {', '.join(causes)}", err=True)
+    if report.mismatches:
+        typer.echo(f"{len(report.mismatches)} interface mismatch(es): see build/mismatches.json")
+    if report.contract_changed:
+        typer.echo("the contract changed: run again so the stages that read it rebuild")
+    ran = sum(r.status is Status.RAN for r in report.results)
+    typer.echo(f"done: {ran} ran, {len(report.results) - ran} from cache")
+    if report.failed:
+        typer.echo(
+            f"run {report.run_id} failed: {len(report.failed)} failed, "
+            f"{len(report.blocked)} blocked", err=True,
+        )
+        raise typer.Exit(1)
 
 
 @app.command()

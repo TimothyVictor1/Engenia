@@ -1,4 +1,14 @@
-"""The serial pipeline: key every stage, use the cache, run only what changed.
+"""The pipeline: key every stage, use the cache, run only what changed, run independent stages
+side by side.
+
+Stages run on a small thread pool (scheduler.py) and start only when everything they need has
+finished. A stage that fails blocks the stages that depend on it, directly or through others;
+every other stage carries on. The run is recorded in .engenia/run.db (runstate.py). Change
+requests from the stages are decided before the run starts and after it ends (board.py), and
+build/mismatches.json lists where the stages' interfaces disagree (mismatches.py).
+
+Parallel and serial runs write byte-identical files: a stage reads only its own inputs and its
+upstream stages' finished interface.json, and writes only its own src/ and build/ directories.
 
 For each stage, in dependency order:
 
@@ -27,17 +37,21 @@ propagation.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
 from engenia.contracts.models import Interface, StageContext
-from engenia.core import graph, spec
+from engenia.core import board, graph, spec
 from engenia.core.cache import Cache, default_store
 from engenia.core.errors import CoreError
 from engenia.core.hashing import StageKeys, compute_keys, tree_files, tree_hash
+from engenia.core.mismatches import write_mismatches
+from engenia.core.runstate import RunStore
+from engenia.core.scheduler import Hooks, schedule
 from engenia.stages.base import Stage
 
 MARKER_DIR = ".generated-from"
@@ -52,6 +66,16 @@ _NOT_OUTPUTS = (INTERFACE_FILE, VERDICT_FILE, TRANSCRIPTS_DIR)
 
 class PipelineError(CoreError):
     """A stage's own code (generate, build or interface) failed."""
+
+    stage_key: str | None = None  # the key the stage was running under, when it got that far
+
+
+class RunFailed(PipelineError):
+    """A run finished but some stages failed. Everything that could run did; see `report`."""
+
+    def __init__(self, message: str, report: RunReport) -> None:
+        super().__init__(message)
+        self.report = report
 
 
 class Status(StrEnum):
@@ -124,6 +148,14 @@ def _write_build_files(stage: Stage, ctx: StageContext) -> None:
 
 def _run_stage(stage: Stage, ctx: StageContext, cache: Cache) -> StageResult:
     keys: StageKeys = compute_keys(stage, ctx)
+    try:
+        return _run_keyed(stage, ctx, cache, keys)
+    except PipelineError as exc:
+        exc.stage_key = getattr(exc, "stage_key", None) or keys.stage_key
+        raise
+
+
+def _run_keyed(stage: Stage, ctx: StageContext, cache: Cache, keys: StageKeys) -> StageResult:
 
     generated = False
     state = _src_state(ctx, keys.input_key)
@@ -155,6 +187,106 @@ def _run_stage(stage: Stage, ctx: StageContext, cache: Cache) -> StageResult:
     return StageResult(stage.name, status, generated, built, keys.stage_key)
 
 
+@dataclass
+class RunReport:
+    run_id: int
+    results: list[StageResult]  # stages that finished, in dependency order
+    failed: dict[str, str]  # stage -> why
+    blocked: dict[str, list[str]]  # stage -> the failed stages it was waiting for
+    decisions: list[board.Decision]  # change requests decided before and after the run
+    mismatches: list[dict]
+    errors: dict[str, Exception] = field(default_factory=dict)  # stage -> the exception itself
+
+    @property
+    def ok(self) -> bool:
+        return not self.failed
+
+    @property
+    def contract_changed(self) -> bool:
+        return any(d.status.value == "accepted" for d in self.decisions)
+
+
+def default_workers() -> int:
+    return max(1, min(os.cpu_count() or 1, 4))
+
+
+def _failure_message(stage: str, exc: Exception) -> str:
+    return str(exc) if isinstance(exc, PipelineError) else f"stage {stage} failed: {exc}"
+
+
+def execute(
+    project: str,
+    root: Path,
+    *,
+    registry: graph.Registry | None = None,
+    store: Path | None = None,
+    on_result: Callable[[StageResult], None] | None = None,
+    workers: int | None = None,
+) -> RunReport:
+    """Run every stage of `project`, up to `workers` at a time, and report what happened.
+
+    A failing stage does not stop the run: its dependants are blocked and the rest carry on.
+    Stage failures are in the report. Raises SpecError, GraphError or BoardError for problems
+    found before any stage runs.
+    """
+    root = Path(root)
+    reg = registry if registry is not None else _default_registry()
+    order = graph.topo_order(reg)
+    spec.load_spec(root / "projects" / project / "spec")  # fail early on a broken spec
+    cache = Cache(store if store is not None else default_store(root))
+    decisions = board.process_change_requests(root, project)  # before anything reads the contract
+
+    state = RunStore(root)
+    try:
+        run_id = state.start_run(project, order)
+        failed: dict[str, str] = {}
+
+        def work(name: str) -> StageResult:
+            ctx = StageContext(project=project, stage=name, root=root)
+            return _run_stage(reg[name], ctx, cache)
+
+        def done(name: str, result: StageResult) -> None:
+            status = "done" if result.status is Status.RAN else "cached"
+            state.stage_finished(run_id, name, status, key=result.key)
+            if on_result:
+                on_result(result)
+
+        def fail(name: str, exc: Exception) -> None:
+            message = _failure_message(name, exc)
+            failed[name] = message
+            state.stage_finished(
+                run_id, name, "failed", key=getattr(exc, "stage_key", None), message=message
+            )
+
+        def block(name: str, causes: list[str]) -> None:
+            state.stage_blocked(run_id, name, "blocked by failed stage " + ", ".join(causes))
+
+        hooks = Hooks(
+            started=lambda name: state.stage_started(run_id, name),
+            done=done, failed=fail, blocked=block,
+        )
+        outcome = schedule(
+            order, reg, work, workers=workers or default_workers(), hooks=hooks
+        )
+        state.finish_run(run_id, "failed" if failed else "done")
+    finally:
+        state.close()
+
+    decisions += board.process_change_requests(root, project)  # what the stages asked for
+    mismatches = write_mismatches(
+        root / "projects" / project / "build", board.load_contract(root, project)
+    )
+    return RunReport(
+        run_id=run_id,
+        results=[outcome.done[name] for name in order if name in outcome.done],
+        failed={name: failed[name] for name in order if name in failed},
+        blocked={name: outcome.blocked[name] for name in order if name in outcome.blocked},
+        decisions=decisions,
+        mismatches=mismatches,
+        errors={name: outcome.failed[name] for name in order if name in outcome.failed},
+    )
+
+
 def run_pipeline(
     project: str,
     root: Path,
@@ -162,26 +294,25 @@ def run_pipeline(
     registry: graph.Registry | None = None,
     store: Path | None = None,
     on_result: Callable[[StageResult], None] | None = None,
+    workers: int | None = None,
 ) -> list[StageResult]:
-    """Run every stage of `project` serially, in dependency order, stopping at the first failure.
+    """Run every stage of `project` (see `execute`) and return the results in dependency order.
 
-    Raises SpecError, GraphError, HashError, CacheError or PipelineError (all CoreError).
-    `on_result` is called after each stage so a caller can show progress.
+    If any stage failed, everything that could still run has run, and RunFailed is raised
+    (its `report` has the full picture). Raises SpecError, GraphError, BoardError, HashError or
+    CacheError for problems found before any stage runs.
     """
-    root = Path(root)
-    reg = registry if registry is not None else _default_registry()
-    order = graph.topo_order(reg)
-    spec.load_spec(root / "projects" / project / "spec")  # fail early on a broken spec
-    cache = Cache(store if store is not None else default_store(root))
-
-    results = []
-    for name in order:
-        ctx = StageContext(project=project, stage=name, root=root)
-        result = _run_stage(reg[name], ctx, cache)
-        results.append(result)
-        if on_result:
-            on_result(result)
-    return results
+    report = execute(
+        project, root, registry=registry, store=store, on_result=on_result, workers=workers
+    )
+    if report.failed:
+        blocked = sorted(report.blocked)
+        message = "; ".join(report.failed.values())
+        if blocked:
+            message += f" (not run, because they need a failed stage: {', '.join(blocked)})"
+        first = next(iter(report.errors.values()))
+        raise RunFailed(message, report) from (first.__cause__ or first)
+    return report.results
 
 
 def _default_registry() -> graph.Registry:

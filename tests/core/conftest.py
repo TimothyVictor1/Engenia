@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import shutil
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -98,6 +100,8 @@ class FakeStage:
         writes_code: bool = True,
         fail_in: str | None = None,
         transcripts: bool = False,
+        delay: float = 0.0,
+        barrier: threading.Barrier | None = None,
     ) -> None:
         self.name = name
         self.needs = needs
@@ -107,6 +111,8 @@ class FakeStage:
         self.writes_code = writes_code
         self.fail_in = fail_in
         self.transcripts = transcripts
+        self.delay = delay
+        self.barrier = barrier  # build waits here: only passes if its peers build at the same time
 
     def generate(self, ctx: StageContext) -> None:
         self.recorder.add("generate", self.name)
@@ -120,6 +126,10 @@ class FakeStage:
         self.recorder.add("build", self.name)
         if self.fail_in == "build":
             raise RuntimeError("tool crashed")
+        if self.barrier is not None:
+            self.barrier.wait()
+        if self.delay:
+            time.sleep(self.delay)
         ctx.build_dir.mkdir(parents=True, exist_ok=True)
         code = ctx.src_dir / "code.txt"
         text = code.read_text(encoding="utf-8") if code.exists() else "no code\n"
