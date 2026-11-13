@@ -90,6 +90,7 @@ class StageResult:
     generated: bool
     built: bool
     key: str
+    resumed: bool = False  # skipped because an earlier, interrupted run had already finished it
 
 
 class _Src(StrEnum):
@@ -195,6 +196,7 @@ class RunReport:
     blocked: dict[str, list[str]]  # stage -> the failed stages it was waiting for
     decisions: list[board.Decision]  # change requests decided before and after the run
     mismatches: list[dict]
+    resumed_run: bool = False  # this run continued an earlier one (see `resume`)
     errors: dict[str, Exception] = field(default_factory=dict)  # stage -> the exception itself
 
     @property
@@ -222,8 +224,16 @@ def execute(
     store: Path | None = None,
     on_result: Callable[[StageResult], None] | None = None,
     workers: int | None = None,
+    resume: bool = False,
+    run_id: int | None = None,
 ) -> RunReport:
     """Run every stage of `project`, up to `workers` at a time, and report what happened.
+
+    `resume` continues the newest run of the project that did not finish cleanly (stage_run in
+    .engenia/run.db): a stage it finished (done or cached) is skipped when its key is still the
+    same and its build is still there; every other stage, including one that was interrupted
+    mid-run, is started again and its attempt count goes up. With no such run, a new one starts.
+    `run_id` continues that exact run instead (the repair loop uses it to keep one run row).
 
     A failing stage does not stop the run: its dependants are blocked and the rest carry on.
     Stage failures are in the report. Raises SpecError, GraphError or BoardError for problems
@@ -238,22 +248,50 @@ def execute(
 
     state = RunStore(root)
     try:
-        run_id = state.start_run(project, order)
+        if run_id is None and resume:
+            run_id = state.latest_unfinished(project)
+        kept: dict[str, dict] = {}
+        continued = run_id is not None
+        if run_id is not None:
+            kept = state.reopen_run(run_id, order)
+        else:
+            run_id = state.start_run(project, order)
         failed: dict[str, str] = {}
+        skipped: set[str] = set()  # added by worker threads; set.add is atomic
 
         def work(name: str) -> StageResult:
             ctx = StageContext(project=project, stage=name, root=root)
+            if name in kept:
+                try:
+                    key = compute_keys(reg[name], ctx).stage_key
+                except CoreError:
+                    key = None  # the normal path reports what is wrong
+                if key == kept[name]["key"] and ctx.stage_interface_path(name).is_file():
+                    skipped.add(name)
+                    return StageResult(name, Status.CACHED, False, False, key, resumed=True)
             return _run_stage(reg[name], ctx, cache)
 
+        def started(name: str) -> None:
+            if name not in kept:
+                state.stage_started(run_id, name)
+
+        def restarted(name: str) -> None:
+            # A stage kept from the earlier run that could not be skipped: it runs again.
+            if name in kept and name not in skipped:
+                state.stage_started(run_id, name)
+
         def done(name: str, result: StageResult) -> None:
-            status = "done" if result.status is Status.RAN else "cached"
-            state.stage_finished(run_id, name, status, key=result.key)
+            if name not in skipped:
+                restarted(name)
+                status = "done" if result.status is Status.RAN else "cached"
+                state.stage_finished(run_id, name, status, key=result.key)
             if on_result:
                 on_result(result)
 
         def fail(name: str, exc: Exception) -> None:
             message = _failure_message(name, exc)
             failed[name] = message
+            restarted(name)
             state.stage_finished(
                 run_id, name, "failed", key=getattr(exc, "stage_key", None), message=message
             )
@@ -262,7 +300,7 @@ def execute(
             state.stage_blocked(run_id, name, "blocked by failed stage " + ", ".join(causes))
 
         hooks = Hooks(
-            started=lambda name: state.stage_started(run_id, name),
+            started=started,
             done=done, failed=fail, blocked=block,
         )
         outcome = schedule(
@@ -283,6 +321,7 @@ def execute(
         blocked={name: outcome.blocked[name] for name in order if name in outcome.blocked},
         decisions=decisions,
         mismatches=mismatches,
+        resumed_run=continued,
         errors={name: outcome.failed[name] for name in order if name in outcome.failed},
     )
 
@@ -295,6 +334,7 @@ def run_pipeline(
     store: Path | None = None,
     on_result: Callable[[StageResult], None] | None = None,
     workers: int | None = None,
+    resume: bool = False,
 ) -> list[StageResult]:
     """Run every stage of `project` (see `execute`) and return the results in dependency order.
 
@@ -303,7 +343,8 @@ def run_pipeline(
     CacheError for problems found before any stage runs.
     """
     report = execute(
-        project, root, registry=registry, store=store, on_result=on_result, workers=workers
+        project, root, registry=registry, store=store, on_result=on_result, workers=workers,
+        resume=resume,
     )
     if report.failed:
         blocked = sorted(report.blocked)
