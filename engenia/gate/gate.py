@@ -311,6 +311,10 @@ def _canary(root: Path, name: str) -> str | None:
         contract = scratch / "projects" / "_canary" / "contract" / "contract.json"
         contract.parent.mkdir(parents=True)
         contract.write_text(json.dumps(CONTRACT), encoding="utf-8")
+        for relative, data in case.files.items():
+            path = scratch / "projects" / "_canary" / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(yaml.safe_dump(data), encoding="utf-8")
         try:
             run = _load_verifier(root, name)
             ctx = CheckContext(

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from engenia.contracts.models import CheckContext, Limit
 
@@ -26,6 +27,18 @@ def write_interface(tmp_path):
             tmp_path / "projects" / PROJECT / "build" / stage / "interface.json",
             {"stage": stage, "key": INTERFACE_KEY, "facts": facts},
         )
+
+    return _write
+
+
+@pytest.fixture
+def write_measurements(tmp_path):
+    """Write projects/demo/measurements.yaml, the file `engenia measure` records."""
+
+    def _write(data: dict[str, Any]) -> None:
+        path = tmp_path / "projects" / PROJECT / "measurements.yaml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(yaml.safe_dump(data), encoding="utf-8")
 
     return _write
 
