@@ -1,0 +1,15 @@
+- id: C-001
+  requirement: R-001
+  check: mass_budget
+  params: {}
+  limit: {max: 400}
+- id: C-002
+  requirement: R-002
+  check: wall_thickness_min
+  params: {}
+  limit: {min: 3}
+- id: C-003
+  requirement: R-003
+  check: detection_rate
+  params: {}
+  limit: {min: 0.9}

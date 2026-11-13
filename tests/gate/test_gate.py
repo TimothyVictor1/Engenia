@@ -38,8 +38,8 @@ def test_clean_project_passes_and_unverified_is_reported(root, registry, project
     assert result.passed, result.report["gates"]
     assert result.exit_code == 0
     assert result.report["unverified"] == [
-        {"requirement": "R-003", "check": "detection_rate", "status": "unverified",
-         "reason": "no verifier verifiers/detection_rate.py yet"}
+        {"requirement": "R-003", "check": "flow_drag", "status": "unverified",
+         "reason": "no verifier verifiers/flow_drag.py yet"}
     ]
     assert {v["requirement"] for v in result.report["verdicts"]} == {"R-001", "R-002"}
     saved = json.loads((project_dir / "build" / "gate" / "report.json").read_text())

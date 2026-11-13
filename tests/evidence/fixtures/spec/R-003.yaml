@@ -1,0 +1,10 @@
+id: R-003
+statement: The firmware shall detect a 200 Hz tone with a detection rate of at least 0.9.
+value: 0.9
+unit: ratio
+verify:
+  method: analysis
+  check: detection_rate
+  limit: {min: 0.9}
+affects: [firmware]
+status: approved

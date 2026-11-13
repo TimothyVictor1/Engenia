@@ -1,0 +1,1 @@
+{"stage": "electronics", "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "facts": {"mass_g": 100.0, "board_mm": [60.0, 35.0, 15.0], "battery_mm": [50.0, 30.0, 20.0], "board_holes_mm": [[3, 3], [67, 3], [3, 37], [67, 37]], "pins_used": {"HYDROPHONE_ADC": "GPIO34", "LORA_CS": "GPIO5"}, "contract_version": 1}}

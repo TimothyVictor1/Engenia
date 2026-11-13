@@ -43,7 +43,7 @@ def root(tmp_path: Path) -> Path:
     reqs = [
         requirement(1, "mass_budget", {"max": 400}),
         requirement(2, "print_bed_fit", {"equals": 1}),
-        requirement(3, "detection_rate", {"min": 0.9}),  # no verifier yet
+        requirement(3, "flow_drag", {"min": 0.9}),  # no verifier yet
         requirement(4, "wall_thickness_min", {"min": 3}, status="draft"),
     ]
     for req in reqs:

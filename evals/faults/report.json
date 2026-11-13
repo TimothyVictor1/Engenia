@@ -1,0 +1,66 @@
+{
+  "caught": 10,
+  "total": 10,
+  "faults": [
+    {
+      "fault": "F01",
+      "expected_check": "wall_thickness_min",
+      "caught": true,
+      "message": "measured 1.0 below min 3.0"
+    },
+    {
+      "fault": "F02",
+      "expected_check": "battery_capacity",
+      "caught": true,
+      "message": "measured 0.33333333333333337 below min 7.0"
+    },
+    {
+      "fault": "F03",
+      "expected_check": "print_bed_fit",
+      "caught": true,
+      "message": "bbox [260.0, 100.0, 100.0] mm does not fit bed [160.0, 160.0, 220.0] mm in any axis-aligned orientation"
+    },
+    {
+      "fault": "F04",
+      "expected_check": "mass_budget",
+      "caught": true,
+      "message": "measured 450.0 above max 400.0"
+    },
+    {
+      "fault": "F05",
+      "expected_check": "buoyancy_margin",
+      "caught": true,
+      "message": "measured -0.74875 below min 0.2"
+    },
+    {
+      "fault": "F06",
+      "expected_check": "erc_clean",
+      "caught": true,
+      "message": "2 ERC error(s) reported"
+    },
+    {
+      "fault": "F07",
+      "expected_check": "bay_fit",
+      "caught": true,
+      "message": "board [100.0, 100.0, 10.0] mm do not fit battery bay [70.0, 40.0, 22.0] mm in any axis-aligned orientation"
+    },
+    {
+      "fault": "F08",
+      "expected_check": "int_pins_match",
+      "caught": true,
+      "message": "int_pins_match: mismatch"
+    },
+    {
+      "fault": "F09",
+      "expected_check": "detection_rate",
+      "caught": true,
+      "message": "measured 0.5 below min 0.9"
+    },
+    {
+      "fault": "F10",
+      "expected_check": "mass_budget",
+      "caught": true,
+      "message": "result pass but measured 450.0 against limit {'max': 400.0} gives fail"
+    }
+  ]
+}

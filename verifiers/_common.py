@@ -26,13 +26,23 @@ class MissingInput(Exception):
     """A required build input is absent, unreadable, or not usable."""
 
 
-def _read_json(path: Path, label: str) -> Any:
+def _read_json(path: Path, label: str, shown: str | None = None) -> Any:
+    """Read one JSON file, raising :class:`MissingInput` that names it as ``shown``."""
+    where = shown if shown is not None else str(path)
     if not path.is_file():
-        raise MissingInput(f"missing {label}: {path}")
+        raise MissingInput(f"missing {label}: {where}")
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise MissingInput(f"cannot read {label} {path}: {exc}") from exc
+        raise MissingInput(f"cannot read {label} {where}: {exc}") from exc
+
+
+def _shown_path(ctx: CheckContext, path: Path) -> str:
+    """Paths in messages are project-relative, so the text does not change between roots."""
+    try:
+        return str(path.relative_to(ctx.root))
+    except ValueError:
+        return str(path)
 
 
 def read_interface(ctx: CheckContext, stage: str | None = None) -> dict[str, Any]:
@@ -43,7 +53,7 @@ def read_interface(ctx: CheckContext, stage: str | None = None) -> dict[str, Any
     """
     name = stage or ctx.stage
     path = ctx.stage_interface_path(name)
-    data = _read_json(path, f"{name} interface")
+    data = _read_json(path, f"{name} interface", _shown_path(ctx, path))
     if not isinstance(data, dict):
         raise MissingInput(f"{name} interface {path} must contain a JSON object")
     facts = data.get("facts")
@@ -62,7 +72,9 @@ def try_read_interface(ctx: CheckContext, stage: str | None = None) -> dict[str,
 
 def read_contract(ctx: CheckContext) -> dict[str, Any]:
     """Read and return ``contract/contract.json`` for the current project."""
-    data = _read_json(ctx.contract_path, "contract.json")
+    data = _read_json(
+        ctx.contract_path, "contract.json", _shown_path(ctx, ctx.contract_path)
+    )
     if not isinstance(data, dict):
         raise MissingInput(f"contract.json {ctx.contract_path} must contain a JSON object")
     return data
@@ -239,6 +251,27 @@ def comparison_message(measured: float, limit: Limit | Mapping[str, Any] | Any) 
     return f"measured {measured} " + ", ".join(reasons)
 
 
+def _verdict_with_level(
+    ctx: CheckContext,
+    measured: float | None,
+    result: VerdictResult,
+    evidence_level: EvidenceLevel,
+    *,
+    limit: Limit | None = None,
+    message: str | None = None,
+) -> Verdict:
+    """Build a verdict using ``ctx`` for the check identity."""
+    return Verdict(
+        check=ctx.check,
+        requirement=ctx.requirement,
+        measured=None if measured is None else float(measured),
+        limit=limit if limit is not None else ctx.limit,
+        result=result,
+        evidence_level=evidence_level,
+        message=message,
+    )
+
+
 def calculated_verdict(
     ctx: CheckContext,
     measured: float | None,
@@ -248,14 +281,22 @@ def calculated_verdict(
     message: str | None = None,
 ) -> Verdict:
     """Build a ``calculated`` verdict using ``ctx`` for the check identity."""
-    return Verdict(
-        check=ctx.check,
-        requirement=ctx.requirement,
-        measured=None if measured is None else float(measured),
-        limit=limit if limit is not None else ctx.limit,
-        result=result,
-        evidence_level=EvidenceLevel.CALCULATED,
-        message=message,
+    return _verdict_with_level(
+        ctx, measured, result, EvidenceLevel.CALCULATED, limit=limit, message=message
+    )
+
+
+def simulated_verdict(
+    ctx: CheckContext,
+    measured: float | None,
+    result: VerdictResult,
+    *,
+    limit: Limit | None = None,
+    message: str | None = None,
+) -> Verdict:
+    """Build a ``simulated`` verdict: the measured value comes from a simulation job."""
+    return _verdict_with_level(
+        ctx, measured, result, EvidenceLevel.SIMULATED, limit=limit, message=message
     )
 
 
@@ -270,6 +311,19 @@ def checked_verdict(
     result = compare(measured, selected)
     message = None if result == VerdictResult.PASS else comparison_message(measured, selected)
     return calculated_verdict(ctx, measured, result, limit=selected, message=message)
+
+
+def checked_simulated_verdict(
+    ctx: CheckContext,
+    measured: float,
+    *,
+    limit: Limit | None = None,
+) -> Verdict:
+    """Like :func:`checked_verdict`, but with ``evidence_level`` "simulated"."""
+    selected = limit if limit is not None else ctx.limit
+    result = compare(measured, selected)
+    message = None if result == VerdictResult.PASS else comparison_message(measured, selected)
+    return simulated_verdict(ctx, measured, result, limit=selected, message=message)
 
 
 def error_verdict(ctx: CheckContext, message: str) -> Verdict:

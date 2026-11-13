@@ -1,0 +1,1 @@
+[{"check": "mass_budget", "requirement": "R-001", "measured": 450.0, "limit": {"max": 400.0}, "result": "pass", "evidence_level": "calculated", "artifact": null, "message": null}]

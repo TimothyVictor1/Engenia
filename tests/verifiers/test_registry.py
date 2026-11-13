@@ -14,6 +14,10 @@ EXPECTED = {
     "battery_capacity",
     "erc_clean",
     "bay_fit",
+    "detection_rate",
+    "false_alarm_rate",
+    "wave_tilt",
+    "stress_safety_factor",
 }
 
 

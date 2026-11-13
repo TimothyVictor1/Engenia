@@ -414,3 +414,340 @@ def test_bay_fit_missing_battery_size(write_interface, make_ctx):
         )
     )
     assert verdict.result == "error"
+
+
+def test_detection_rate_pass(write_interface, make_ctx):
+    write_interface("firmware", {"detection_rate": 0.92})
+    verdict = load("detection_rate")(
+        make_ctx(
+            stage="firmware",
+            check="detection_rate",
+            requirement="R-009",
+            limit=Limit(min=0.9),
+        )
+    )
+    assert verdict.result == "pass"
+    assert verdict.measured == 0.92
+
+
+def test_detection_rate_fail(write_interface, make_ctx):
+    write_interface("firmware", {"detection_rate": 0.5})
+    verdict = load("detection_rate")(
+        make_ctx(
+            stage="firmware",
+            check="detection_rate",
+            requirement="R-009",
+            limit=Limit(min=0.9),
+        )
+    )
+    assert verdict.result == "fail"
+    assert verdict.measured == 0.5
+    assert "0.5" in (verdict.message or "")
+
+
+def test_detection_rate_missing_fact(write_interface, make_ctx):
+    write_interface("firmware", {"false_alarms_per_hour": 1.0})
+    verdict = load("detection_rate")(
+        make_ctx(
+            stage="firmware",
+            check="detection_rate",
+            requirement="R-009",
+            limit=Limit(min=0.9),
+        )
+    )
+    assert verdict.result == "error"
+    assert "no 'detection_rate' fact" in (verdict.message or "")
+
+
+@pytest.mark.parametrize("rate", [-0.1, 1.4])
+def test_detection_rate_out_of_range_is_an_error(write_interface, make_ctx, rate):
+    write_interface("firmware", {"detection_rate": rate})
+    verdict = load("detection_rate")(
+        make_ctx(
+            stage="firmware",
+            check="detection_rate",
+            requirement="R-009",
+            limit=Limit(min=0.9),
+        )
+    )
+    assert verdict.result == "error"
+    assert "within [0, 1]" in (verdict.message or "")
+
+
+def test_false_alarm_rate_pass(write_interface, make_ctx):
+    write_interface("firmware", {"false_alarms_per_hour": 1.5})
+    verdict = load("false_alarm_rate")(
+        make_ctx(
+            stage="firmware",
+            check="false_alarm_rate",
+            requirement="R-010",
+            limit=Limit(max=2),
+        )
+    )
+    assert verdict.result == "pass"
+    assert verdict.measured == 1.5
+
+
+def test_false_alarm_rate_fail(write_interface, make_ctx):
+    write_interface("firmware", {"false_alarms_per_hour": 3.0})
+    verdict = load("false_alarm_rate")(
+        make_ctx(
+            stage="firmware",
+            check="false_alarm_rate",
+            requirement="R-010",
+            limit=Limit(max=2),
+        )
+    )
+    assert verdict.result == "fail"
+    assert verdict.measured == 3.0
+
+
+def test_false_alarm_rate_missing_fact(make_ctx):
+    verdict = load("false_alarm_rate")(
+        make_ctx(
+            stage="firmware",
+            check="false_alarm_rate",
+            requirement="R-010",
+            limit=Limit(max=2),
+        )
+    )
+    assert verdict.result == "error"
+
+
+def test_false_alarm_rate_negative_is_an_error(write_interface, make_ctx):
+    write_interface("firmware", {"false_alarms_per_hour": -1.0})
+    verdict = load("false_alarm_rate")(
+        make_ctx(
+            stage="firmware",
+            check="false_alarm_rate",
+            requirement="R-010",
+            limit=Limit(max=2),
+        )
+    )
+    assert verdict.result == "error"
+    assert "cannot be negative" in (verdict.message or "")
+
+
+def test_wave_tilt_pass_on_fallback_scenarios(write_interface, make_ctx):
+    write_interface(
+        "simulation",
+        {
+            "scenarios": {
+                "calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 8.0},
+                "baltic_winter": {"wave_height_m": 1.5, "max_tilt_deg": 20.0},
+            }
+        },
+    )
+    verdict = load("wave_tilt")(
+        make_ctx(
+            stage="simulation",
+            check="wave_tilt",
+            requirement="R-011",
+            limit=Limit(max=30),
+        )
+    )
+    assert verdict.result == "pass"
+    assert verdict.measured == 20.0  # the worse of the two judged scenarios
+    assert verdict.evidence_level == "simulated"
+
+
+def test_wave_tilt_fail_on_fallback_scenarios(write_interface, make_ctx):
+    write_interface(
+        "simulation",
+        {
+            "scenarios": {
+                "calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 8.0},
+                "baltic_winter": {"wave_height_m": 1.5, "max_tilt_deg": 45.0},
+            }
+        },
+    )
+    verdict = load("wave_tilt")(
+        make_ctx(
+            stage="simulation",
+            check="wave_tilt",
+            requirement="R-011",
+            limit=Limit(max=30),
+        )
+    )
+    assert verdict.result == "fail"
+    assert verdict.measured == 45.0
+    assert verdict.evidence_level == "simulated"
+
+
+def test_wave_tilt_condition_selects_matching_scenarios(write_interface, make_ctx):
+    """With a wave-height condition, harsher scenarios are not judged (and cannot fail it)."""
+    write_interface(
+        "simulation",
+        {
+            "scenarios": {
+                "calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 10.0},
+                "baltic_winter": {"wave_height_m": 1.5, "max_tilt_deg": 20.0},
+                "storm": {"wave_height_m": 4.0, "max_tilt_deg": 50.0},
+            }
+        },
+    )
+    verdict = load("wave_tilt")(
+        make_ctx(
+            stage="simulation",
+            check="wave_tilt",
+            requirement="R-011",
+            params={"wave_height_m": 0.5},
+            limit=Limit(max=30),
+        )
+    )
+    assert verdict.result == "pass"
+    assert verdict.measured == 10.0
+
+
+def test_wave_tilt_condition_with_no_matching_scenario(write_interface, make_ctx):
+    write_interface(
+        "simulation",
+        {"scenarios": {"storm": {"wave_height_m": 4.0, "max_tilt_deg": 50.0}}},
+    )
+    verdict = load("wave_tilt")(
+        make_ctx(
+            stage="simulation",
+            check="wave_tilt",
+            requirement="R-011",
+            params={"wave_height_m": 0.5},
+            limit=Limit(max=30),
+        )
+    )
+    assert verdict.result == "error"
+    assert "no scenario with wave height at most 0.5" in (verdict.message or "")
+
+
+def test_wave_tilt_condition_requires_scenario_wave_height(write_interface, make_ctx):
+    write_interface(
+        "simulation",
+        {
+            "scenarios": {
+                "calm_harbour": {"max_tilt_deg": 10.0},
+                "baltic_winter": {"wave_height_m": 1.5, "max_tilt_deg": 20.0},
+            }
+        },
+    )
+    verdict = load("wave_tilt")(
+        make_ctx(
+            stage="simulation",
+            check="wave_tilt",
+            requirement="R-011",
+            params={"wave_height_m": 0.5},
+            limit=Limit(max=30),
+        )
+    )
+    assert verdict.result == "error"
+    assert "calm_harbour" in (verdict.message or "") and "wave_height_m" in (
+        verdict.message or ""
+    )
+
+
+def test_wave_tilt_missing_scenarios_fact(write_interface, make_ctx):
+    write_interface("simulation", {"safety_factor": 2.5})
+    verdict = load("wave_tilt")(
+        make_ctx(
+            stage="simulation",
+            check="wave_tilt",
+            requirement="R-011",
+            limit=Limit(max=30),
+        )
+    )
+    assert verdict.result == "error"
+    assert "no 'scenarios' fact" in (verdict.message or "")
+
+
+def test_wave_tilt_missing_fallback_scenario(write_interface, make_ctx):
+    write_interface(
+        "simulation",
+        {"scenarios": {"calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 8.0}}},
+    )
+    verdict = load("wave_tilt")(
+        make_ctx(
+            stage="simulation",
+            check="wave_tilt",
+            requirement="R-011",
+            limit=Limit(max=30),
+        )
+    )
+    assert verdict.result == "error"
+    assert "baltic_winter" in (verdict.message or "")
+
+
+def test_wave_tilt_scenario_without_tilt(write_interface, make_ctx):
+    write_interface(
+        "simulation",
+        {
+            "scenarios": {
+                "calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 8.0},
+                "baltic_winter": {"wave_height_m": 1.5},
+            }
+        },
+    )
+    verdict = load("wave_tilt")(
+        make_ctx(
+            stage="simulation",
+            check="wave_tilt",
+            requirement="R-011",
+            limit=Limit(max=30),
+        )
+    )
+    assert verdict.result == "error"
+    assert "baltic_winter" in (verdict.message or "") and "max_tilt_deg" in (
+        verdict.message or ""
+    )
+
+
+def test_stress_safety_factor_pass(write_interface, make_ctx):
+    write_interface("simulation", {"safety_factor": 2.5})
+    verdict = load("stress_safety_factor")(
+        make_ctx(
+            stage="simulation",
+            check="stress_safety_factor",
+            requirement="R-012",
+            limit=Limit(min=2),
+        )
+    )
+    assert verdict.result == "pass"
+    assert verdict.measured == 2.5
+    assert verdict.evidence_level == "simulated"
+
+
+def test_stress_safety_factor_fail(write_interface, make_ctx):
+    write_interface("simulation", {"safety_factor": 1.2})
+    verdict = load("stress_safety_factor")(
+        make_ctx(
+            stage="simulation",
+            check="stress_safety_factor",
+            requirement="R-012",
+            limit=Limit(min=2),
+        )
+    )
+    assert verdict.result == "fail"
+    assert verdict.measured == 1.2
+    assert verdict.evidence_level == "simulated"
+
+
+def test_stress_safety_factor_missing_fact(make_ctx):
+    verdict = load("stress_safety_factor")(
+        make_ctx(
+            stage="simulation",
+            check="stress_safety_factor",
+            requirement="R-012",
+            limit=Limit(min=2),
+        )
+    )
+    assert verdict.result == "error"
+
+
+def test_stress_safety_factor_non_positive_is_an_error(write_interface, make_ctx):
+    write_interface("simulation", {"safety_factor": 0.0})
+    verdict = load("stress_safety_factor")(
+        make_ctx(
+            stage="simulation",
+            check="stress_safety_factor",
+            requirement="R-012",
+            limit=Limit(min=2),
+        )
+    )
+    assert verdict.result == "error"
+    assert "must be positive" in (verdict.message or "")
