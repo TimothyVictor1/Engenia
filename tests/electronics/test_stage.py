@@ -155,6 +155,12 @@ def test_build_pins_power_bom_and_repeatability(tmp_path):
     stage.build(other)
     assert (other.build_dir / "circuit.net").read_bytes() == first
     assert stage.interface(other) == interface
+    assert (other.build_dir / "build.log").read_bytes() == (
+        ctx.build_dir / "build.log"
+    ).read_bytes()
+    log = (ctx.build_dir / "build.log").read_text(encoding="utf-8")
+    assert str(ctx.root.resolve()) not in log
+    assert str(other.root.resolve()) not in log
     # Inspect actual pad connectivity rather than merely checking echoed pin metadata.
     text = first.decode()
     assert '(name "HYDROPHONE_ADC")' in text

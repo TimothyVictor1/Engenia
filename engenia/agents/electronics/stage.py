@@ -125,7 +125,15 @@ class ElectronicsStage:
             timeout=120,
             check=False,
         )
-        (ctx.build_dir / "build.log").write_text(result.stdout + result.stderr, encoding="utf-8")
+        log = result.stdout + result.stderr
+        # Replace nested paths before the root so their specific labels survive.
+        for path, label in (
+            (ctx.build_dir, "<build>"),
+            (ctx.src_dir, "<src>"),
+            (ctx.root, "<root>"),
+        ):
+            log = log.replace(str(path.resolve()), label)
+        (ctx.build_dir / "build.log").write_text(log, encoding="utf-8")
         if result.returncode:
             raise RuntimeError(
                 f"SKiDL build failed; see {ctx.build_dir / 'build.log'}\n{result.stderr[-4000:]}"
