@@ -18,6 +18,9 @@ dependencies = [
     "platformio==6.1.18",
     "numpy>=2,<3",
     "capytaine>=3.0.0",
+    "gmsh>=4.15,<5",
+    "scikit-fem>=11,<12",
+    "meshio>=5.3,<6",
 ]
 
 [project.scripts]

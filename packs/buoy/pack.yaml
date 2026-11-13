@@ -6,3 +6,8 @@ templates:
     checks: [mass_budget, buoyancy_margin, print_bed_fit, wall_thickness_min]
   mast_housing:
     checks: [mass_budget, print_bed_fit, wall_thickness_min]
+structure:
+  youngs_modulus_mpa: 2100  # Assumption: representative printed PETG elastic modulus.
+  poisson_ratio: 0.38  # Assumption: isotropic PETG Poisson ratio.
+  allowable_stress_mpa: 35  # Assumption: PETG yield-based allowable stress.
+  printed_knock_down_factor: 0.60  # Assumption: reduction for layer bonding and defects.
