@@ -107,7 +107,9 @@ class MechanicalStage:
         (ctx.src_dir / "params.yaml").write_text(
             yaml.safe_dump(params, sort_keys=True), encoding="utf-8"
         )
-        (ctx.src_dir / "model.py").write_text(MODEL, encoding="utf-8")
+        (ctx.src_dir / "model.py").write_text(
+            MODEL + f"\ncontract_version = {contract.version}\n", encoding="utf-8"
+        )
 
     def build(self, ctx: StageContext) -> None:
         density = 1.27

@@ -49,6 +49,7 @@ def build(src_dir: Path, build_dir: Path, density_g_cm3: float) -> None:
         params.height_mm + params.lid_thickness_mm
     )
     facts = {
+        "contract_version": model["contract_version"],
         "dry_mass_g": round(volume / 1000 * density_g_cm3 * params.infill_factor, 6),
         "displaced_volume_cm3": round(closed_volume / 1000, 6),
         "internal_volume_cm3": round((closed_volume - volume) / 1000, 6),

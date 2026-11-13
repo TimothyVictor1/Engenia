@@ -53,7 +53,7 @@ def test_build_produces_real_artifacts_and_valid_interface(built):
     assert stage.interface(ctx) == interface.facts
     assert set(interface.facts) == {
         "dry_mass_g", "displaced_volume_cm3", "internal_volume_cm3", "battery_bay_mm",
-        "wall_min_mm", "bbox_mm", "centre_of_mass_mm",
+        "wall_min_mm", "bbox_mm", "centre_of_mass_mm", "contract_version",
     }
     for name in ("hull", "lid"):
         solid = import_step(ctx.build_dir / f"{name}.step")
@@ -285,3 +285,26 @@ def test_invalid_parameters_fail_before_cad(updates):
     params = HullParams(**propose_params(default_contract(), []))
     with pytest.raises(ValueError):
         replace(params, **updates)
+
+
+@pytest.mark.parametrize("source,version", [("project", 9), ("default", 7), ("packaged", 1)])
+def test_interface_records_contract_version_used_for_generation(tmp_path, source, version):
+    ctx = StageContext(root=tmp_path, project="version-fixture", stage="mechanical")
+    contract = default_contract().model_dump(mode="json")
+    contract["version"] = version
+    path = ctx.contract_path if source == "project" else (
+        tmp_path / "packs/buoy/default_contract.json"
+    )
+    if source != "packaged":
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(contract))
+    stage = MechanicalStage()
+    stage.generate(ctx)
+    if source != "packaged":
+        # Rebuilding generated source must retain the version used to design it.
+        contract["version"] += 1
+        path.write_text(json.dumps(contract))
+    stage.build(ctx)
+    interface = Interface.model_validate_json((ctx.build_dir / "interface.json").read_text())
+    assert interface.facts["contract_version"] == version
+    assert stage.interface(ctx)["contract_version"] == version
