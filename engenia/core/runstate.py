@@ -89,8 +89,68 @@ class RunStore:
         if status not in ("done", "cached", "failed"):
             raise ValueError(f"not a finishing status: {status}")
         self._update(
-            run_id, stage, "UPDATE stage_run SET status = ?, key = ?, message = ?, finished = ?"
-            " WHERE run_id = ? AND stage = ?", (status, key, message, _now()),
+            run_id, stage, "UPDATE stage_run SET status = ?, key = ?,"
+            " message = COALESCE(?, message), finished = ? WHERE run_id = ? AND stage = ?",
+            (status, key, message, _now()),
+        )
+
+    def latest_unfinished(self, project: str) -> int | None:
+        """The newest run of `project` that did not end `done` (it failed or was interrupted)."""
+        row = self._db.execute(
+            "SELECT id FROM run WHERE project = ? AND status != 'done' ORDER BY id DESC LIMIT 1",
+            (project,),
+        ).fetchone()
+        return int(row["id"]) if row else None
+
+    def reopen_run(self, run_id: int, stages: list[str]) -> dict[str, dict]:
+        """Continue an earlier run. Stages that finished (done or cached) keep their rows; every
+        other stage goes back to pending, keeping its attempt count. Returns the kept rows."""
+        with self._db:
+            self._db.execute(
+                "UPDATE run SET status = 'running', finished = NULL WHERE id = ?", (run_id,)
+            )
+            self._db.executemany(
+                "INSERT OR IGNORE INTO stage_run (run_id, stage, status) VALUES (?, ?, 'pending')",
+                [(run_id, stage) for stage in stages],
+            )
+            self._db.execute(
+                "UPDATE stage_run SET status = 'pending', started = NULL, finished = NULL,"
+                " message = NULL WHERE run_id = ? AND status NOT IN ('done', 'cached')",
+                (run_id,),
+            )
+        return {
+            row["stage"]: row
+            for row in self.stage_runs(run_id)
+            if row["status"] in ("done", "cached")
+        }
+
+    def _message(self, run_id: int, stage: str) -> str | None:
+        row = self._db.execute(
+            "SELECT message FROM stage_run WHERE run_id = ? AND stage = ?", (run_id, stage)
+        ).fetchone()
+        if row is None:
+            raise KeyError(f"run {run_id} has no stage {stage!r}")
+        return row["message"]
+
+    def stage_repair(self, run_id: int, stage: str, *, round_number: int, outcome: str) -> None:
+        """Record one repair round of `stage`: an attempt, and a line in its message. Rounds
+        add to the message, so the row tells the whole story. The status is left alone."""
+        note = f"repair round {round_number}: {outcome}"
+        earlier = self._message(run_id, stage)
+        self._update(
+            run_id, stage, "UPDATE stage_run SET attempts = attempts + 1, message = ?"
+            " WHERE run_id = ? AND stage = ?", ("; ".join(filter(None, [earlier, note])),),
+        )
+
+    def stage_note(self, run_id: int, stage: str, note: str, *, status: str) -> None:
+        """Set a stage's status and add a line to its message (attempts are not touched)."""
+        if status not in STAGE_STATUSES:
+            raise ValueError(f"unknown status: {status}")
+        earlier = self._message(run_id, stage)
+        self._update(
+            run_id, stage, "UPDATE stage_run SET status = ?, message = ?, finished = ?"
+            " WHERE run_id = ? AND stage = ?",
+            (status, "; ".join(filter(None, [earlier, note])), _now()),
         )
 
     def stage_blocked(self, run_id: int, stage: str, message: str) -> None:
