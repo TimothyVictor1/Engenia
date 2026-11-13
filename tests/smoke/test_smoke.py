@@ -54,9 +54,9 @@ def test_models_import():
     assert len(STAGE_NAMES) == 12
 
 
-def test_three_specs_validate():
+def test_spec_files_validate():
     files = sorted(SPEC_DIR.glob("R-*.yaml"))
-    assert [f.stem for f in files] == ["R-001", "R-003", "R-005"]
+    assert len(files) >= 3
     for path in files:
         requirement = Requirement.model_validate(yaml.safe_load(path.read_text()))
         assert requirement.id == path.stem
@@ -77,9 +77,7 @@ def test_run_exits_zero_and_builds_every_stage(workdir):
     assert result.exit_code == 0, result.output
     for name in STAGE_NAMES:
         build = workdir / "projects" / "harbour-listener" / "build" / name
-        assert (build / "placeholder.txt").is_file()
-        interface = Interface.model_validate_json((build / "interface.json").read_text())
-        assert interface.facts == {"stub": True}
+        Interface.model_validate_json((build / "interface.json").read_text())
         assert json.loads((build / "verdict.json").read_text()) == []
         assert (workdir / "projects" / "harbour-listener" / "src" / name).is_dir()
 

@@ -1,0 +1,10 @@
+id: R-007
+statement: The electronics shall draw an average power of at most 25 mW.
+value: 25
+unit: mW
+verify:
+  method: analysis
+  check: power_budget
+  limit: {max: 25}
+affects: [electronics]
+status: approved

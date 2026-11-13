@@ -1,0 +1,10 @@
+id: R-012
+statement: The hull shall keep a stress safety factor of at least 2 at 3 m depth.
+value: 2
+unit: ratio
+verify:
+  method: simulation
+  check: stress_safety_factor
+  limit: {min: 2}
+affects: [simulation]
+status: approved

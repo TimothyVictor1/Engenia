@@ -1,0 +1,10 @@
+id: R-011
+statement: The buoy shall keep its tilt within 30 degrees in 0.5 m significant wave height.
+value: 30
+unit: deg
+verify:
+  method: simulation
+  check: wave_tilt
+  limit: {max: 30}
+affects: [simulation]
+status: approved

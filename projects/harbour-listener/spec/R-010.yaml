@@ -1,0 +1,10 @@
+id: R-010
+statement: The firmware shall raise at most 2 false alarms per hour on the quiet recording.
+value: 2
+unit: 1/h
+verify:
+  method: analysis
+  check: false_alarm_rate
+  limit: {max: 2}
+affects: [firmware]
+status: approved
