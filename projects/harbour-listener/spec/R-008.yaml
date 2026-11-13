@@ -1,0 +1,10 @@
+id: R-008
+statement: The electronics shall have zero electrical rule errors.
+value: 0
+unit: count
+verify:
+  method: analysis
+  check: erc_clean
+  limit: {max: 0}
+affects: [electronics]
+status: approved
