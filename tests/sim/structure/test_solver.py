@@ -5,11 +5,14 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+import pytest
 import yaml
 from build123d import Align, Cylinder, export_step
 
 from engenia.contracts.models import StageContext
 from engenia.sim.structure import run_case
+
+pytestmark = pytest.mark.slow
 
 
 def _fixture(tmp_path: Path) -> StageContext:

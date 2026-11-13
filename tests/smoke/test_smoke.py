@@ -73,6 +73,7 @@ def test_registry_has_all_twelve_stages():
         assert all(isinstance(check, str) for check in stage.checks)
 
 
+@pytest.mark.slow
 def test_run_exits_zero_and_builds_every_stage(workdir):
     result = runner.invoke(app, ["run", "harbour-listener"])
     assert result.exit_code == 0, result.output
@@ -86,6 +87,7 @@ def test_run_exits_zero_and_builds_every_stage(workdir):
         assert (workdir / "projects" / "harbour-listener" / "src" / name).is_dir()
 
 
+@pytest.mark.slow
 def test_run_is_deterministic(workdir):
     interfaces = []
     for _ in range(2):
@@ -95,6 +97,7 @@ def test_run_is_deterministic(workdir):
     assert interfaces[0] == interfaces[1]
 
 
+@pytest.mark.slow
 def test_run_respects_dependency_order(workdir):
     result = runner.invoke(app, ["run", "harbour-listener"])
     ran = [line.split()[1] for line in result.output.splitlines() if line.startswith("ran")]

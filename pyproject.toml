@@ -37,6 +37,9 @@ module-root = ""
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--import-mode=importlib"
+markers = [
+    "slow: runs CAD, meshing or the full pipeline (CI runs these in a separate job)",
+]
 
 [tool.ruff]
 line-length = 100
