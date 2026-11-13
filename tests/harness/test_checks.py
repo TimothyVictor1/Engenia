@@ -1,6 +1,9 @@
 import json
+import sys
 import textwrap
+from pathlib import Path
 
+import pytest
 import yaml
 
 from engenia.contracts.models import EvidenceLevel, Limit, Verdict, VerdictResult
@@ -121,3 +124,75 @@ def test_write_verdicts_round_trips(ctx):
     write_verdicts(ctx, [make_verdict("fail")])
     saved = json.loads((ctx.build_dir / "verdict.json").read_text())
     assert Verdict.model_validate(saved[0]).result == VerdictResult.FAIL
+
+
+# --- verifiers that import shared helpers --------------------------------------------------------
+
+HELPER = "def helper():\n    return 42.0\n"
+
+VERIFIER_USING_HELPER = """
+    {import_line}
+    from engenia.contracts.models import EvidenceLevel, Verdict, VerdictResult
+
+    def run(ctx):
+        return Verdict(check=ctx.check, requirement=ctx.requirement, measured=helper(),
+                       limit=ctx.limit, result=VerdictResult.PASS,
+                       evidence_level=EvidenceLevel.CALCULATED)
+"""
+
+
+def without_root_on_sys_path(monkeypatch, root):
+    """Make the repository root absent from sys.path, as under the `engenia` console script."""
+    wanted = root.resolve()
+    monkeypatch.setattr(
+        sys, "path", [p for p in sys.path if Path(p or ".").resolve() != wanted]
+    )
+    for name in [m for m in sys.modules if m == "verifiers" or m.startswith("verifiers.")]:
+        monkeypatch.delitem(sys.modules, name)
+
+
+@pytest.mark.parametrize(
+    "import_line",
+    ["from verifiers._common import helper", "from ._common import helper"],
+    ids=["absolute", "relative"],
+)
+def test_verifier_can_import_shared_helpers_when_root_is_not_on_sys_path(
+    root, ctx, make_stage, monkeypatch, import_line
+):
+    (root / "verifiers" / "_common.py").write_text(HELPER)
+    write_verifier(root, "demo", VERIFIER_USING_HELPER.format(import_line=import_line))
+    plan(root, item("demo"))
+    without_root_on_sys_path(monkeypatch, root)
+    assert str(root.resolve()) not in [str(Path(p or ".").resolve()) for p in sys.path]
+
+    (verdict,) = run_stage_checks(make_stage(checks=["demo"]), ctx)
+
+    assert verdict.result == VerdictResult.PASS  # the verifier's own verdict, not an error
+    assert verdict.measured == 42.0
+    assert verdict.message is None
+    assert not (root / "verifiers" / "__pycache__").exists()
+
+
+def test_root_already_on_sys_path_is_not_added_twice(root, ctx, make_stage, monkeypatch):
+    (root / "verifiers" / "_common.py").write_text(HELPER)
+    import_line = "from verifiers._common import helper"
+    write_verifier(root, "demo", VERIFIER_USING_HELPER.format(import_line=import_line))
+    plan(root, item("demo"))
+    without_root_on_sys_path(monkeypatch, root)
+    stage = make_stage(checks=["demo"])
+    run_stage_checks(stage, ctx)
+    run_stage_checks(stage, ctx)
+    assert [Path(p).resolve() for p in sys.path].count(root.resolve()) == 1
+
+
+def test_an_edited_helper_is_picked_up_on_the_next_run(root, ctx, make_stage, monkeypatch):
+    import_line = "from verifiers._common import helper"
+    (root / "verifiers" / "_common.py").write_text(HELPER)
+    write_verifier(root, "demo", VERIFIER_USING_HELPER.format(import_line=import_line))
+    plan(root, item("demo"))
+    without_root_on_sys_path(monkeypatch, root)
+    stage = make_stage(checks=["demo"])
+    assert run_stage_checks(stage, ctx)[0].measured == 42.0
+
+    (root / "verifiers" / "_common.py").write_text(HELPER.replace("42.0", "7.0"))
+    assert run_stage_checks(stage, ctx)[0].measured == 7.0  # an edited helper is picked up

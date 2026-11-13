@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 import types
 from pathlib import Path
 from typing import Any
@@ -71,17 +72,46 @@ def _load_plan(ctx: StageContext) -> list[CheckPlanItem]:
     return [CheckPlanItem.model_validate(item) for item in raw]
 
 
+def _ensure_on_sys_path(root: Path) -> None:
+    """Put the repository root on sys.path if it is not already there.
+
+    The `engenia` console script does not have it there, and verifiers import their shared
+    helpers as `verifiers._common`.
+    """
+    wanted = root.resolve()
+    for entry in sys.path:
+        try:
+            if Path(entry or ".").resolve() == wanted:
+                return
+        except OSError:
+            continue
+    sys.path.insert(0, str(wanted))
+
+
 def _load_verifier(root: Path, name: str):
     if not VERIFIER_NAME.fullmatch(name):
         raise ValueError(f"invalid verifier name: {name!r}")
     path = root / "verifiers" / f"{name}.py"
     if not path.is_file():
         raise FileNotFoundError(f"verifier not found: verifiers/{name}.py")
-    # Compile from source instead of importing. An import would read and write __pycache__, which
-    # can serve stale bytecode for an edited file and writes outside build/.
+    _ensure_on_sys_path(root)
+    # A `verifiers` package cached from another root, or from before an edit, must not be reused.
+    for cached in [m for m in sys.modules if m == "verifiers" or m.startswith("verifiers.")]:
+        del sys.modules[cached]
+    # Compile the verifier itself from source instead of importing it. An import would read and
+    # write __pycache__, which can serve stale bytecode for an edited file and writes outside
+    # build/. Its imports of shared helpers (`from verifiers._common import ...`, or the relative
+    # form, thanks to __package__) are ordinary imports, so no bytecode is written for those.
     module = types.ModuleType(f"engenia_verifier_{name}")
     module.__file__ = str(path)
-    exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), module.__dict__)
+    module.__package__ = "verifiers"
+    code = compile(path.read_text(encoding="utf-8"), str(path), "exec")
+    keep_bytecode_flag = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        exec(code, module.__dict__)
+    finally:
+        sys.dont_write_bytecode = keep_bytecode_flag
     run = getattr(module, "run", None)
     if not callable(run):
         raise AttributeError(f"verifiers/{name}.py has no run(ctx)")
