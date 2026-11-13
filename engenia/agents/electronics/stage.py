@@ -87,6 +87,10 @@ class ElectronicsStage:
         facts = load_facts(_pack_file(ctx, "parts/facts.toml"))
         selection = propose_selection(contract, requirements, facts)
         selection["pins_used"] = dict(sorted(contract.interfaces.pin_map.items()))
+        selection["board_holes_mm"] = [
+            list(hole) for hole in contract.interfaces.mounts.board_holes_mm
+        ]
+        selection["contract_version"] = contract.version
         # Snapshot catalogue/profile: build never reselects against changed inputs.
         selection["facts"] = facts.model_dump(mode="json")
         ctx.src_dir.mkdir(parents=True, exist_ok=True)
@@ -142,6 +146,9 @@ class ElectronicsStage:
         built = {
             "mass_g": sum(p.mass_g for p in parts.values()) + facts.design.support_mass_g,
             "board_mm": list(facts.design.board_mm),
+            "battery_mm": list(parts["battery"].size_mm),
+            "board_holes_mm": selection["board_holes_mm"],
+            "contract_version": selection["contract_version"],
             "assembly_mm": assembly_size(parts["battery"], facts, selection["bay_mm"]),
             **power_facts(parts, facts, profile.duty_cycle),
             "pins_used": erc["pins_used"],
