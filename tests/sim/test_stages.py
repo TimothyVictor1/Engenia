@@ -25,17 +25,18 @@ def test_simprep_writes_one_case_per_simulation_requirement(root):
     ctx, stage, cases = run_simprep(root)
     assert [(c["id"], c["solver"], c["requirement"]) for c in cases] == [
         ("SIM-011", "waves", "R-011"), ("SIM-012", "structure", "R-012"),
+        ("SIM-FLOW", "flow", None),
     ]
     assert cases[0]["scenarios"] == ["short_chop", "swell"]
     assert (ctx.src_dir / "cases.yaml").is_file()
-    assert stage.interface(ctx) == {"cases": ["SIM-011", "SIM-012"]}
+    assert stage.interface(ctx) == {"cases": ["SIM-011", "SIM-012", "SIM-FLOW"]}
 
 
 def test_simprep_skips_draft_requirements(root):
     path = root / "projects/fixture/spec/R-011.yaml"
     path.write_text(path.read_text().replace("status: approved", "status: draft"))
     _, _, cases = run_simprep(root)
-    assert [c["id"] for c in cases] == ["SIM-012"]
+    assert [c["id"] for c in cases] == ["SIM-012", "SIM-FLOW"]
 
 
 def fake_solver(monkeypatch, results):
@@ -61,7 +62,8 @@ def test_facts_merge_and_missing_solver_is_not_run(root, monkeypatch):
     facts = simulate(root)
     assert facts == {
         "wave_tilt": tilt, "safety_factor": None, "max_von_mises_mpa": None,
-        "structure_depth_m": None, "not_run": ["SIM-012"],
+        "structure_depth_m": None, "drag_n": {}, "drag_evidence": {},
+        "not_run": ["SIM-012", "SIM-FLOW"],
         "sanity": {"SIM-011": {"passed": True, "messages": []}},
     }
 
@@ -73,7 +75,17 @@ def test_structure_scalars_are_merged(root, monkeypatch):
     facts = simulate(root)
     assert (facts["safety_factor"], facts["max_von_mises_mpa"], facts["structure_depth_m"]) == (
         2.5, 12.0, 3.0)
-    assert facts["not_run"] == ["SIM-011"] and facts["wave_tilt"] == {}
+    assert facts["not_run"] == ["SIM-011", "SIM-FLOW"] and facts["wave_tilt"] == {}
+
+
+def test_flow_drag_is_published_per_scenario(root, monkeypatch):
+    flow = {"drag_n": {"short_chop": 0.2, "swell": 0.8},
+            "evidence": {"short_chop": "calculated", "swell": "calculated"},
+            "sanity": {"passed": True, "messages": []}}
+    fake_solver(monkeypatch, {"flow": flow})
+    facts = simulate(root)
+    assert facts["drag_n"] == flow["drag_n"]
+    assert facts["drag_evidence"] == flow["evidence"]
 
 
 def test_case_failing_sanity_contributes_only_its_sanity(root, monkeypatch):
@@ -101,6 +113,9 @@ def test_pipeline_gives_wave_tilt_for_every_scenario(tmp_path, monkeypatch):
     facts = json.loads((build / "simulation/interface.json").read_text())["facts"]
     scenarios = sorted(p.stem for p in (build / "redteam/scenarios").glob("*.yaml"))
     assert sorted(facts["wave_tilt"]) == scenarios and len(scenarios) >= 1
+    assert sorted(facts["drag_n"]) == scenarios
+    assert all(value > 0 for value in facts["drag_n"].values())
+    assert all(facts["drag_evidence"][name] == "calculated" for name in scenarios)
     assert facts["sanity"]["SIM-011"]["passed"] is True
     text = (build / "simulation/results.json").read_text()
     assert str(tmp_path) not in text and str(REPO) not in text

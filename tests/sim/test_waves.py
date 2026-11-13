@@ -107,3 +107,17 @@ def test_hull_centre_of_mass_used_when_assembly_has_none(root, ctx):
     write_interface(root, "integration", {"total_mass_g": 191.9, "centre_of_mass_mm": None})
     result = run_case(CASE, ctx)
     assert result["sanity"]["passed"] and result["notes"]
+
+
+def test_flooded_bay_adds_water_mass_and_lowers_hull(root, ctx):
+    write_interface(root, "mechanical", {
+        "bbox_mm": [114.0, 114.0, 43.2], "centre_of_mass_mm": [0.0, 0.0, 22.8],
+        "internal_volume_cm3": 300.0, "wall_min_mm": 3.0,
+    })
+    dry = run_case(CASE, ctx)["wave_tilt"]["short_chop"]
+    write_scenario(root, "short_chop", extra={"hull_flood_percent": 10.0})
+    wet_result = run_case(CASE, ctx)
+    assert wet_result["sanity"]["passed"]
+    wet = wet_result["wave_tilt"]["short_chop"]
+    assert wet["flooded_mass_kg"] == pytest.approx(0.03015)
+    assert wet["draft_m"] > dry["draft_m"]

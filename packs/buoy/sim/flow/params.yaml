@@ -1,0 +1,13 @@
+# Cross-flow circular-cylinder coefficient from Virginia Tech AOE 3054, Experiment 3:
+# https://devenport.aoe.vt.edu/aoe3054/manual/expt3/text.html
+# The source reports Cd about 1.2 in the subcritical regime. This buoy's finite
+# aspect ratio and waterline make it an engineering estimate, not a measured value.
+cd: 1.2
+# Current speeds are assumptions until red-team scenarios carry extra.current_speed_ms.
+# Scenario values, when present, take precedence over these defaults.
+current_speed_ms:
+  calm_harbour: 0.1
+  baltic_winter: 0.2
+  storm: 0.6
+  flooded_bay: 0.2
+default_current_speed_ms: 0.2

@@ -3,7 +3,7 @@
 generate() writes src/simprep/cases.yaml, a list of cases:
 
     - id: SIM-011
-      solver: waves            # "waves" or "structure"
+      solver: waves            # "waves", "structure", or "flow"
       requirement: R-011
       scenarios: [calm_harbour, ...]   # red-team scenario names; empty means every scenario
 
@@ -49,6 +49,13 @@ def build_cases(ctx: StageContext) -> list[dict]:
             "id": f"SIM-{requirement.id.removeprefix('R-')}",
             "solver": solver,
             "requirement": requirement.id,
+            "scenarios": list(names),
+        })
+    if names:
+        cases.append({
+            "id": "SIM-FLOW",
+            "solver": "flow",
+            "requirement": None,
             "scenarios": list(names),
         })
     return cases
