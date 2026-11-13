@@ -36,7 +36,8 @@ that lists scenarios which were not built, or leaves out built ones, also fails.
 
 `packs/buoy/sim/waves/params.yaml`: gravity, mesh resolution, volume tolerance.
 
-## Not covered by the cache
+## Cache
 
-The stage key hashes the stage classes, not this package or `params.yaml`. After changing them,
-clear `build/simulation/` (or the cache entry) to force a rerun.
+The simulation stage key includes `SimulationStage.solver_digest`, a hash of `engenia/sim/**/*.py`,
+`verifiers/**/*.py` and every `packs/buoy/sim/*/params.yaml`. After changing any of them, run
+`uv run python -m engenia.sim.solver_digest --write`; a test fails until you do.

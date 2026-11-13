@@ -57,6 +57,8 @@ class SimulationStage:
     needs = ["integration", "redteam", "simprep"]
     reads_contract = False
     checks: list[str] = []
+    # Part of this class's source, so the stage key follows the solvers. See solver_digest.py.
+    solver_digest = "sha256:fb17c94101384280ad43b8062dcd5422193f62b4c0fff3c159b41da874c7eb92"
 
     def generate(self, ctx: StageContext) -> None:
         ctx.src_dir.mkdir(parents=True, exist_ok=True)
