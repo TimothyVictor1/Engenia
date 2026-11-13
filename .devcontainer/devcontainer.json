@@ -1,0 +1,22 @@
+{
+  "name": "Engenia",
+  "build": { "dockerfile": "Dockerfile" },
+  "hostRequirements": { "cpus": 4 },
+  "containerEnv": {
+    "UV_LINK_MODE": "copy",
+    "UV_PYTHON_DOWNLOADS": "never",
+    "PLATFORMIO_CORE_DIR": "/home/vscode/.platformio"
+  },
+  "onCreateCommand": "bash .devcontainer/setup.sh",
+  "updateContentCommand": "uv sync --frozen",
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": { "label": "Engenia dashboard", "onAutoForward": "notify" }
+  },
+  "customizations": {
+    "vscode": {
+      "settings": { "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python" },
+      "extensions": ["ms-python.python", "charliermarsh.ruff"]
+    }
+  }
+}
