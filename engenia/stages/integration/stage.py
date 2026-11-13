@@ -38,13 +38,20 @@ def _vector(facts: dict, stage: str, name: str) -> list:
     return value
 
 
-def int_board_fits_bay(facts: dict, contract: dict) -> bool:
+def _smallest_clearance_mm(facts: dict) -> float:
     """Each component must fit the bay with 1 mm on both sides of each axis."""
     bay = _vector(facts, "mechanical", "battery_bay_mm")
     board = _vector(facts, "electronics", "board_mm")
     battery = _vector(facts, "electronics", "battery_mm")
-    return all(0 < size <= space - 2 for item in (board, battery)
+    if any(size <= 0 for item in (board, battery, bay) for size in item):
+        raise ValueError("mechanical/electronics: invalid battery_bay_mm, board_mm or battery_mm")
+    return min((space - size) / 2 for item in (board, battery)
                for size, space in zip(item, bay, strict=True))
+
+
+def int_board_fits_bay(facts: dict, contract: dict) -> bool:
+    """Each component needs at least 1 mm clearance per side on every axis."""
+    return _smallest_clearance_mm(facts) >= 1.0
 
 
 def int_mounts_match(facts: dict, contract: dict) -> bool:
@@ -139,8 +146,22 @@ class IntegrationStage:
         for check, stages in CHECKS:
             name = check.__name__
             message = None
+            measured = None
+            mass_check = name == "int_mass_total"
+            if mass_check:
+                limit = {"max": contract["totals"]["mass_g_max"]}
+            elif name == "int_board_fits_bay":
+                limit = {"min": 1.0}
+            else:
+                limit = {"equals": 1.0}
             try:
-                result = "pass" if check(facts, contract) else "fail"
+                if name == "int_board_fits_bay":
+                    measured = _smallest_clearance_mm(facts)
+                    passed = measured >= 1.0
+                else:
+                    passed = check(facts, contract)
+                    measured = assembly["total_mass_g"] if mass_check else float(passed)
+                result = "pass" if passed else "fail"
                 if result == "fail":
                     message = f"{name}: mismatch"
             except ValueError as exc:
@@ -151,11 +172,9 @@ class IntegrationStage:
                             or facts[s].get("contract_version") != contract["version"]]
             if result != "pass":
                 mismatches.append({"check": name, "stages": involved, "message": message})
-            mass_check = name == "int_mass_total"
             verdicts.append(Verdict(
                 check=name, requirement="R-001" if mass_check else None,
-                measured=assembly["total_mass_g"] if mass_check else None,
-                limit={"max": contract["totals"]["mass_g_max"]} if mass_check else {},
+                measured=measured, limit=limit,
                 result=result, evidence_level="calculated", artifact=artifact, message=message,
             ).model_dump(mode="json"))
         assembly["failed_checks"] = [v["check"] for v in verdicts if v["result"] != "pass"]

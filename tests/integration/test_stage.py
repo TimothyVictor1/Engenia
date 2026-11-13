@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from engenia.contracts.models import StageContext, Verdict
+from engenia.gate.gate import verdict_problem
 from engenia.stages.integration.stage import CHECKS, IntegrationStage
 
 
@@ -15,11 +16,13 @@ def assembly(tmp_path):
     facts = {
         "mechanical": {"dry_mass_g": 300, "battery_bay_mm": [70, 40, 22],
                        "centre_of_mass_mm": [0, 0, 10], "battery_bay_centre_mm": [0, 0, 30],
-                       "displaced_volume_cm3": 500, "contract_version": 1},
+                       "displaced_volume_cm3": 500, "contract_version": contract["version"]},
         "electronics": {"mass_g": 60, "board_mm": [68, 38, 20], "battery_mm": [50, 30, 18],
                         "board_holes_mm": contract["interfaces"]["mounts"]["board_holes_mm"],
-                        "pins_used": contract["interfaces"]["pin_map"], "contract_version": 1},
-        "firmware": {"pins_used": contract["interfaces"]["pin_map"], "contract_version": 1},
+                        "pins_used": contract["interfaces"]["pin_map"],
+                        "contract_version": contract["version"]},
+        "firmware": {"pins_used": contract["interfaces"]["pin_map"],
+                        "contract_version": contract["version"]},
     }
     ctx = StageContext(root=tmp_path, project="fixture", stage="integration")
     ctx.contract_path.parent.mkdir(parents=True)
@@ -41,13 +44,24 @@ def run(assembly):
     stage.build(ctx)
     verdicts = json.loads((ctx.build_dir / "verdict.json").read_text())
     for verdict in verdicts:
-        Verdict.model_validate(verdict)
+        validated = Verdict.model_validate(verdict)
+        assert verdict_problem(validated) is None
     return {v["check"]: v for v in verdicts}
 
 
 @pytest.mark.parametrize("check,_stages", CHECKS)
 def test_pass(assembly, check, _stages):
-    assert run(assembly)[check.__name__]["result"] == "pass"
+    verdict = run(assembly)[check.__name__]
+    assert verdict["result"] == "pass"
+    if check.__name__ == "int_mass_total":
+        assert verdict["measured"] == 360
+        assert verdict["limit"]["max"] == 400
+    elif check.__name__ == "int_board_fits_bay":
+        assert verdict["measured"] == 1.0
+        assert verdict["limit"]["min"] == 1.0
+    else:
+        assert verdict["measured"] == 1.0
+        assert verdict["limit"]["equals"] == 1.0
 
 
 @pytest.mark.parametrize("check,stage,fact,value,stages", [
@@ -63,6 +77,12 @@ def test_fail(assembly, check, stage, fact, value, stages):
     facts[stage][fact] = value
     verdict = run(assembly)[check]
     assert verdict["result"] == "fail"
+    if check == "int_board_fits_bay":
+        assert verdict["measured"] == 0.5
+    elif check == "int_mass_total":
+        assert verdict["measured"] == 401
+    else:
+        assert verdict["measured"] == 0.0
     assert verdict["requirement"] == ("R-001" if check == "int_mass_total" else None)
     mismatches = json.loads((ctx.build_dir / "mismatches.json").read_text())
     assert mismatches == [{"check": check, "stages": stages, "message": verdict["message"]}]
@@ -95,6 +115,7 @@ def test_missing_fact(assembly, stage, fact, check):
     del assembly[2][stage][fact]
     verdict = run(assembly)[check]
     assert verdict["result"] == "error"
+    assert verdict["measured"] is None
     assert stage in verdict["message"] and fact in verdict["message"]
 
 
@@ -110,7 +131,7 @@ def test_assembly_and_reproduction(assembly):
     assembly[2]["firmware"]["contract_version"] = 0
     run(assembly)
     assert IntegrationStage().interface(ctx)["failed_checks"] == ["int_contract_version"]
-    assembly[2]["firmware"]["contract_version"] = 1
+    assembly[2]["firmware"]["contract_version"] = assembly[1]["version"]
     run(assembly)
     assert json.loads((ctx.build_dir / "mismatches.json").read_text()) == []
 
@@ -144,3 +165,18 @@ def test_unknown_assembly_location(assembly):
 def test_packaged_fallback_contract(assembly):
     assembly[0].contract_path.unlink()
     assert all(v["result"] == "pass" for v in run(assembly).values())
+
+
+@pytest.mark.parametrize("battery,clearance,result", [
+    ([50, 39, 18], 0.5, "fail"),
+    ([50, 30, 22], 0.0, "fail"),
+    ([72, 30, 18], -1.0, "fail"),
+    ([50, 30, 18], 2.0, "pass"),
+])
+def test_bay_reports_smallest_per_side_clearance(assembly, battery, clearance, result):
+    assembly[2]["electronics"]["board_mm"] = [60, 30, 10]
+    assembly[2]["electronics"]["battery_mm"] = battery
+    verdict = run(assembly)["int_board_fits_bay"]
+    assert verdict["measured"] == clearance
+    assert verdict["limit"]["min"] == 1.0
+    assert verdict["result"] == result

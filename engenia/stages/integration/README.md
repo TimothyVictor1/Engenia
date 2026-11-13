@@ -24,3 +24,11 @@ rewritten, including an empty list on success. Each record contains `check`,
 version is missing, stubbed, or differs from the active contract. Other records
 name the upstream stages supplying the compared facts. The contract itself is
 never a rerun target.
+
+Every pass/fail verdict has numeric evidence so gate G2 can recompute it.
+Mount, pin, and contract-version comparisons report 1.0 for equality and 0.0
+for a mismatch, with `equals: 1`. Bay fit reports the smallest per-side
+clearance, `min((bay_dimension - component_dimension) / 2)`, across both
+components and all three axes, with `min: 1.0` mm. Mass reports the assembly
+mass in grams against the contract maximum. Missing facts remain error
+verdicts with a null measurement.
