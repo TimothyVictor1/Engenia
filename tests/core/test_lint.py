@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 
 from engenia.core.cli import app
 from engenia.core.lint import Severity, lint_data, lint_spec_dir
+from engenia.core.spec import load_requirements
 
 runner = CliRunner()
 
@@ -188,20 +189,43 @@ def test_bad_yaml_is_an_s0_finding(project_dir, root):
 # --- engenia lint <project> ----------------------------------------------------------------
 
 
-def test_cli_passes_the_example_spec_with_warnings(root):
+def test_cli_passes_the_fixture_spec_with_warnings(root):
     result = runner.invoke(app, ["lint", "harbour-listener"])
     assert result.exit_code == 0, result.output
     assert "L6 warning" in result.output
     assert "0 error(s), 3 warning(s)" in result.output
+    # warnings do not stop a file being ok; they follow its ok line
+    assert result.output.splitlines()[:2] == [
+        "ok   R-001.yaml",
+        "R-001.yaml: L6 warning: verify.check 'mass_budget' has no file verifiers/mass_budget.py",
+    ]
 
 
 def test_cli_is_clean_once_the_verifiers_exist(root):
     (root / "verifiers").mkdir()
-    for name in ("mass_budget", "battery_capacity", "buoyancy_margin"):
+    spec_dir = root / "projects" / "harbour-listener" / "spec"
+    checks = {r.verify.check for r in load_requirements(spec_dir)}
+    assert len(checks) == 3
+    for name in checks:  # one verifier file for every check the fixture spec names
         (root / "verifiers" / f"{name}.py").write_text("")
     result = runner.invoke(app, ["lint", "harbour-listener"])
     assert result.exit_code == 0
     assert "0 error(s), 0 warning(s)" in result.output
+    assert [ln for ln in result.output.splitlines() if ln.startswith("ok")] == [
+        "ok   R-001.yaml",
+        "ok   R-003.yaml",
+        "ok   R-005.yaml",
+    ]
+
+
+def test_cli_does_not_print_ok_for_a_file_with_an_error(root, project_dir, edit):
+    edit(project_dir / "spec" / "R-003.yaml", "shall operate", "shall operate a robust")
+    result = runner.invoke(app, ["lint", "harbour-listener"])
+    lines = result.output.splitlines()
+    assert result.exit_code == 1
+    assert "ok   R-001.yaml" in lines and "ok   R-005.yaml" in lines
+    assert any(ln.startswith("R-003.yaml: L2 error") for ln in lines)
+    assert not any(ln.startswith("ok   R-003") for ln in lines)
 
 
 @pytest.mark.parametrize(("rule", "data", "text"), FAILING)

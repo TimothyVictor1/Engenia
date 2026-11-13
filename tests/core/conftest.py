@@ -19,14 +19,15 @@ from engenia.contracts.models import StageContext
 from engenia.core.spec import load_requirements
 from engenia.stages.registry import REGISTRY
 
-REPO = Path(__file__).resolve().parents[2]
-EXAMPLE_PROJECT = "harbour-listener"
-EXAMPLE_SPEC = REPO / "projects" / EXAMPLE_PROJECT / "spec"
+# The core tests own their fixture project: three requirements under tests/core/fixtures/spec.
+# They never read projects/harbour-listener, which other lanes are free to change.
+EXAMPLE_PROJECT = "harbour-listener"  # a name only; the project lives in a scratch directory
+FIXTURE_SPEC = Path(__file__).resolve().parent / "fixtures" / "spec"
 
 
 @pytest.fixture
 def root(tmp_path, monkeypatch) -> Path:
-    shutil.copytree(EXAMPLE_SPEC, tmp_path / "projects" / EXAMPLE_PROJECT / "spec")
+    shutil.copytree(FIXTURE_SPEC, tmp_path / "projects" / EXAMPLE_PROJECT / "spec")
     monkeypatch.setenv("ENGENIA_ROOT", str(tmp_path))
     monkeypatch.setenv("ENGENIA_STORE", str(tmp_path / "store"))
     return tmp_path

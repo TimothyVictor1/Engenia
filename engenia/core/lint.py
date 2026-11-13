@@ -201,5 +201,22 @@ def lint_spec_dir(spec_dir: Path, verifiers_dir: Path) -> list[Finding]:
     return sorted(findings, key=lambda f: (f.file, f.rule, f.message))
 
 
+def report_lines(spec_dir: Path, findings: list[Finding]) -> list[str]:
+    """One block per spec file, in file order: "ok   <file>" if it has no error, then its findings.
+
+    A file with only warnings is still ok (it passes lint), and its warnings follow the ok line.
+    Findings not tied to a spec file (an empty or missing folder) come last.
+    """
+    names = [p.name for p in spec.spec_paths(spec_dir)]
+    lines = []
+    for name in names:
+        own = [f for f in findings if f.file == name]
+        if not has_errors(own):
+            lines.append(f"ok   {name}")
+        lines.extend(str(f) for f in own)
+    lines.extend(str(f) for f in findings if f.file not in names)
+    return lines
+
+
 def has_errors(findings: list[Finding]) -> bool:
     return any(f.severity is Severity.ERROR for f in findings)

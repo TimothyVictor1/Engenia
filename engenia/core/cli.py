@@ -11,7 +11,7 @@ import typer
 
 from engenia.core.engine import StageResult, Status, run_pipeline
 from engenia.core.errors import CoreError
-from engenia.core.lint import Severity, lint_spec_dir
+from engenia.core.lint import Severity, lint_spec_dir, report_lines
 from engenia.core.paths import find_root
 from engenia.core.spec import SpecError
 
@@ -34,9 +34,10 @@ def _project_dir(project: str) -> Path:
 @app.command()
 def lint(project: str) -> None:
     """Validate and lint the spec of a project. Exits 1 if any finding is an error."""
-    findings = lint_spec_dir(_project_dir(project) / "spec", find_root() / "verifiers")
-    for finding in findings:
-        typer.echo(str(finding))
+    spec_dir = _project_dir(project) / "spec"
+    findings = lint_spec_dir(spec_dir, find_root() / "verifiers")
+    for line in report_lines(spec_dir, findings):
+        typer.echo(line)
     errors = sum(f.severity is Severity.ERROR for f in findings)
     warnings = len(findings) - errors
     typer.echo(f"lint {project}: {errors} error(s), {warnings} warning(s)")

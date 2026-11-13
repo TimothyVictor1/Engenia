@@ -327,10 +327,19 @@ def test_result_key_is_the_stage_key(root, run, project_dir, make_ctx, fake_regi
     assert results["mechanical"].key == stage_key(registry["mechanical"], ctx)
 
 
-# --- the command line, with the real (stub) stages -----------------------------------------
+# --- the command line -----------------------------------------------------------------------
+# The CLI runs the registry's stages. These tests swap in FakeStage, whose interface does not
+# follow the spec (as with the step 0 stubs), so no other lane's stage code is involved.
 
 
-def test_cli_second_run_executes_zero_stages(root):
+@pytest.fixture
+def cli_stages(monkeypatch, fake_registry):
+    registry = fake_registry(follow_spec=False)
+    monkeypatch.setattr("engenia.core.engine._default_registry", lambda: registry)
+    return registry
+
+
+def test_cli_second_run_executes_zero_stages(root, cli_stages):
     first = runner.invoke(app, ["run", PROJECT])
     assert first.exit_code == 0, first.output
     assert "done: 12 ran, 0 from cache" in first.output
@@ -341,9 +350,9 @@ def test_cli_second_run_executes_zero_stages(root):
 
 
 def test_cli_editing_r003_reruns_the_affected_and_spec_wide_stages_only(
-    root, project_dir, edit
+    root, cli_stages, project_dir, edit
 ):
-    """The stubs publish the same interface every time, so nothing else follows."""
+    """The interfaces do not change, so nothing else follows."""
     runner.invoke(app, ["run", PROJECT])
     edit(project_dir / "spec" / "R-003.yaml", "value: 7", "value: 30")
     result = runner.invoke(app, ["run", PROJECT])
