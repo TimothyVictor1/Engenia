@@ -112,7 +112,7 @@ class IntegrationStage:
     checks: list[str] = []  # These checks run here, not through the verifier loader.
 
     def generate(self, ctx: StageContext) -> None:
-        pass
+        ctx.src_dir.mkdir(parents=True, exist_ok=True)
 
     def build(self, ctx: StageContext) -> None:
         path = ctx.contract_path

@@ -36,7 +36,8 @@ def run(assembly):
                                     "facts": data}))
     stage = IntegrationStage()
     stage.generate(ctx)
-    assert not ctx.src_dir.exists()
+    assert ctx.src_dir.is_dir()
+    assert list(ctx.src_dir.iterdir()) == []
     stage.build(ctx)
     verdicts = json.loads((ctx.build_dir / "verdict.json").read_text())
     for verdict in verdicts:
