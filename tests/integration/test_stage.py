@@ -12,6 +12,7 @@ from engenia.stages.integration.stage import CHECKS, IntegrationStage
 @pytest.fixture
 def assembly(tmp_path):
     contract = json.loads(Path("packs/buoy/default_contract.json").read_text())
+    contract["version"] = 1
     facts = {
         "mechanical": {"dry_mass_g": 300, "battery_bay_mm": [70, 40, 22],
                        "centre_of_mass_mm": [0, 0, 10], "battery_bay_centre_mm": [0, 0, 30],
@@ -47,7 +48,17 @@ def run(assembly):
 
 @pytest.mark.parametrize("check,_stages", CHECKS)
 def test_pass(assembly, check, _stages):
-    assert run(assembly)[check.__name__]["result"] == "pass"
+    verdict = run(assembly)[check.__name__]
+    assert verdict["result"] == "pass"
+    if check.__name__ == "int_board_fits_bay":
+        assert verdict["measured"] == 1.0
+        assert verdict["limit"]["min"] == 1.0
+    elif check.__name__ == "int_mass_total":
+        assert verdict["measured"] == 360
+        assert verdict["limit"]["max"] == 400
+    else:
+        assert verdict["measured"] == 1.0
+        assert verdict["limit"]["equals"] == 1
 
 
 @pytest.mark.parametrize("check,stage,fact,value,stages", [
@@ -63,6 +74,14 @@ def test_fail(assembly, check, stage, fact, value, stages):
     facts[stage][fact] = value
     verdict = run(assembly)[check]
     assert verdict["result"] == "fail"
+    if check == "int_board_fits_bay":
+        assert verdict["measured"] == 0.5
+        assert verdict["limit"]["min"] == 1.0
+    elif check == "int_mass_total":
+        assert verdict["measured"] == 401
+    else:
+        assert verdict["measured"] == 0.0
+        assert verdict["limit"]["equals"] == 1
     assert verdict["requirement"] == ("R-001" if check == "int_mass_total" else None)
     mismatches = json.loads((ctx.build_dir / "mismatches.json").read_text())
     assert mismatches == [{"check": check, "stages": stages, "message": verdict["message"]}]
@@ -143,4 +162,16 @@ def test_unknown_assembly_location(assembly):
 
 def test_packaged_fallback_contract(assembly):
     assembly[0].contract_path.unlink()
+    version = json.loads(Path("packs/buoy/default_contract.json").read_text())["version"]
+    for facts in assembly[2].values():
+        facts["contract_version"] = version
     assert all(v["result"] == "pass" for v in run(assembly).values())
+
+
+@pytest.mark.parametrize("size,clearance", [([68, 38, 20], 1.0), ([71, 38, 20], -0.5),
+                                          ([68, 39, 20], 0.5)])
+def test_clearance_measurement(assembly, size, clearance):
+    assembly[2]["electronics"]["board_mm"] = size
+    verdict = run(assembly)["int_board_fits_bay"]
+    assert verdict["measured"] == clearance
+    assert verdict["result"] == ("pass" if clearance >= 1.0 else "fail")

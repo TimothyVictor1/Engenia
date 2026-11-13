@@ -96,7 +96,7 @@ def test_taller_battery_bay_increases_internal_volume(built):
     stage.generate(changed)
     stage.build(changed)
     original, taller = stage.interface(ctx), stage.interface(changed)
-    assert taller["battery_bay_mm"] == [70, 40, 26]
+    assert taller["battery_bay_mm"] == contract["budgets"]["electronics"]["bay_mm"]
     assert taller["internal_volume_cm3"] > original["internal_volume_cm3"]
     assert taller["bbox_mm"][2] == pytest.approx(original["bbox_mm"][2] + 4)
     assert hashes(changed) != hashes(ctx)
