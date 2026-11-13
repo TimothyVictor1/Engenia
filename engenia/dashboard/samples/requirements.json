@@ -1,0 +1,43 @@
+{
+  "requirements": [
+    {
+      "id": "R-005",
+      "statement": "The buoy shall have a buoyancy margin of at least 0.20.",
+      "unit": "ratio",
+      "limit": {
+        "min": 0.2,
+        "max": null,
+        "equals": null
+      },
+      "affects": [
+        "mechanical"
+      ],
+      "method": "analysis",
+      "status": "fail",
+      "verdict": {
+        "check": "buoyancy_margin",
+        "measured": 0.17,
+        "result": "fail",
+        "evidence_level": "calculated",
+        "message": "Calculated buoyancy margin is below the required minimum.",
+        "stage": "mechanical"
+      }
+    },
+    {
+      "id": "R-012",
+      "statement": "The hull shall withstand water pressure at 10 m depth.",
+      "unit": "m",
+      "limit": {
+        "min": 10,
+        "max": null,
+        "equals": null
+      },
+      "affects": [
+        "simulation"
+      ],
+      "method": "simulation",
+      "status": "unverified",
+      "verdict": null
+    }
+  ]
+}

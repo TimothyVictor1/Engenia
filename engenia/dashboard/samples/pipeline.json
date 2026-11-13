@@ -1,0 +1,99 @@
+{
+  "project": "harbour-listener",
+  "updated": "2026-11-13T10:20:30Z",
+  "stages": [
+    {
+      "name": "verify_plan",
+      "needs": [],
+      "status": "done",
+      "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "architect",
+      "needs": [
+        "verify_plan"
+      ],
+      "status": "done",
+      "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "mechanical",
+      "needs": [
+        "architect"
+      ],
+      "status": "failed",
+      "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "electronics",
+      "needs": [
+        "architect"
+      ],
+      "status": "done",
+      "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "firmware",
+      "needs": [
+        "architect"
+      ],
+      "status": "running",
+      "key": null
+    },
+    {
+      "name": "redteam",
+      "needs": [],
+      "status": "done",
+      "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "testplan",
+      "needs": [],
+      "status": "stub",
+      "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "simprep",
+      "needs": [],
+      "status": "not_run",
+      "key": null
+    },
+    {
+      "name": "integration",
+      "needs": [
+        "mechanical",
+        "electronics",
+        "firmware"
+      ],
+      "status": "blocked",
+      "key": null
+    },
+    {
+      "name": "simulation",
+      "needs": [
+        "integration",
+        "redteam",
+        "simprep"
+      ],
+      "status": "blocked",
+      "key": null
+    },
+    {
+      "name": "final",
+      "needs": [
+        "simulation",
+        "testplan"
+      ],
+      "status": "blocked",
+      "key": null
+    },
+    {
+      "name": "report",
+      "needs": [
+        "final"
+      ],
+      "status": "blocked",
+      "key": null
+    }
+  ]
+}
