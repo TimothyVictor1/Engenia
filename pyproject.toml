@@ -13,6 +13,8 @@ dependencies = [
     "httpx",
     "fastapi",
     "uvicorn",
+    "skidl==2.2.3",
+    "tomli-w>=1.2,<2",
 ]
 
 [project.scripts]
