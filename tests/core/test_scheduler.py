@@ -1,6 +1,9 @@
 """Parallel scheduling: independent stages overlap, needs are respected, failures stay local."""
 
+import inspect
+import re
 import threading
+from pathlib import Path
 
 import pytest
 
@@ -64,12 +67,13 @@ def test_a_failed_stage_blocks_only_its_dependants(root, recorder, fake_registry
     report = execute(PROJECT, root, registry=registry, workers=4)
     assert not report.ok
     assert set(report.failed) == {"mechanical", "redteam"}
-    # redteam is needed by simulation; integration and the rest hang off mechanical.
-    assert set(report.blocked) == DEPENDANTS_OF_MECHANICAL
+    # redteam is needed by simprep and simulation; integration and the rest hang off mechanical.
+    assert set(report.blocked) == DEPENDANTS_OF_MECHANICAL | {"simprep"}
+    assert report.blocked["simprep"] == ["redteam"]
     assert report.blocked["integration"] == ["mechanical"]
     assert report.blocked["simulation"] == ["mechanical", "redteam"]
     assert {r.stage for r in report.results} == (
-        {"verify_plan", "architect", "electronics", "firmware", "testplan", "simprep"}
+        {"verify_plan", "architect", "electronics", "firmware", "testplan"}
     )
     assert recorder.stages("build").isdisjoint(DEPENDANTS_OF_MECHANICAL)
 
@@ -111,3 +115,28 @@ def test_cli_reports_failures_and_exits_1_but_still_runs_the_rest(root, monkeypa
     assert "FAIL mechanical" in result.output and "blocked integration" in result.output
     assert "ran  firmware" in result.output
     assert "run 1 failed: 1 failed, 4 blocked" in result.output
+
+
+# --- needs must cover every read of another stage's output ------------------------------------
+
+_READS = [
+    re.compile(r"""stage_build_dir\(\s*["'](\w+)["']"""),
+    re.compile(r"""stage_interface_path\(\s*["'](\w+)["']"""),
+    re.compile(r"""["']build["']\s*/\s*["'](\w+)["']"""),
+    re.compile(r"""["']src["']\s*/\s*["'](\w+)["']"""),
+]
+
+
+def test_every_stage_that_reads_another_stages_output_lists_it_in_needs():
+    """Without the need, a parallel run can read the output before it is written (a race)."""
+    from engenia.contracts.models import STAGE_NAMES
+    from engenia.stages.registry import REGISTRY
+
+    missing = []
+    for name, stage in REGISTRY.items():
+        source = Path(inspect.getfile(type(stage))).read_text(encoding="utf-8")
+        read = {m for pattern in _READS for m in pattern.findall(source)}
+        for other in sorted(read & set(STAGE_NAMES) - {name}):
+            if other not in stage.needs:
+                missing.append(f"{name} reads {other} but needs {stage.needs}")
+    assert not missing, "\n".join(missing)

@@ -28,7 +28,7 @@ def test_downstream_is_transitive_and_in_order():
     assert downstream("architect") == [
         "mechanical", "electronics", "firmware", "integration", "simulation", "final", "report",
     ]
-    assert downstream("redteam") == ["simulation", "final", "report"]
+    assert downstream("redteam") == ["simprep", "simulation", "final", "report"]
     assert downstream("mechanical") == ["integration", "simulation", "final", "report"]
 
 

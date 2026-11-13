@@ -31,7 +31,7 @@ EXPECTED_NEEDS = {
     "firmware": ["architect"],
     "redteam": [],
     "testplan": [],
-    "simprep": [],
+    "simprep": ["redteam"],
     "integration": ["mechanical", "electronics", "firmware"],
     "simulation": ["integration", "redteam", "simprep"],
     "final": ["simulation", "testplan"],

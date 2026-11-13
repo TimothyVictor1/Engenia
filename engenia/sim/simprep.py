@@ -70,7 +70,7 @@ def load_cases(path: Path) -> list[dict]:
 
 class SimprepStage:
     name = "simprep"
-    needs: list[str] = []
+    needs: list[str] = ["redteam"]
     reads_contract = False
     checks: list[str] = []
 
