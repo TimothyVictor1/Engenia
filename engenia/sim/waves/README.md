@@ -21,7 +21,9 @@ the buoy hull with [Capytaine](https://capytaine.org) for each red-team scenario
   overstated. Scenario periods are far above it for this hull.
 - The centre of mass is the integration value; if integration has none (no battery bay
   position), the hull's own is used and a note is written to `results.json`.
-- Flooding (`extra.hull_flood_percent`) and the other `extra` fields are not modelled.
+- Flooding (`extra.hull_flood_percent`) adds that fraction of the mechanical internal volume
+  as water mass at the cavity bottom. The extra mass raises draft, lowers the waterline
+  relative to the hull top, and shifts the centre of mass. Other `extra` fields are not modelled.
 
 ## Sanity checks
 

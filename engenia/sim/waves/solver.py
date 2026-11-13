@@ -72,7 +72,39 @@ def load_buoy(ctx: StageContext) -> dict:
         "mass_kg": mass_g / 1000.0,
         "com_z_m": centre[2] / 1000.0,
         "com_source": source,
+        "internal_volume_m3": mechanical.get("internal_volume_cm3", 0.0) / 1e6,
+        "wall_m": mechanical.get("wall_min_mm", 3.0) / 1000.0,
     }
+
+
+def flooded_buoy(buoy: dict, scenario: dict) -> tuple[dict, float]:
+    """Add trapped floodwater at the bottom of the cavity and shift the mass centre."""
+    percent = scenario.get("extra", {}).get("hull_flood_percent", 0.0)
+    if (
+        not isinstance(percent, (int, float))
+        or not math.isfinite(percent)
+        or not 0 <= percent <= 100
+    ):
+        raise InputError("hull_flood_percent must be between 0 and 100")
+    if percent == 0:
+        return buoy, 0.0
+    volume = buoy["internal_volume_m3"]
+    if not isinstance(volume, (int, float)) or not math.isfinite(volume) or volume <= 0:
+        raise InputError("mechanical internal_volume_cm3 is required for flooding")
+    flooded_volume = volume * percent / 100
+    added_mass = flooded_volume * scenario["water_density"]
+    inner_radius = buoy["radius_m"] - buoy["wall_m"]
+    if inner_radius <= 0:
+        raise InputError("wall thickness leaves no internal cavity")
+    flooded_height = flooded_volume / (math.pi * inner_radius**2)
+    water_com_z = buoy["wall_m"] + flooded_height / 2
+    total_mass = buoy["mass_kg"] + added_mass
+    result = buoy | {
+        "mass_kg": total_mass,
+        "com_z_m": (buoy["mass_kg"] * buoy["com_z_m"] + added_mass * water_com_z)
+        / total_mass,
+    }
+    return result, added_mass
 
 
 def load_scenarios(ctx: StageContext) -> dict[str, dict]:
@@ -163,8 +195,13 @@ def run_case(case: dict, ctx: StageContext) -> dict:
     g = params["gravity_m_s2"]
     for name in sorted(set(wanted) & set(built)):
         scenario = built[name]
+        try:
+            scenario_buoy, flooded_mass = flooded_buoy(buoy, scenario)
+        except InputError as exc:
+            messages.append(f"{name}: {exc}")
+            continue
         area = math.pi * buoy["radius_m"] ** 2
-        level1 = buoy["mass_kg"] / scenario["water_density"]  # level 1: weight = buoyancy
+        level1 = scenario_buoy["mass_kg"] / scenario["water_density"]
         draft = level1 / area
         problems = []
         if draft >= buoy["height_m"]:
@@ -176,7 +213,7 @@ def run_case(case: dict, ctx: StageContext) -> dict:
                                    params["mesh_resolution"])
             problems += mesh_messages(mesh, level1, params["displaced_volume_tolerance"])
         if not problems:
-            rao, pitch_stiffness = pitch_rao(mesh, buoy, draft, scenario, g)
+            rao, pitch_stiffness = pitch_rao(mesh, scenario_buoy, draft, scenario, g)
             tilt = math.degrees(rao * scenario["wave_height_m"] / 2)
             if pitch_stiffness <= 0:
                 problems.append("hull is not statically stable in pitch")
@@ -186,6 +223,8 @@ def run_case(case: dict, ctx: StageContext) -> dict:
                 wave_tilt[name] = {
                     "wave_height_m": scenario["wave_height_m"],
                     "max_tilt_deg": round(tilt, DECIMALS),
+                    "draft_m": round(draft, DECIMALS),
+                    "flooded_mass_kg": round(flooded_mass, DECIMALS),
                 }
         messages += [f"{name}: {p}" for p in problems]
 

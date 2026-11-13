@@ -4,6 +4,7 @@ For each case in build/simprep/cases.yaml, `engenia.sim.<solver>.run_case(case, 
 dict. A solver module that does not exist gives the case status "not_run". The dict may hold:
 
     wave_tilt        {scenario: {"wave_height_m": float, "max_tilt_deg": float}}
+    drag_n           {scenario: float}
     safety_factor, max_von_mises_mpa, structure_depth_m     float
     sanity           {"passed": bool, "messages": [str]}
 
@@ -85,6 +86,8 @@ class SimulationStage:
         results = json.loads((ctx.build_dir / RESULTS_FILE).read_text(encoding="utf-8"))
         facts: dict = {
             "wave_tilt": {},
+            "drag_n": {},
+            "drag_evidence": {},
             "safety_factor": None,
             "max_von_mises_mpa": None,
             "structure_depth_m": None,
@@ -105,6 +108,8 @@ class SimulationStage:
             if entry["status"] != "ok":
                 continue
             facts["wave_tilt"].update(result.get("wave_tilt", {}))
+            facts["drag_n"].update(result.get("drag_n", {}))
+            facts["drag_evidence"].update(result.get("evidence", {}))
             for key in SCALARS:
                 if result.get(key) is not None:
                     facts[key] = result[key]
