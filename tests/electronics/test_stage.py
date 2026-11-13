@@ -155,6 +155,12 @@ def test_build_pins_power_bom_and_repeatability(tmp_path):
     stage.build(other)
     assert (other.build_dir / "circuit.net").read_bytes() == first
     assert stage.interface(other) == interface
+    assert (other.build_dir / "build.log").read_bytes() == (
+        ctx.build_dir / "build.log"
+    ).read_bytes()
+    log = (ctx.build_dir / "build.log").read_text(encoding="utf-8")
+    assert str(ctx.root.resolve()) not in log
+    assert str(other.root.resolve()) not in log
     # Inspect actual pad connectivity rather than merely checking echoed pin metadata.
     text = first.decode()
     assert '(name "HYDROPHONE_ADC")' in text
@@ -246,3 +252,24 @@ def test_build_without_project_contract(tmp_path, local_default):
     assert not ctx.contract_path.exists()
     if local_default:
         assert interface["pins_used"] == {"HYDROPHONE_ADC": "GPIO35", "LORA_CS": "GPIO14"}
+
+
+def test_interface_contains_battery_mounts_and_build_contract_version(tmp_path):
+    ctx = make_context(tmp_path)
+    used_contract = contract().model_copy(update={"version": 7}, deep=True)
+    used_contract.interfaces.mounts.board_holes_mm = [(4, 5), (60, 5), (4, 30), (60, 30)]
+    ctx.contract_path.write_text(used_contract.model_dump_json(), encoding="utf-8")
+    stage = ElectronicsStage()
+    stage.generate(ctx)
+    selection = yaml.safe_load((ctx.src_dir / "selection.yaml").read_text(encoding="utf-8"))
+    selected_battery = next(
+        part for part in load_facts(CATALOGUE).parts if part.id == selection["parts"]["battery"]
+    )
+    # Build uses the generated snapshot even if the live contract/catalogue changes.
+    ctx.contract_path.unlink()
+    (ctx.root / "packs/buoy/parts/facts.toml").unlink()
+    stage.build(ctx)
+    interface = stage.interface(ctx)
+    assert interface["battery_mm"] == list(selected_battery.size_mm)
+    assert interface["board_holes_mm"] == [[4, 5], [60, 5], [4, 30], [60, 30]]
+    assert interface["contract_version"] == 7
