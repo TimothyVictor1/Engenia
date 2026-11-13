@@ -6,7 +6,6 @@ import math
 import re
 from pathlib import Path
 
-import gmsh
 import numpy as np
 import yaml
 from scipy.sparse.linalg import spsolve
@@ -29,6 +28,12 @@ def _depth(ctx) -> float:
 
 
 def _mesh(step: Path) -> MeshTet:
+    try:
+        import gmsh
+    except ImportError as exc:
+        raise RuntimeError(
+            "structural simulation not_run: gmsh needs its system libraries, including GLU"
+        ) from exc
     gmsh.initialize()
     try:
         gmsh.option.setNumber("General.Terminal", 0)
