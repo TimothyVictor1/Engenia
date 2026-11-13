@@ -1,0 +1,6 @@
+.env
+.venv
+.engenia/
+projects/*/build/
+__pycache__
+projects/*/src/*/placeholder.txt
