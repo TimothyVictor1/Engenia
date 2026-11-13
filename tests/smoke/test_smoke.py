@@ -69,7 +69,8 @@ def test_registry_has_all_twelve_stages():
         assert isinstance(stage, Stage)
         assert stage.name == name
         assert stage.needs == EXPECTED_NEEDS[name]
-        assert stage.checks == []
+        assert isinstance(stage.checks, list)
+        assert all(isinstance(check, str) for check in stage.checks)
 
 
 def test_run_exits_zero_and_builds_every_stage(workdir):

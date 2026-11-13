@@ -1,0 +1,3 @@
+materials: {PETG: {density_g_cm3: 1.27}}
+# Infill 1.0 means solid walls.
+printing: {infill_factor: 1.0, bed_mm: [220, 220, 250]}
