@@ -5,7 +5,7 @@ generate() writes src/simprep/cases.yaml, a list of cases:
     - id: SIM-011
       solver: waves            # "waves" or "structure"
       requirement: R-011
-      scenarios: [calm_harbour, ...]   # red-team scenario names; empty means every scenario
+      scenarios: [calm_harbour, ...]   # the built red-team scenarios; empty means all
 
 build() copies it to build/simprep/. Which solver answers a requirement follows from the name of
 its verify.check (SOLVER_FOR_CHECK).
@@ -26,12 +26,9 @@ SOLVER_FOR_CHECK = {"wave_tilt": "waves", "stress_safety_factor": "structure"}
 
 
 def _scenario_names(ctx: StageContext) -> list[str]:
-    """Red-team scenario names, from its build if present, else its source. Empty if neither."""
-    for base in (ctx.stage_build_dir("redteam"), ctx.project_dir / "src" / "redteam"):
-        directory = base / "scenarios"
-        if directory.is_dir():
-            return sorted(path.stem for path in directory.glob("*.yaml"))
-    return []
+    """Names of the built red-team scenarios."""
+    directory = ctx.stage_build_dir("redteam") / "scenarios"
+    return sorted(path.stem for path in directory.glob("*.yaml"))
 
 
 def build_cases(ctx: StageContext) -> list[dict]:
@@ -63,7 +60,7 @@ def load_cases(path: Path) -> list[dict]:
 
 class SimprepStage:
     name = "simprep"
-    needs: list[str] = []
+    needs = ["redteam"]
     reads_contract = False
     checks: list[str] = []
 
