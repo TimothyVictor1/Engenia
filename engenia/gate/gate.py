@@ -343,13 +343,18 @@ def run_gate(
     *,
     registry: graph.Registry | None = None,
     write_report: bool = True,
+    stages: Sequence[str] | None = None,
 ) -> GateResult:
+    """Run the gate. `stages` limits G3 (rebuild) and the stored-verdict part of G2 to those
+    stages. The default is every stage except `final`, whose output is made by the gate itself
+    (rebuilding it would run the gate again, without end)."""
     root = Path(root)
     if registry is None:
         from engenia.stages.registry import REGISTRY
 
         registry = REGISTRY
     order = graph.topo_order(registry)
+    covered = [n for n in order if (n in stages if stages is not None else n != "final")]
     project_dir = root / "projects" / project
     checks_path = project_dir / "checks" / "checks.yaml"
 
@@ -388,7 +393,7 @@ def run_gate(
             )
         if (problem := verdict_problem(verdict)) is not None:
             g2.append(f"{item_id}: {problem}")
-    for name in order:
+    for name in covered:
         path = project_dir / "build" / name / "verdict.json"
         if not path.is_file():
             continue
@@ -403,7 +408,7 @@ def run_gate(
                 g2.append(f"build/{name}/verdict.json[{index}] {verdict.check}: {problem}")
 
     # G3
-    g3 = _reproduce(project, root, registry, order)
+    g3 = _reproduce(project, root, registry, covered)
 
     # G4
     g4: list[str] = []

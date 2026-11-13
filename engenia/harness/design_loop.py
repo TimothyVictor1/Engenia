@@ -25,7 +25,7 @@ from engenia.harness.checks import (
     write_verdicts,
 )
 from engenia.harness.limits import Limits
-from engenia.harness.llm import ChatFn, chat
+from engenia.harness.llm import ChatFn, chat, check_model_families
 from engenia.harness.loop import run_agent
 from engenia.harness.tools import Toolbox
 from engenia.stages.base import Stage
@@ -114,6 +114,7 @@ def generate_until_pass(
     a stage's own agent passes its own. build/<stage>/verdict.json holds the last attempt's
     verdicts afterwards, and build/<stage>/transcripts/ holds one transcript per attempt.
     """
+    check_model_families()  # refuses a design model in the verification model's family
     limits = limits or Limits.from_env()
     model = model or _model_from_env()
     system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT.format(stage=stage.name)
