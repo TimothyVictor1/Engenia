@@ -1,0 +1,7 @@
+# Numerical settings for the waves solver (engenia/sim/waves). Lengths in metres.
+gravity_m_s2: 9.81
+# Faces of the hull mesh along the radius (end caps), around the circumference and along the
+# height. 32 around keeps the polygon within 1 percent of the true circle's area.
+mesh_resolution: {radial: 3, azimuthal: 32, vertical: 5}
+# Allowed relative difference between the mesh's displaced volume and mass / density.
+displaced_volume_tolerance: 0.05

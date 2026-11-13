@@ -17,6 +17,7 @@ dependencies = [
     "tomli-w>=1.2,<2",
     "platformio==6.1.18",
     "numpy>=2,<3",
+    "capytaine>=3.0.0",
 ]
 
 [project.scripts]
