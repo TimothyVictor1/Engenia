@@ -118,7 +118,7 @@ def test_lint_rejects_id_not_matching_file_name(workdir):
     assert runner.invoke(app, ["lint", "harbour-listener"]).exit_code == 1
 
 
-@pytest.mark.parametrize("command", ["plan", "gate", "matrix", "status"])
+@pytest.mark.parametrize("command", ["plan", "matrix", "status"])
 def test_unimplemented_commands_exit_zero(command, workdir):
     result = runner.invoke(app, [command, "harbour-listener"])
     assert result.exit_code == 0

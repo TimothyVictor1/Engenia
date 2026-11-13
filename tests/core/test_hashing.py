@@ -19,6 +19,7 @@ from engenia.core.hashing import (
 )
 from engenia.core.spec import SpecError
 from engenia.stages.registry import REGISTRY
+from engenia.stages.stub import StubStage
 
 
 def write_interface(project_dir, stage, facts, indent=None):
@@ -291,9 +292,13 @@ def test_base_classes_in_the_engenia_package_are_part_of_the_key(
         hashing.inspect, "getsource", lambda klass: asked.append(klass.__name__) or real(klass)
     )
     write_interface(project_dir, "verify_plan", {})
-    stage = REGISTRY["architect"]
-    stage_key(stage, make_ctx("architect"))
-    assert asked == ["ArchitectStage", "StubStage"]  # not Protocol, not object
+
+    class ProbeStage(StubStage):
+        name = "architect"
+        needs = ["verify_plan"]
+
+    stage_key(ProbeStage(), make_ctx("architect"))
+    assert asked == ["ProbeStage", "StubStage"]  # not Protocol, not object
 
 
 def test_the_stage_name_is_part_of_the_key(root, project_dir, make_ctx, fake_stage):
