@@ -5,8 +5,10 @@ import subprocess
 import pytest
 
 from engenia.core import hashing
+from engenia.core.engine import _NOT_OUTPUTS
 from engenia.core.hashing import (
     EMPTY_TREE_HASH,
+    SPEC_WIDE_STAGES,
     HashError,
     canonical_json,
     compute_keys,
@@ -111,6 +113,31 @@ def test_tree_hash_rejects_symlinks(tmp_path):
     (tmp_path / "link").symlink_to(tmp_path / "real")
     with pytest.raises(HashError, match="symlink"):
         tree_hash(tmp_path)
+
+
+def test_excluding_a_directory_excludes_everything_under_it(tmp_path):
+    (tmp_path / "out.txt").write_text("design")
+    (tmp_path / "interface.json").write_text("{}")
+    base = tree_hash(tmp_path, exclude=_NOT_OUTPUTS)
+    log = tmp_path / "transcripts"
+    (log / "deep").mkdir(parents=True)
+    (log / "a.txt").write_text("attempt 1")
+    (log / "deep" / "b.txt").write_text("attempt 2")
+    (log / "deep" / "link").symlink_to(tmp_path / "out.txt")  # never looked at
+    assert tree_hash(tmp_path, exclude=_NOT_OUTPUTS) == base
+    (log / "a.txt").write_text("attempt 1, rewritten")
+    assert tree_hash(tmp_path, exclude=_NOT_OUTPUTS) == base
+
+
+@pytest.mark.parametrize(
+    "name", ["transcripts.txt", "my-transcripts/x.txt", "sub/transcripts/x.txt"]
+)
+def test_only_the_top_level_transcripts_directory_is_excluded(tmp_path, name):
+    (tmp_path / "out.txt").write_text("design")
+    base = tree_hash(tmp_path, exclude=_NOT_OUTPUTS)
+    (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / name).write_text("this is part of the outputs")
+    assert tree_hash(tmp_path, exclude=_NOT_OUTPUTS) != base
 
 
 # --- stage keys -----------------------------------------------------------------------------
@@ -362,3 +389,80 @@ def test_stage_key_is_identical_across_two_fresh_clones(tmp_path, fake_stage, ma
 
     assert keys[0] == keys[1]
     assert keys[0][0] != keys[0][1]
+
+
+# --- spec-wide stages -----------------------------------------------------------------------
+
+
+def test_the_spec_wide_stages_are_the_agreed_seven():
+    assert SPEC_WIDE_STAGES == {
+        "verify_plan", "architect", "testplan", "simprep", "redteam", "final", "report",
+    }
+
+
+@pytest.mark.parametrize("name", sorted(SPEC_WIDE_STAGES))
+def test_a_spec_wide_stage_changes_key_when_any_requirement_changes(
+    root, project_dir, make_ctx, fake_stage, edit, name
+):
+    for need in REGISTRY[name].needs:
+        write_interface(project_dir, need, {})
+    stage, ctx = fake_stage(name), make_ctx(name)
+    before = stage_key(stage, ctx)
+    # R-003 names electronics and mechanical only
+    edit(project_dir / "spec" / "R-003.yaml", "value: 7", "value: 30")
+    assert stage_key(stage, ctx) != before
+
+
+def test_a_new_requirement_changes_a_spec_wide_key(root, project_dir, make_ctx, fake_stage):
+    write_interface(project_dir, "verify_plan", {})
+    stage, ctx = fake_stage("architect"), make_ctx("architect")
+    before = stage_key(stage, ctx)
+    spec_dir = project_dir / "spec"
+    new = (spec_dir / "R-005.yaml").read_text().replace("R-005", "R-006")
+    (spec_dir / "R-006.yaml").write_text(new)
+    assert stage_key(stage, ctx) != before
+
+
+def test_a_draft_requirement_is_not_part_of_a_spec_wide_key(
+    root, project_dir, make_ctx, fake_stage, edit
+):
+    spec_dir = project_dir / "spec"
+    edit(spec_dir / "R-003.yaml", "status: approved", "status: draft")
+    write_interface(project_dir, "verify_plan", {})
+    wide, ctx = fake_stage("architect"), make_ctx("architect")
+    before = stage_key(wide, ctx)
+    edit(spec_dir / "R-003.yaml", "value: 7", "value: 30")
+    assert stage_key(wide, ctx) == before
+    edit(spec_dir / "R-003.yaml", "status: draft", "status: approved")
+    assert stage_key(wide, ctx) != before
+
+
+def test_a_stage_that_is_not_spec_wide_ignores_requirements_that_do_not_name_it(
+    root, project_dir, make_ctx, fake_stage, edit
+):
+    write_interface(project_dir, "architect", {})
+    stage, ctx = fake_stage("firmware"), make_ctx("firmware")
+    before = stage_key(stage, ctx)
+    edit(project_dir / "spec" / "R-003.yaml", "value: 7", "value: 30")
+    assert stage_key(stage, ctx) == before
+
+
+def test_a_stage_can_opt_in_with_reads_all_requirements(
+    root, project_dir, make_ctx, fake_stage, edit
+):
+    write_interface(project_dir, "architect", {})
+    stage, ctx = fake_stage("firmware"), make_ctx("firmware")
+    stage.reads_all_requirements = True
+    before = stage_key(stage, ctx)
+    edit(project_dir / "spec" / "R-003.yaml", "value: 7", "value: 30")
+    assert stage_key(stage, ctx) != before
+
+
+def test_reads_all_requirements_false_changes_nothing(
+    root, project_dir, make_ctx, fake_stage, edit
+):
+    write_interface(project_dir, "architect", {})
+    stage, ctx = fake_stage("firmware"), make_ctx("firmware")
+    plain = stage_key(stage, ctx)
+    stage.reads_all_requirements = False
+    assert stage_key(stage, ctx) == plain

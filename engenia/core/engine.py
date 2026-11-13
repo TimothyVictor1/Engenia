@@ -18,9 +18,10 @@ in projects/<p>/src/.generated-from/<stage>. That file is committed with the cod
 clone knows which inputs its code was written for. Code with no such record (written by hand,
 or by an older run) is treated as current and is never overwritten.
 
-interface.json holds `key`, the hash of the build outputs (not the stage key). Two runs that
-produce the same outputs and the same facts therefore write byte-identical interface files, which
-is what stops propagation.
+interface.json holds `key`, the hash of the build outputs (not the stage key), leaving out
+interface.json, verdict.json and the transcripts/ directory. Two runs that produce the same
+outputs and the same facts therefore write byte-identical interface files, which is what stops
+propagation.
 """
 
 from __future__ import annotations
@@ -42,8 +43,11 @@ from engenia.stages.base import Stage
 MARKER_DIR = ".generated-from"
 INTERFACE_FILE = "interface.json"
 VERDICT_FILE = "verdict.json"
-# Written after the outputs exist, so they are not part of the outputs hash in interface.json.
-_NOT_OUTPUTS = (INTERFACE_FILE, VERDICT_FILE)
+# Left out of the outputs hash in interface.json. The first two are written after the outputs
+# exist. build/<stage>/transcripts/ (and everything under it) holds agent logs, which differ on
+# every run and say nothing about the design.
+TRANSCRIPTS_DIR = "transcripts"
+_NOT_OUTPUTS = (INTERFACE_FILE, VERDICT_FILE, TRANSCRIPTS_DIR)
 
 
 class PipelineError(CoreError):

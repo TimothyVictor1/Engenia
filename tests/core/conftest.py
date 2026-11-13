@@ -96,6 +96,7 @@ class FakeStage:
         reads_contract: bool = False,
         writes_code: bool = True,
         fail_in: str | None = None,
+        transcripts: bool = False,
     ) -> None:
         self.name = name
         self.needs = needs
@@ -104,6 +105,7 @@ class FakeStage:
         self.follow_spec = follow_spec
         self.writes_code = writes_code
         self.fail_in = fail_in
+        self.transcripts = transcripts
 
     def generate(self, ctx: StageContext) -> None:
         self.recorder.add("generate", self.name)
@@ -121,6 +123,11 @@ class FakeStage:
         code = ctx.src_dir / "code.txt"
         text = code.read_text(encoding="utf-8") if code.exists() else "no code\n"
         (ctx.build_dir / "out.txt").write_text("built from: " + text, encoding="utf-8")
+        if self.transcripts:  # a log that is different on every build
+            n = self.recorder.count("build", self.name)
+            log = ctx.build_dir / "transcripts" / f"run-{n}.txt"
+            log.parent.mkdir(parents=True, exist_ok=True)
+            log.write_text(f"model said something different, attempt {n}\n", encoding="utf-8")
 
     def interface(self, ctx: StageContext) -> dict:
         own = {}

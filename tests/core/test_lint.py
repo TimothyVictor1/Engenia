@@ -111,6 +111,19 @@ def test_l3_does_not_apply_to_inspection(verifiers):
     assert lint_data("R-001.yaml", data, verifiers) == []
 
 
+def test_l4_does_not_apply_to_inspection(verifiers):
+    data = variant(value=..., unit=..., verify_method="inspection", verify_limit=...)
+    assert lint_data("R-001.yaml", data, verifiers) == []
+    data = variant(value=..., unit=..., verify_method="inspection", verify_limit={})
+    assert lint_data("R-001.yaml", data, verifiers) == []
+
+
+def test_l4_still_applies_to_every_other_method(verifiers):
+    for method in ("analysis", "simulation", "test"):
+        data = variant(verify_method=method, verify_limit=...)
+        assert rules_of(lint_data("R-001.yaml", data, verifiers)) == ["L4"], method
+
+
 def test_l6_is_a_warning_for_a_missing_verifier(verifiers):
     data = variant(verify_check="buoyancy_margin")
     (finding,) = lint_data("R-001.yaml", data, verifiers)

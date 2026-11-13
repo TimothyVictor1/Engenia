@@ -115,6 +115,8 @@ def _l3(t: Target) -> list[str]:
 
 
 def _l4(t: Target) -> list[str]:
+    if t.verify.get("method") == "inspection":
+        return []  # an inspection has nothing to measure, so no limit, as in L3
     limit = t.verify.get("limit")
     if isinstance(limit, dict) and any(limit.get(k) is not None for k in ("min", "max", "equals")):
         return []
@@ -146,7 +148,7 @@ RULES: tuple[Rule, ...] = (
     Rule("L1", Severity.ERROR, 'statement contains exactly one "shall"', _l1),
     Rule("L2", Severity.ERROR, "no vague words", _l2),
     Rule("L3", Severity.ERROR, "value and unit present unless method is inspection", _l3),
-    Rule("L4", Severity.ERROR, "limit has at least one of min, max, equals", _l4),
+    Rule("L4", Severity.ERROR, "limit has at least one of min, max, equals unless inspection", _l4),
     Rule("L5", Severity.ERROR, "affects names only real stage names", _l5),
     Rule("L6", L6_SEVERITY, "verify.check names an existing file in verifiers/", _l6),
 )

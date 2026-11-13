@@ -16,6 +16,8 @@ ALL = {
     "verify_plan", "architect", "mechanical", "electronics", "firmware", "redteam",
     "testplan", "simprep", "integration", "simulation", "final", "report",
 }
+# These read the whole specification, so any requirement edit reruns them.
+SPEC_WIDE = {"verify_plan", "architect", "testplan", "simprep", "redteam", "final", "report"}
 runner = CliRunner()
 
 
@@ -55,16 +57,21 @@ def test_second_run_executes_zero_stages(run, recorder):
     assert all(r.status is Status.CACHED and not r.generated and not r.built for r in results)
 
 
-def test_editing_r003_reruns_electronics_mechanical_and_downstream_but_not_firmware(
+def test_editing_r003_reruns_the_spec_wide_stages_and_what_follows_but_not_firmware(
     run, recorder, project_dir, edit
 ):
     run()
     recorder.reset()
     edit(project_dir / "spec" / "R-003.yaml", "value: 7", "value: 30")
     run()
-    rerun = {"electronics", "mechanical", "integration", "simulation", "final", "report"}
+    # R-003 affects electronics and mechanical; integration follows their new interfaces;
+    # the spec-wide stages read it whether or not `affects` names them.
+    rerun = SPEC_WIDE | {"electronics", "mechanical", "integration", "simulation"}
     assert recorder.stages("build") == rerun
     assert recorder.stages("generate") == rerun
+    # The architect reran, but its facts did not change, so firmware (which needs only the
+    # architect) has no reason to.
+    assert "architect" in recorder.stages("build")
     assert "firmware" not in recorder.stages("build") | recorder.stages("generate")
     assert recorder.count("build", "mechanical") == 1  # once, not once per downstream stage
 
@@ -94,11 +101,9 @@ def test_firmware_reruns_when_an_upstream_interface_changed(
     recorder.reset()
     edit(project_dir / "spec" / "R-007.yaml", "value: 120", "value: 140")
     run()
-    assert recorder.stages("build") == {
-        "architect", "mechanical", "electronics", "firmware",
-        "integration", "simulation", "final", "report",
+    assert recorder.stages("build") == SPEC_WIDE | {
+        "mechanical", "electronics", "firmware", "integration", "simulation",
     }
-    assert not recorder.stages("build") & {"verify_plan", "redteam", "testplan", "simprep"}
 
 
 def test_a_stage_that_reruns_with_an_unchanged_interface_does_not_wake_its_downstream(
@@ -112,11 +117,13 @@ def test_a_stage_that_reruns_with_an_unchanged_interface_does_not_wake_its_downs
 
     results = run(registry)
 
-    assert recorder.stages("build") == {"electronics", "mechanical"}  # they reran ...
+    reran = SPEC_WIDE | {"electronics", "mechanical"}
+    assert recorder.stages("build") == reran  # they reran ...
     assert interface_bytes(project_dir) == before  # ... and said the same thing
     by_stage = {r.stage: r for r in results}
-    for name in ALL - {"electronics", "mechanical"}:
+    for name in ALL - reran:  # firmware, integration, simulation
         assert by_stage[name].status is Status.CACHED, name
+    assert {"firmware", "integration"} <= ALL - reran
 
 
 def test_a_whitespace_only_edit_reruns_the_stage_but_stops_there(
@@ -128,7 +135,8 @@ def test_a_whitespace_only_edit_reruns_the_stage_but_stops_there(
     with open(project_dir / "spec" / "R-005.yaml", "a", encoding="utf-8") as handle:
         handle.write("\n")  # R-005 affects mechanical only
     run()
-    assert recorder.stages("build") == {"mechanical"}  # same facts, so nothing downstream
+    # Same facts, so nothing follows mechanical (integration stays cached).
+    assert recorder.stages("build") == SPEC_WIDE | {"mechanical"}
 
 
 def test_reverting_a_change_restores_the_earlier_build_from_the_cache(
@@ -287,6 +295,24 @@ def test_interface_that_is_not_valid_is_a_pipeline_error(run, fake_registry):
         run(registry)
 
 
+def test_transcripts_do_not_change_the_interface_or_wake_downstream(
+    run, recorder, project_dir, fake_registry, edit
+):
+    """Agent transcripts differ on every run; they must not count as design outputs."""
+    registry = fake_registry({"mechanical": {"transcripts": True}})
+    run(registry)
+    before = interface_bytes(project_dir)
+    first = sorted((project_dir / "build" / "mechanical" / "transcripts").iterdir())
+    assert [p.name for p in first] == ["run-1.txt"]
+    edit(project_dir / "spec" / "R-005.yaml", "value: 0.20", "value: 0.20\n")  # forces a rebuild
+    results = {r.stage: r for r in run(registry)}
+    transcripts = sorted((project_dir / "build" / "mechanical" / "transcripts").iterdir())
+    assert recorder.count("build", "mechanical") == 2
+    assert [p.name for p in transcripts] == ["run-2.txt"]  # a different transcript ...
+    assert interface_bytes(project_dir) == before  # ... and the same interface
+    assert results["integration"].status is Status.CACHED
+
+
 def test_every_core_error_shares_one_base():
     assert issubclass(PipelineError, CoreError) and issubclass(SpecError, CoreError)
 
@@ -314,14 +340,16 @@ def test_cli_second_run_executes_zero_stages(root):
     assert not any(line.startswith("ran") for line in second.output.splitlines())
 
 
-def test_cli_editing_r003_reruns_only_mechanical_and_electronics(root, project_dir, edit):
-    """The stubs publish the same interface every time, so the rerun stops at those two."""
+def test_cli_editing_r003_reruns_the_affected_and_spec_wide_stages_only(
+    root, project_dir, edit
+):
+    """The stubs publish the same interface every time, so nothing else follows."""
     runner.invoke(app, ["run", PROJECT])
     edit(project_dir / "spec" / "R-003.yaml", "value: 7", "value: 30")
     result = runner.invoke(app, ["run", PROJECT])
     ran = {line.split()[1] for line in result.output.splitlines() if line.startswith("ran")}
-    assert ran == {"mechanical", "electronics"}
-    assert "done: 2 ran, 10 from cache" in result.output
+    assert ran == SPEC_WIDE | {"mechanical", "electronics"}
+    assert "done: 9 ran, 3 from cache" in result.output
 
 
 def test_cli_reports_a_broken_spec_and_exits_1(root, project_dir):

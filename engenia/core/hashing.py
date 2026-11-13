@@ -5,7 +5,9 @@ that is what lets the cache skip a stage (rule 5). Everything that feeds a key i
 
 The key covers six parts, always in this order:
 
-1. requirements: the raw bytes of the R-*.yaml files whose `affects` names the stage
+1. requirements: the raw bytes of the R-*.yaml files whose `affects` names the stage. A
+   spec-wide stage (see SPEC_WIDE_STAGES) reads the whole specification instead, so it gets
+   every approved requirement, whatever `affects` says; draft requirements do not count for it
 2. upstream: the interface.json of every stage in `needs`, as canonical JSON
 3. contract: contract.json as canonical JSON, only if the stage has `reads_contract`
 4. src: every file under src/<stage>/
@@ -47,6 +49,12 @@ from engenia.core.errors import CoreError
 from engenia.stages.base import Stage
 
 KEY_VERSION = 1  # bump when the way keys are built changes, so old cache entries stop matching
+
+# Stages that read every requirement, not only those whose `affects` names them. A stage class
+# outside this set can opt in by setting `reads_all_requirements = True`; no contract change.
+SPEC_WIDE_STAGES = frozenset(
+    {"verify_plan", "architect", "testplan", "simprep", "redteam", "final", "report"}
+)
 
 PART_ORDER = ("requirements", "upstream", "contract", "src", "stage_class", "container")
 
@@ -96,16 +104,22 @@ def file_hash(path: Path) -> str:
 def tree_files(directory: Path, exclude: Iterable[str] = ()) -> list[tuple[str, Path]]:
     """(relative posix path, absolute path) of every file under `directory`, sorted by path.
 
-    `exclude` holds relative posix paths to leave out. Symlinks and anything that is not a
-    regular file raise HashError: a link points outside the tree, so the tree would not be the
-    whole story.
+    `exclude` holds relative posix paths to leave out. An entry names a file, or a directory
+    together with everything under it; it matches whole path parts only, so "transcripts" does
+    not match "transcripts.txt" or "sub/transcripts". Symlinks and anything that is not a regular
+    file raise HashError: a link points outside the tree, so the tree would not be the whole
+    story. Excluded paths are not looked at, so a link inside an excluded directory is fine.
     """
     root = Path(directory)
     skip = set(exclude)
     found: list[tuple[str, Path]] = []
     for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
         here = Path(dirpath)
-        dirnames[:] = sorted(d for d in dirnames if d not in IGNORED_DIRS)
+        dirnames[:] = sorted(
+            d
+            for d in dirnames
+            if d not in IGNORED_DIRS and (here / d).relative_to(root).as_posix() not in skip
+        )
         for name in dirnames:
             if (here / name).is_symlink():
                 raise HashError(f"symlink not allowed in a hashed tree: {here / name}")
@@ -146,11 +160,22 @@ class StageKeys:
     stage_key: str  # every part
 
 
+def reads_all_requirements(stage: Stage) -> bool:
+    """True for the spec-wide stages and for any stage class that sets the opt-in attribute."""
+    return stage.name in SPEC_WIDE_STAGES or bool(getattr(stage, "reads_all_requirements", False))
+
+
 def _requirements_part(stage: Stage, ctx: StageContext) -> str:
     files = {f.requirement.id: f for f in spec.load_spec(ctx.spec_dir)}
-    wanted = graph.requirements_for(
-        stage.name, (f.requirement for f in files.values()), {stage.name: stage}
-    )
+    if reads_all_requirements(stage):
+        wanted = sorted(
+            (f.requirement for f in files.values() if f.requirement.status == "approved"),
+            key=lambda r: r.id,
+        )
+    else:
+        wanted = graph.requirements_for(
+            stage.name, (f.requirement for f in files.values()), {stage.name: stage}
+        )
     return _digest([[files[r.id].path.name, _sha256(files[r.id].raw)] for r in wanted])
 
 
