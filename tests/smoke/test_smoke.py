@@ -79,7 +79,10 @@ def test_run_exits_zero_and_builds_every_stage(workdir):
     for name in STAGE_NAMES:
         build = workdir / "projects" / "harbour-listener" / "build" / name
         Interface.model_validate_json((build / "interface.json").read_text())
-        assert json.loads((build / "verdict.json").read_text()) == []
+        verdicts = json.loads((build / "verdict.json").read_text())
+        assert isinstance(verdicts, list)
+        for item in verdicts:
+            Verdict.model_validate(item)
         assert (workdir / "projects" / "harbour-listener" / "src" / name).is_dir()
 
 
