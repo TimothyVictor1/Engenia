@@ -1,0 +1,8 @@
+{
+  "stage": "mechanical",
+  "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "facts": {
+    "dry_mass_g": 318.4,
+    "buoyancy_margin": 0.17
+  }
+}
