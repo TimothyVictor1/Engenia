@@ -58,6 +58,14 @@ def build(src_dir: Path, build_dir: Path, density_g_cm3: float) -> None:
         "bbox_mm": [round(v, 6) for v in size],
         "centre_of_mass_mm": [round(v, 6) for v in centre],
     }
+    if model.get("template", "hull") == "mast_housing":
+        # The mast housing is mounted in air; it has no buoyancy displacement fact.
+        del facts["displaced_volume_cm3"]
+        inner_width = params.outer_diameter_mm - 2 * params.wall_thickness_mm
+        inner_depth = max(params.battery_bay_mm[1] + 8 * params.wall_thickness_mm,
+                          params.outer_diameter_mm * 0.65) - 2 * params.wall_thickness_mm
+        inner_height = params.height_mm - params.wall_thickness_mm
+        facts["internal_volume_cm3"] = round(inner_width * inner_depth * inner_height / 1000, 6)
     digest = hashlib.sha256(json.dumps(facts, sort_keys=True).encode())
     for name in ARTIFACTS:
         digest.update(name.encode())
