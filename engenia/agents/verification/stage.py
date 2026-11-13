@@ -34,7 +34,7 @@ from engenia.contracts.models import (
 )
 from engenia.core.hashing import file_hash
 from engenia.harness.limits import Limits
-from engenia.harness.llm import ChatFn, chat
+from engenia.harness.llm import ChatFn, chat, check_model_families
 from engenia.harness.loop import run_agent
 from engenia.harness.tools import Toolbox, ToolError
 
@@ -267,6 +267,7 @@ class VerifyPlanStage:
         plan_dir.mkdir(parents=True, exist_ok=True)
 
         source = "deterministic"
+        check_model_families()
         model = self._model or os.environ.get("ENGENIA_VERIFY_MODEL", "").strip()
         if model and self._generate_with_model(ctx, model, requirements):
             source = "model"

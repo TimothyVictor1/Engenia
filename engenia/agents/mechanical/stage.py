@@ -14,6 +14,7 @@ from pathlib import Path
 import yaml
 
 from engenia.contracts.models import Contract, Requirement, StageContext
+from engenia.harness.proposer import propose_mechanical_params
 
 LOG = logging.getLogger(__name__)
 REPO = Path(__file__).resolve().parents[3]
@@ -98,7 +99,7 @@ class MechanicalStage:
             Requirement.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
             for path in sorted(ctx.spec_dir.glob("R-*.yaml"))
         ]
-        params = propose_params(contract, requirements)
+        params = propose_mechanical_params(ctx, contract, requirements, propose_params)
         pack_path = _pack_file(ctx, "pack.yaml")
         if pack_path.is_file():
             pack = yaml.safe_load(pack_path.read_text(encoding="utf-8"))

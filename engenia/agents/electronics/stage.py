@@ -15,6 +15,7 @@ import yaml
 from engenia.agents.electronics.facts import Facts, load_facts
 from engenia.agents.electronics.selection import assembly_size, power_facts, propose_selection
 from engenia.contracts.models import ChangeRequest, Contract, Requirement, StageContext
+from engenia.harness.proposer import propose_electronics_selection
 
 
 def _pack_file(ctx: StageContext, name: str) -> Path:
@@ -85,7 +86,9 @@ class ElectronicsStage:
             for path in sorted(ctx.spec_dir.glob("R-*.yaml"))
         ]
         facts = load_facts(_pack_file(ctx, "parts/facts.toml"))
-        selection = propose_selection(contract, requirements, facts)
+        selection = propose_electronics_selection(
+            ctx, contract, requirements, facts, propose_selection
+        )
         selection["pins_used"] = dict(sorted(contract.interfaces.pin_map.items()))
         selection["board_holes_mm"] = [
             list(hole) for hole in contract.interfaces.mounts.board_holes_mm
