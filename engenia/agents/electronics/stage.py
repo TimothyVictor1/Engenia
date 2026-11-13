@@ -15,7 +15,7 @@ import yaml
 from engenia.agents.electronics.facts import Facts, load_facts
 from engenia.agents.electronics.selection import assembly_size, power_facts, propose_selection
 from engenia.contracts.models import ChangeRequest, Contract, Requirement, StageContext
-from engenia.harness.proposer import propose_electronics_selection
+from engenia.harness.proposer import propose_electronics_selection, proposer_fact
 
 
 def _pack_file(ctx: StageContext, name: str) -> Path:
@@ -177,4 +177,6 @@ class ElectronicsStage:
         _write_json(ctx.build_dir / "build_facts.json", built)
 
     def interface(self, ctx: StageContext) -> dict:
-        return json.loads((ctx.build_dir / "build_facts.json").read_text(encoding="utf-8"))
+        facts = json.loads((ctx.build_dir / "build_facts.json").read_text(encoding="utf-8"))
+        facts["proposer"] = proposer_fact(ctx)
+        return facts

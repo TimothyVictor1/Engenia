@@ -50,7 +50,7 @@ def test_build_produces_real_artifacts_and_valid_interface(built):
     assert stage.checks == CHECKS
     interface = Interface.model_validate_json((ctx.build_dir / "interface.json").read_text())
     assert interface.stage == "mechanical"
-    assert stage.interface(ctx) == interface.facts
+    assert stage.interface(ctx) == {**interface.facts, "proposer": "deterministic"}
     assert set(interface.facts) == {
         "dry_mass_g", "displaced_volume_cm3", "internal_volume_cm3", "battery_bay_mm",
         "wall_min_mm", "bbox_mm", "centre_of_mass_mm", "contract_version",
@@ -310,3 +310,25 @@ def test_interface_records_contract_version_used_for_generation(tmp_path, source
     interface = Interface.model_validate_json((ctx.build_dir / "interface.json").read_text())
     assert interface.facts["contract_version"] == version
     assert stage.interface(ctx)["contract_version"] == version
+
+
+def test_mast_housing_build_is_reproducible(tmp_path):
+    ctx = StageContext(root=tmp_path, project="mast", stage="mechanical")
+    contract = default_contract().model_dump(mode="json")
+    contract["template"] = "mast_housing"
+    ctx.contract_path.parent.mkdir(parents=True)
+    ctx.contract_path.write_text(json.dumps(contract))
+    stage = MechanicalStage()
+    stage.generate(ctx)
+    assert "buoyancy_margin" not in stage.checks
+    assert "metacentric_height" not in stage.checks
+    stage.build(ctx)
+    facts = stage.interface(ctx)
+    assert "displaced_volume_cm3" not in facts
+    assert {"dry_mass_g", "bbox_mm", "wall_min_mm", "internal_volume_cm3",
+            "battery_bay_mm", "contract_version", "proposer"} <= facts.keys()
+    for name in ARTIFACTS:
+        assert (ctx.build_dir / name).stat().st_size > 0
+    before = hashes(ctx)
+    stage.build(ctx)
+    assert hashes(ctx) == before

@@ -14,7 +14,7 @@ from pathlib import Path
 import yaml
 
 from engenia.contracts.models import Contract, Requirement, StageContext
-from engenia.harness.proposer import propose_mechanical_params
+from engenia.harness.proposer import propose_mechanical_params, proposer_fact
 
 LOG = logging.getLogger(__name__)
 REPO = Path(__file__).resolve().parents[3]
@@ -94,7 +94,9 @@ class MechanicalStage:
         contract_path = ctx.contract_path
         if not contract_path.is_file():
             contract_path = _pack_file(ctx, "default_contract.json")
-        contract = Contract.model_validate_json(contract_path.read_text(encoding="utf-8"))
+        contract_data = json.loads(contract_path.read_text(encoding="utf-8"))
+        template = contract_data.pop("template", "hull")
+        contract = Contract.model_validate(contract_data)
         requirements = [
             Requirement.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
             for path in sorted(ctx.spec_dir.glob("R-*.yaml"))
@@ -103,13 +105,24 @@ class MechanicalStage:
         pack_path = _pack_file(ctx, "pack.yaml")
         if pack_path.is_file():
             pack = yaml.safe_load(pack_path.read_text(encoding="utf-8"))
+            templates = pack.get("templates", {"hull": {"checks": CHECKS}})
+            if template not in templates:
+                raise ValueError(f"Unknown mechanical template: {template}")
+            self.checks = list(templates[template]["checks"])
             params["infill_factor"] = pack.get("printing", {}).get("infill_factor", 1.0)
         ctx.src_dir.mkdir(parents=True, exist_ok=True)
         (ctx.src_dir / "params.yaml").write_text(
             yaml.safe_dump(params, sort_keys=True), encoding="utf-8"
         )
         (ctx.src_dir / "model.py").write_text(
-            MODEL + f"\ncontract_version = {contract.version}\n", encoding="utf-8"
+            (MODEL if template == "hull" else MODEL.replace(
+                "from packs.buoy.templates.hull import HullParams, build_hull",
+                "from packs.buoy.templates.mast_housing "
+                "import MastHousingParams, build_mast_housing",
+            ).replace("HullParams(**", "MastHousingParams(**").replace(
+                "build_hull(params)", "build_mast_housing(params)"
+            )) + f"\ncontract_version = {contract.version}\n"
+            + f"template = {template!r}\n", encoding="utf-8"
         )
 
     def build(self, ctx: StageContext) -> None:
@@ -148,4 +161,6 @@ class MechanicalStage:
 
     def interface(self, ctx: StageContext) -> dict:
         """Return facts, as required by Stage; build also publishes the envelope."""
-        return json.loads((ctx.build_dir / "interface.json").read_text(encoding="utf-8"))["facts"]
+        facts = json.loads((ctx.build_dir / "interface.json").read_text(encoding="utf-8"))["facts"]
+        facts["proposer"] = proposer_fact(ctx)
+        return facts
