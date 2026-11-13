@@ -31,6 +31,14 @@ hull, lid = build_hull(params)
 '''
 
 
+class EnvelopeBudgetError(ValueError):
+    def __init__(self, required: list[float], available: list[float]):
+        self.required = required
+        super().__init__(
+            f"Battery bay and mounts need envelope {required} mm; available {available} mm"
+        )
+
+
 def propose_params(contract: Contract | dict, requirements: list[Requirement]) -> dict:
     """Replaceable proposal seam using budgets and approved wall requirements.
 
@@ -63,7 +71,9 @@ def propose_params(contract: Contract | dict, requirements: list[Requirement]) -
     lid_thickness = wall + 1.2
     ex, ey, ez = c.budgets.mechanical.outer_envelope_mm
     if diameter > min(ex, ey) or height + lid_thickness > ez:
-        raise ValueError("Battery bay and mounts exceed the mechanical envelope; revise contract")
+        raise EnvelopeBudgetError(
+            [diameter, diameter, round(height + lid_thickness, 6)], [ex, ey, ez]
+        )
     return {
         "outer_diameter_mm": diameter,
         "height_mm": round(height, 6),
@@ -84,10 +94,23 @@ def _pack_file(ctx: StageContext, name: str) -> Path:
     return local if local.is_file() else REPO / "packs" / "buoy" / name
 
 
+def _request_budget(ctx: StageContext, path: str, requested, reason: str) -> None:
+    # The board lands in PR #23. Keep this import at the call site so normal
+    # mechanical builds remain usable until that dependency is merged.
+    from engenia.core.board import load_requests, submit_change_request
+
+    for _, existing in load_requests(ctx.root, ctx.project):
+        if (existing.from_stage == "mechanical" and existing.path == path
+                and existing.requested == requested):
+            return
+    submit_change_request(ctx, path=path, requested=requested, reason=reason)
+
+
 class MechanicalStage:
     name = "mechanical"
     needs = ["architect"]
     reads_contract = True
+    reads_calibration = True
     checks = CHECKS.copy()
 
     def generate(self, ctx: StageContext) -> None:
@@ -101,7 +124,13 @@ class MechanicalStage:
             Requirement.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
             for path in sorted(ctx.spec_dir.glob("R-*.yaml"))
         ]
-        params = propose_mechanical_params(ctx, contract, requirements, propose_params)
+        try:
+            params = propose_mechanical_params(ctx, contract, requirements, propose_params)
+        except EnvelopeBudgetError as exc:
+            _request_budget(
+                ctx, "budgets.mechanical.outer_envelope_mm", exc.required, str(exc),
+            )
+            raise
         pack_path = _pack_file(ctx, "pack.yaml")
         if pack_path.is_file():
             pack = yaml.safe_load(pack_path.read_text(encoding="utf-8"))
@@ -135,6 +164,14 @@ class MechanicalStage:
             LOG.warning("Missing %s; using PETG density 1.27 g/cm3", pack_path)
         if not math.isfinite(density) or density <= 0:
             raise ValueError("PETG density_g_cm3 must be finite and positive")
+        calibration_path = ctx.project_dir / "calibration.yaml"
+        if calibration_path.is_file():
+            calibration = yaml.safe_load(calibration_path.read_text(encoding="utf-8"))
+            factor = calibration["mass_factor"]
+            if (isinstance(factor, bool) or not isinstance(factor, (int, float))
+                    or not math.isfinite(factor) or factor <= 0):
+                raise ValueError("calibration mass_factor must be finite and positive")
+            density *= factor
 
         # The scheduler hashes the entire build directory. Clear prior verdicts
         # and artifacts so reruns cannot accidentally hash a previous run.
@@ -155,6 +192,17 @@ class MechanicalStage:
             env=env,
             check=True,
         )
+        facts = json.loads((ctx.build_dir / "interface.json").read_text(encoding="utf-8"))["facts"]
+        contract_path = (ctx.contract_path if ctx.contract_path.is_file()
+                         else _pack_file(ctx, "default_contract.json"))
+        contract_data = json.loads(contract_path.read_text(encoding="utf-8"))
+        contract_data.pop("template", None)
+        budget = Contract.model_validate(contract_data).budgets.mechanical.mass_g
+        if facts["dry_mass_g"] > budget:
+            _request_budget(
+                ctx, "budgets.mechanical.mass_g", math.ceil(facts["dry_mass_g"]),
+                f"Calculated mechanical mass {facts['dry_mass_g']} g exceeds {budget:g} g budget",
+            )
         for check in self.checks:
             if not (ctx.root / "verifiers" / f"{check}.py").is_file():
                 LOG.warning("Skipping missing mechanical verifier: %s", check)
