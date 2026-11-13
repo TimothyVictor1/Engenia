@@ -58,26 +58,7 @@
   "facts": {
     "mechanical": {
       "dry_mass_g": 318.4,
-      "outer_envelope_mm": [
-        152,
-        152,
-        214
-      ],
-      "wall_thickness_min_mm": 3.2,
-      "displaced_mass_g": 372.6,
-      "metacentric_height_mm": 8.4,
-      "print_bed_fit": true
-    },
-    "electronics": {
-      "mass_g": 58.2,
-      "bay_mm": [
-        70,
-        40,
-        24
-      ],
-      "energy_mwh_per_day": 176,
-      "erc_errors": 3,
-      "battery_capacity_mah": 2000
+      "buoyancy_margin": 0.17
     }
   },
   "change_requests": [
@@ -90,24 +71,8 @@
         40,
         26
       ],
-      "reason": "battery height 24 mm",
+      "reason": "Battery height is 24 mm; 2 mm clearance is needed.",
       "status": "open"
-    },
-    {
-      "id": "CR-002",
-      "from_stage": "mechanical",
-      "path": "budgets.mechanical.mass_g",
-      "requested": 330,
-      "reason": "3.2 mm walls needed for R-004 add 18 g",
-      "status": "accepted"
-    },
-    {
-      "id": "CR-003",
-      "from_stage": "firmware",
-      "path": "budgets.firmware.ram_kb",
-      "requested": 128,
-      "reason": "FFT buffers at 4096 points",
-      "status": "rejected"
     }
   ]
 }

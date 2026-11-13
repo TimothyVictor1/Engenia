@@ -1,93 +1,6 @@
 {
   "requirements": [
     {
-      "id": "R-001",
-      "statement": "The total mass of the buoy shall not exceed 400 g.",
-      "unit": "g",
-      "limit": {
-        "min": null,
-        "max": 400,
-        "equals": null
-      },
-      "affects": [
-        "mechanical",
-        "electronics"
-      ],
-      "method": "analysis",
-      "status": "pass",
-      "verdict": {
-        "check": "mass_budget",
-        "measured": 318.4,
-        "result": "pass",
-        "evidence_level": "calculated",
-        "message": null,
-        "stage": "mechanical"
-      }
-    },
-    {
-      "id": "R-002",
-      "statement": "The hull shall fit within the 220 x 220 x 250 mm print bed.",
-      "unit": "fits",
-      "limit": {
-        "min": null,
-        "max": null,
-        "equals": 1
-      },
-      "affects": [
-        "mechanical"
-      ],
-      "method": "analysis",
-      "status": "pass",
-      "verdict": {
-        "check": "print_bed_fit",
-        "measured": 1,
-        "result": "pass",
-        "evidence_level": "calculated",
-        "message": null,
-        "stage": "mechanical"
-      }
-    },
-    {
-      "id": "R-003",
-      "statement": "The buoy shall operate for at least 7 days on one battery charge.",
-      "unit": "day",
-      "limit": {
-        "min": 7,
-        "max": null,
-        "equals": null
-      },
-      "affects": [
-        "electronics",
-        "mechanical"
-      ],
-      "method": "analysis",
-      "status": "unverified",
-      "verdict": null
-    },
-    {
-      "id": "R-004",
-      "statement": "The hull shall have a minimum wall thickness of at least 3 mm.",
-      "unit": "mm",
-      "limit": {
-        "min": 3,
-        "max": null,
-        "equals": null
-      },
-      "affects": [
-        "mechanical"
-      ],
-      "method": "analysis",
-      "status": "pass",
-      "verdict": {
-        "check": "wall_thickness_min",
-        "measured": 3.2,
-        "result": "pass",
-        "evidence_level": "calculated",
-        "message": null,
-        "stage": "mechanical"
-      }
-    },
-    {
       "id": "R-005",
       "statement": "The buoy shall have a buoyancy margin of at least 0.20.",
       "unit": "ratio",
@@ -103,136 +16,19 @@
       "status": "fail",
       "verdict": {
         "check": "buoyancy_margin",
-        "measured": 0.14,
+        "measured": 0.17,
         "result": "fail",
         "evidence_level": "calculated",
-        "message": "Buoyancy margin 0.14 is below the required 0.20 (displaced mass 372.6 g at water density 1005 kg/m3, dry mass 318.4 g).",
+        "message": "Calculated buoyancy margin is below the required minimum.",
         "stage": "mechanical"
       }
-    },
-    {
-      "id": "R-006",
-      "statement": "The buoy shall float upright with a metacentric height of at least 5 mm.",
-      "unit": "mm",
-      "limit": {
-        "min": 5,
-        "max": null,
-        "equals": null
-      },
-      "affects": [
-        "mechanical"
-      ],
-      "method": "analysis",
-      "status": "pass",
-      "verdict": {
-        "check": "metacentric_height",
-        "measured": 8.4,
-        "result": "pass",
-        "evidence_level": "calculated",
-        "message": null,
-        "stage": "mechanical"
-      }
-    },
-    {
-      "id": "R-007",
-      "statement": "The electronics shall draw an average power of at most 25 mW.",
-      "unit": "mW",
-      "limit": {
-        "min": null,
-        "max": 25,
-        "equals": null
-      },
-      "affects": [
-        "electronics"
-      ],
-      "method": "analysis",
-      "status": "error",
-      "verdict": {
-        "check": "power_budget",
-        "measured": null,
-        "result": "error",
-        "evidence_level": "calculated",
-        "message": "Verifier could not read build/electronics/interface.json: key 'avg_power_mw' is missing.",
-        "stage": "electronics"
-      }
-    },
-    {
-      "id": "R-008",
-      "statement": "The electronics shall have zero electrical rule errors.",
-      "unit": "count",
-      "limit": {
-        "min": null,
-        "max": 0,
-        "equals": null
-      },
-      "affects": [
-        "electronics"
-      ],
-      "method": "analysis",
-      "status": "fail",
-      "verdict": {
-        "check": "erc_clean",
-        "measured": 3,
-        "result": "fail",
-        "evidence_level": "calculated",
-        "message": "3 electrical rule errors: U2 pin 4 unconnected; C7 has no footprint; net LORA_CS has two drivers.",
-        "stage": "electronics"
-      }
-    },
-    {
-      "id": "R-009",
-      "statement": "The firmware shall detect a 200 Hz tone in the recorded test audio with a detection rate of at least 0.9.",
-      "unit": "ratio",
-      "limit": {
-        "min": 0.9,
-        "max": null,
-        "equals": null
-      },
-      "affects": [
-        "firmware"
-      ],
-      "method": "analysis",
-      "status": "unverified",
-      "verdict": null
-    },
-    {
-      "id": "R-010",
-      "statement": "The firmware shall raise at most 2 false alarms per hour on the quiet recording.",
-      "unit": "1/h",
-      "limit": {
-        "min": null,
-        "max": 2,
-        "equals": null
-      },
-      "affects": [
-        "firmware"
-      ],
-      "method": "analysis",
-      "status": "unverified",
-      "verdict": null
-    },
-    {
-      "id": "R-011",
-      "statement": "The buoy shall keep its tilt within 30 degrees in 0.5 m significant wave height.",
-      "unit": "deg",
-      "limit": {
-        "min": null,
-        "max": 30,
-        "equals": null
-      },
-      "affects": [
-        "simulation"
-      ],
-      "method": "simulation",
-      "status": "unverified",
-      "verdict": null
     },
     {
       "id": "R-012",
-      "statement": "The hull shall keep a stress safety factor of at least 2 at 3 m depth.",
-      "unit": "ratio",
+      "statement": "The hull shall withstand water pressure at 10 m depth.",
+      "unit": "m",
       "limit": {
-        "min": 2,
+        "min": 10,
         "max": null,
         "equals": null
       },

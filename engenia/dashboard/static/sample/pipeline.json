@@ -1,12 +1,12 @@
 {
   "project": "harbour-listener",
-  "updated": "2026-11-13T09:41:07+00:00",
+  "updated": "2026-11-13T10:20:30Z",
   "stages": [
     {
       "name": "verify_plan",
       "needs": [],
       "status": "done",
-      "key": "sha256:0101010101010101010101010101010101010101010101010101010101010101"
+      "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     {
       "name": "architect",
@@ -14,23 +14,23 @@
         "verify_plan"
       ],
       "status": "done",
-      "key": "sha256:0202020202020202020202020202020202020202020202020202020202020202"
+      "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     {
       "name": "mechanical",
       "needs": [
         "architect"
       ],
-      "status": "done",
-      "key": "sha256:0303030303030303030303030303030303030303030303030303030303030303"
+      "status": "failed",
+      "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     {
       "name": "electronics",
       "needs": [
         "architect"
       ],
-      "status": "failed",
-      "key": "sha256:0404040404040404040404040404040404040404040404040404040404040404"
+      "status": "done",
+      "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     {
       "name": "firmware",
@@ -44,18 +44,18 @@
       "name": "redteam",
       "needs": [],
       "status": "done",
-      "key": "sha256:0606060606060606060606060606060606060606060606060606060606060606"
+      "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     {
       "name": "testplan",
       "needs": [],
-      "status": "not_run",
-      "key": null
+      "status": "stub",
+      "key": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     },
     {
       "name": "simprep",
       "needs": [],
-      "status": "stub",
+      "status": "not_run",
       "key": null
     },
     {

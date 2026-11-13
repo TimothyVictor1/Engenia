@@ -20,12 +20,19 @@ function resolve(path) {
   return rest.startsWith('files/') ? `sample/${rest}` : `sample/${rest}.json`;
 }
 
+const wait = (ms) => new Promise((done) => setTimeout(done, ms));
+
 async function request(path) {
   let res;
-  try {
-    res = await fetch(resolve(path), { headers: { Accept: 'application/json' }, cache: 'no-store' });
-  } catch (err) {
-    throw new ApiError('Cannot reach the server.', { network: true });
+  // The backend answers 503 while a build is writing its files; that clears in moments.
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      res = await fetch(resolve(path), { headers: { Accept: 'application/json' }, cache: 'no-store' });
+    } catch (err) {
+      throw new ApiError('Cannot reach the server.', { network: true });
+    }
+    if (res.status !== 503 || attempt >= 2) break;
+    await wait(400 * (attempt + 1));
   }
   if (!res.ok) throw new ApiError(`Server answered ${res.status} ${res.statusText}`.trim(), { status: res.status });
   try {
@@ -35,10 +42,24 @@ async function request(path) {
   }
 }
 
+/**
+ * Sample mode: sample/stages.json holds one stage (or a list). Any other stage is answered with
+ * its status from the sample pipeline and no facts or verdicts.
+ */
+async function sampleStage(name) {
+  const sample = await request('/api/stages');
+  const hit = (Array.isArray(sample) ? sample : [sample]).find((s) => s && s.name === name);
+  if (hit) return hit;
+  const pipeline = await request('/api/pipeline');
+  const stage = pipeline.stages.find((s) => s.name === name);
+  if (!stage) throw new ApiError('Unknown stage', { status: 404 });
+  return { name, status: stage.status, facts: {}, verdicts: [] };
+}
+
 export const api = {
   pipeline: () => request('/api/pipeline'),
   requirements: () => request('/api/requirements'),
-  stage: (name) => request(`/api/stages/${enc(name)}`),
+  stage: (name) => (mode.sample ? sampleStage(name) : request(`/api/stages/${enc(name)}`)),
   contract: () => request('/api/contract'),
   scenarios: () => request('/api/scenarios'),
   /** URL of a raw build file. `version` busts the cache after a design change. */
