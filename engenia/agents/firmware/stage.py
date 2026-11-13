@@ -9,7 +9,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from engenia.contracts.models import Contract, StageContext
+from engenia.contracts.models import Contract, Requirement, StageContext
+from engenia.core.spec import SpecError, load_requirements
+from engenia.harness.proposer import propose_firmware_detector, proposer_fact
+
+DEFAULT_DETECTOR = {"frequency_hz": 200.0, "threshold": 0.15, "hold_s": 0.15}
 
 
 def _write(path: Path, value: dict) -> None:
@@ -21,6 +25,17 @@ def _run(args: list[str], cwd: Path) -> str:
     if result.returncode:
         raise RuntimeError(f"{args[0]} failed:\n{result.stdout}\n{result.stderr}")
     return result.stdout
+
+
+def default_detector() -> dict:
+    return dict(DEFAULT_DETECTOR)
+
+
+def _requirements(ctx: StageContext) -> list[Requirement]:
+    try:
+        return load_requirements(ctx.spec_dir)
+    except SpecError:
+        return []
 
 
 def propose_firmware(ctx: StageContext) -> None:
@@ -36,6 +51,7 @@ def propose_firmware(ctx: StageContext) -> None:
     electronics = ctx.build_dir.parent / "electronics/interface.json"
     if electronics.is_file():
         duty = json.loads(electronics.read_text())["facts"].get("duty_cycle", duty)
+    detector = propose_firmware_detector(ctx, _requirements(ctx), default_detector)
     shutil.copytree(Path(__file__).with_name("templates"), ctx.src_dir, dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     include = ctx.src_dir / "include"
@@ -54,6 +70,7 @@ def propose_firmware(ctx: StageContext) -> None:
     )
     _write(ctx.src_dir / "config.json", {
         "pins_used": pins, "duty_cycle": duty, "contract_version": contract.version,
+        "detector": detector,
     })
     _run([sys.executable, "tools/make_data.py"], ctx.src_dir)
 
@@ -76,10 +93,16 @@ class FirmwareStage:
             raise RuntimeError(f"Unity tests missing or unsuccessful:\n{output}")
         # PlatformIO test replaces the native executable with the Unity runner.
         _run(["pio", "run", "-e", "native"], ctx.src_dir)
+        detector = json.loads((ctx.src_dir / "config.json").read_text()).get(
+            "detector", DEFAULT_DETECTOR
+        )
         detections = {}
         for name in ("tone_in_noise", "quiet"):
             detections[name] = json.loads(_run(
-                [sys.executable, "tools/replay.py", f"data/{name}.wav"], ctx.src_dir
+                [sys.executable, "tools/replay.py", f"data/{name}.wav",
+                 "--frequency", str(detector["frequency_hz"]),
+                 "--threshold", str(detector["threshold"]),
+                 "--hold", str(detector["hold_s"])], ctx.src_dir
             ))
         truth = json.loads((ctx.src_dir / "data/truth.json").read_text())
         hits = sum(any(start <= t < end for t in detections["tone_in_noise"])
@@ -99,4 +122,5 @@ class FirmwareStage:
         return {
             **json.loads((ctx.src_dir / "config.json").read_text()),
             **json.loads((ctx.build_dir / "metrics.json").read_text()),
+            "proposer": proposer_fact(ctx),
         }
