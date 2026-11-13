@@ -287,10 +287,12 @@ def test_invalid_parameters_fail_before_cad(updates):
         replace(params, **updates)
 
 
-@pytest.mark.parametrize("source,version", [("project", 9), ("default", 7), ("packaged", 1)])
+@pytest.mark.parametrize("source,version", [("project", 9), ("default", 7), ("packaged", None)])
 def test_interface_records_contract_version_used_for_generation(tmp_path, source, version):
     ctx = StageContext(root=tmp_path, project="version-fixture", stage="mechanical")
     contract = default_contract().model_dump(mode="json")
+    if source == "packaged":
+        version = contract["version"]
     contract["version"] = version
     path = ctx.contract_path if source == "project" else (
         tmp_path / "packs/buoy/default_contract.json"
