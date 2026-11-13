@@ -99,7 +99,12 @@ def test_build_produces_real_artifacts_and_valid_interface(built):
         interface.facts["dry_mass_g"] * interface.facts["centre_of_mass_mm"][2]
         + 60 * interface.facts["battery_bay_centre_mm"][2]
     ) / assembled["total_mass_g"]
-    assert assembled["centre_of_mass_mm"] == pytest.approx([0, 0, expected_z])
+    expected_xy = [
+        (interface.facts["dry_mass_g"] * interface.facts["centre_of_mass_mm"][axis]
+         + 60 * interface.facts["battery_bay_centre_mm"][axis]) / assembled["total_mass_g"]
+        for axis in (0, 1)
+    ]
+    assert assembled["centre_of_mass_mm"] == pytest.approx([*expected_xy, expected_z])
     for name in ("hull", "lid"):
         solid = import_step(ctx.build_dir / f"{name}.step")
         assert solid.is_valid and len(solid.solids()) == 1 and solid.volume > 0
