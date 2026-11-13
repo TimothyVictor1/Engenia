@@ -60,7 +60,7 @@ def propose_firmware(ctx: StageContext) -> None:
 
 class FirmwareStage:
     name = "firmware"
-    needs = ["architect", "electronics"]
+    needs = ["architect"]
     reads_contract = True
     checks = ["detection_rate", "false_alarm_rate"]
 

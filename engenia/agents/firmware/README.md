@@ -2,8 +2,8 @@
 
 `propose_firmware()` snapshots the contract pins and electronics duty fractions,
 then copies the PlatformIO templates and creates deterministic PCM16 fixtures.
-Firmware depends on electronics so an available interface is current. Older
-interfaces without duty fractions use the electronics design defaults (sample
+An available electronics interface supplies duty fractions. Older interfaces
+without duty fractions use the electronics design defaults (sample
 0.003, transmit 0.0005, sleep 0.9965).
 
 The pure C Goertzel detector uses nonoverlapping 100-sample windows. Defaults are
