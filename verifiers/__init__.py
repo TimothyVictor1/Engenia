@@ -28,6 +28,8 @@ _BUILTIN_NAMES = (
     "battery_capacity",
     "erc_clean",
     "bay_fit",
+    "wave_tilt",
+    "stress_safety_factor",
 )
 
 REGISTRY: dict[str, Runner] = {}

@@ -82,4 +82,13 @@ CASES: dict[str, CanaryCase] = {
     "power_budget": CanaryCase(
         "electronics", {"electronics": {"avg_power_mw": 100.0}}, {"max": 25.0}
     ),
+    "wave_tilt": CanaryCase(
+        "simulation",
+        {"simulation": {"wave_tilt": {"gust": {"wave_height_m": 0.4, "max_tilt_deg": 45.0}}}},
+        {"max": 30.0},
+        {"max_wave_height_m": 0.5},
+    ),
+    "stress_safety_factor": CanaryCase(
+        "simulation", {"simulation": {"safety_factor": 1.5}}, {"min": 2.0}
+    ),
 }
