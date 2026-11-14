@@ -1,0 +1,19 @@
+{
+ "stage": "mechanical",
+ "files": [
+  {
+   "path": "hull.stl",
+   "name": "hull.stl",
+   "size": 22484,
+   "type": "stl",
+   "modified": "2026-11-13T10:19:02+00:00"
+  },
+  {
+   "path": "lid.stl",
+   "name": "lid.stl",
+   "size": 25284,
+   "type": "stl",
+   "modified": "2026-11-13T10:19:02+00:00"
+  }
+ ]
+}

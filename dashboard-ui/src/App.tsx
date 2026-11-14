@@ -1,5 +1,5 @@
 import { Suspense, lazy, type ComponentType } from "react";
-import { Box, Gauge, FileSignature, FlaskConical, ListChecks, Radio, Workflow, type LucideIcon } from "lucide-react";
+import { Box, FileSignature, FlaskConical, FolderOpen, Gauge, ListChecks, Radio, Workflow, type LucideIcon } from "lucide-react";
 import brand from "./assets/engenia-mark.png";
 import { DashboardProvider, useDash, useResource } from "./lib/store";
 import { VIEWS, useRoute, type View } from "./lib/route";
@@ -11,6 +11,7 @@ import { usePresentation } from "./lib/present";
 import { Requirements } from "./views/Requirements";
 import { Contract } from "./views/Contract";
 import { Scenarios } from "./views/Scenarios";
+import { Files } from "./views/Files";
 
 // three.js is large and only two views need it: load it when one of them opens.
 const Design = lazy(() => import("./views/Design").then((m) => ({ default: m.Design })));
@@ -23,6 +24,7 @@ const NAV: Record<View, { title: string; icon: LucideIcon }> = {
   design: { title: "Design", icon: Box },
   contract: { title: "Contract", icon: FileSignature },
   scenarios: { title: "Scenarios", icon: FlaskConical },
+  files: { title: "Files", icon: FolderOpen },
   studio: { title: "Live studio", icon: Radio },
 };
 
@@ -54,7 +56,7 @@ function Shell() {
   const { view, param } = useRoute();
   const { sample } = useDash();
   const [present] = usePresentation();
-  const Page = ({ mission: Mission, pipeline: Pipeline, requirements: Requirements, design: Design, contract: Contract, scenarios: Scenarios, studio: Studio } as Record<View, ComponentType<{ param: string }>>)[view];
+  const Page = ({ mission: Mission, pipeline: Pipeline, requirements: Requirements, design: Design, contract: Contract, scenarios: Scenarios, files: Files, studio: Studio } as Record<View, ComponentType<{ param: string }>>)[view];
   if (present && view === "mission") {
     // Presentation mode: no sidebar or header, only the view.
     return (

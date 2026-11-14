@@ -98,6 +98,26 @@ class ScenariosResponse(ResponseModel):
         return value
 
 
+class FileEntry(ResponseModel):
+    path: str
+    name: str
+    size: int
+    type: Literal["text", "json", "csv", "stl", "step", "image", "archive", "pdf", "binary"]
+    modified: str
+
+
+class FilesResponse(ResponseModel):
+    stage: str
+    files: list[FileEntry]
+
+
+class ReleaseResponse(ResponseModel):
+    available: bool
+    name: str | None = None
+    size: int | None = None
+    modified: str | None = None
+
+
 class EventsResponse(ResponseModel):
     changed: list[Area]
 

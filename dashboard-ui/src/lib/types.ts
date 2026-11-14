@@ -67,3 +67,9 @@ export interface Scenario {
 export interface ScenariosData { scenarios: Scenario[] }
 
 export type Area = "pipeline" | "requirements" | "contract" | "scenarios" | "design";
+
+export interface FileEntry {
+  path: string; name: string; size: number; modified: string;
+  type: "text" | "json" | "csv" | "stl" | "step" | "image" | "archive" | "pdf" | "binary";
+}
+export interface FilesList { stage: string; files: FileEntry[] }

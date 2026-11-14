@@ -1,5 +1,6 @@
 """Read-only HTTP routes for a single project."""
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -10,11 +11,14 @@ from pydantic import ValidationError
 
 from engenia.core import events as design_events
 from engenia.core.cli import find_root
+from engenia.dashboard import files as build_files
 from engenia.dashboard.changes import merged_stream, stream_design_log, stream_events
 from engenia.dashboard.reader import ProjectReader
 from engenia.dashboard.schemas import (
     ContractResponse,
+    FilesResponse,
     PipelineResponse,
+    ReleaseResponse,
     RequirementsResponse,
     ScenariosResponse,
     StageResponse,
@@ -64,6 +68,57 @@ def create_app(project: str, root: Path | None = None) -> FastAPI:
     @app.get("/api/scenarios", response_model=ScenariosResponse)
     def scenarios():
         return reader.scenarios()
+
+    def build_dir(*, src: bool = False) -> Path | None:
+        directory = reader.directory / ("src" if src else "build")
+        return None if directory.is_symlink() else directory
+
+    @app.get("/api/files/{stage}", response_model=FilesResponse)
+    def list_files(stage: str):
+        """Every file in build/<stage>/ with size, type and modified time."""
+        if stage not in REGISTRY:
+            raise HTTPException(404, "Unknown stage")
+        build = build_dir()
+        files = build_files.describe(build / stage) if build else []
+        return {"stage": stage, "files": files}
+
+    @app.get("/api/release", response_model=ReleaseResponse)
+    def release_info():
+        found = build_files.newest_release(reader.root, reader.project)
+        if found is None:
+            return {"available": False}
+        stat = found.stat()
+        return {
+            "available": True, "name": found.name, "size": stat.st_size,
+            "modified": datetime.fromtimestamp(stat.st_mtime, UTC).isoformat(timespec="seconds"),
+        }
+
+    @app.get("/api/download/release")
+    def download_release():
+        found = build_files.newest_release(reader.root, reader.project)
+        if found is None:
+            raise HTTPException(404, "No release has been made")
+        return FileResponse(found, media_type="application/zip", filename=found.name)
+
+    @app.get("/api/download/{archive}")
+    def download(archive: str):
+        """A zip of one stage's build output (`<stage>.zip`) or of the whole build and src
+        (`all.zip`)."""
+        name = archive.removesuffix(".zip") if archive.endswith(".zip") else None
+        if name is None or (name != "all" and name not in REGISTRY):
+            raise HTTPException(404, "Unknown archive")
+        build, src = build_dir(), build_dir(src=True)
+        if name == "all":
+            parts = [("build", build), ("src", src)]
+        else:
+            parts = [(name, build / name if build else None)]
+        entries = build_files.zip_entries([(prefix, d) for prefix, d in parts if d is not None])
+        if not entries:
+            raise HTTPException(404, "Nothing has been built yet")
+        return StreamingResponse(
+            build_files.stream_zip(entries), media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{reader.project}-{name}.zip"'},
+        )
 
     @app.get("/api/files/{stage}/{filename:path}")
     def file(stage: str, filename: str):
