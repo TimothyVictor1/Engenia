@@ -868,3 +868,28 @@ def test_measured_tilt_without_a_tilt_measurement_is_an_error(write_measurements
     verdict = load("measured_tilt")(measured_ctx(make_ctx, "measured_tilt", Limit(max=30)))
     assert verdict.result == "error"
     assert "no 'tilt_deg' measurement" in (verdict.message or "")
+
+
+def test_detection_rate_simulated_evidence(write_interface, make_ctx):
+    write_interface("firmware", {"detection_rate": 0.92, "evidence": "simulated"})
+    verdict = load("detection_rate")(make_ctx(
+        stage="firmware", check="detection_rate", requirement="R-009", limit=Limit(min=0.9)))
+    assert verdict.result == "pass"
+    assert verdict.evidence_level == "simulated"
+
+
+def test_false_alarm_rate_simulated_evidence(write_interface, make_ctx):
+    write_interface("firmware", {"false_alarms_per_hour": 0.0, "evidence": "simulated"})
+    verdict = load("false_alarm_rate")(make_ctx(
+        stage="firmware", check="false_alarm_rate", requirement="R-010", limit=Limit(max=2)))
+    assert verdict.result == "pass"
+    assert verdict.evidence_level == "simulated"
+
+
+@pytest.mark.parametrize("check", ["detection_rate", "false_alarm_rate"])
+def test_firmware_not_run_is_an_error_with_reason(write_interface, make_ctx, check):
+    write_interface("firmware", {"not_run": {"reason": "PlatformIO (pio) is not installed"}})
+    verdict = load(check)(make_ctx(
+        stage="firmware", check=check, requirement="R-009", limit=Limit(min=0.9)))
+    assert verdict.result == "error"
+    assert "pio" in (verdict.message or "")

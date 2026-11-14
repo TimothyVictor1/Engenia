@@ -25,6 +25,8 @@ DETECTORS = {
     "threshold": {"threshold": 0.25, "hold_s": 0.15},
 }
 DEFAULT_DETECTOR = DETECTORS["tone"]
+# SNR (dB) -> replay file; must match tools/make_data.py in the common template.
+SNR_FILES = {-6: "tone_snr_m6db", 0: "tone_in_noise", 6: "tone_snr_p6db"}
 
 
 def _write(path: Path, value: dict) -> None:
@@ -164,6 +166,16 @@ class FirmwareStage:
 
     def build(self, ctx: StageContext) -> None:
         ctx.build_dir.mkdir(parents=True, exist_ok=True)
+        if shutil.which("pio") is None:
+            # No PlatformIO: publish why, never raise. Verifiers turn this into an error verdict.
+            reason = "PlatformIO (pio) is not installed; firmware replay was not run"
+            events.emit_decision(
+                ctx.root, ctx.stage, title="Firmware replay", choice="not_run", reason=reason,
+                requirements=[], numbers={},
+            )
+            _write(ctx.build_dir / "detections.json", {})
+            _write(ctx.build_dir / "metrics.json", {"not_run": {"reason": reason}})
+            return
         _run(["pio", "run", "-e", "native"], ctx.src_dir)
         output = _run(["pio", "test", "-e", "native"], ctx.src_dir)
         results = re.findall(r"test_detector.c:\d+:\s*(\w+)\s*\[(PASSED|FAILED|IGNORED)\]", output)
@@ -174,19 +186,33 @@ class FirmwareStage:
         config = json.loads((ctx.src_dir / "config.json").read_text())
         detector_type = config.get("detector_type", "tone")
         detector = config.get("detector") or default_detector(detector_type)
+        events.emit_decision(
+            ctx.root, ctx.stage, title="Replay conditions",
+            choice="tone at -6, 0, +6 dB SNR plus noise-only",
+            reason=("fixed-seed synthesised signals go through the compiled native detector "
+                    "with the settings the firmware proposer chose"),
+            requirements=[],
+            numbers={"seed": 20261113, **{k: v for k, v in detector.items()}},
+        )
         detections = {}
-        for name in ("tone_in_noise", "quiet"):
+        for name in [*SNR_FILES.values(), "quiet"]:
             args = [sys.executable, "tools/replay.py", f"data/{name}.wav"]
             if detector_type == "tone":
                 args += ["--frequency", str(detector["frequency_hz"])]
             args += ["--threshold", str(detector["threshold"]), "--hold", str(detector["hold_s"])]
             detections[name] = json.loads(_run(args, ctx.src_dir))
         truth = json.loads((ctx.src_dir / "data/truth.json").read_text())
-        hits = sum(any(start <= t < end for t in detections["tone_in_noise"])
-                   for start, end in truth)
+        by_snr = {
+            str(snr): sum(any(start <= t < end for t in detections[name])
+                          for start, end in truth) / len(truth)
+            for snr, name in SNR_FILES.items()
+        }
         metrics = {
-            "detection_rate": hits / len(truth),
+            # The headline rate is the nominal 0 dB case the requirements are written against.
+            "detection_rate": by_snr["0"],
+            "detection_rate_by_snr_db": by_snr,
             "false_alarms_per_hour": len(detections["quiet"]) * 6,
+            "evidence": "simulated",
             "tests_passed": len(results), "tests_total": len(results),
             # Portable source-size estimate; native executable size includes host runtime.
             "flash_kb": round(sum(p.stat().st_size for p in
