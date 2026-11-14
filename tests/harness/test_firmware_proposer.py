@@ -14,7 +14,13 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 def fctx(root):
-    return StageContext(project="demo", stage="firmware", root=root)
+    ctx = StageContext(project="demo", stage="firmware", root=root)
+    interface = ctx.stage_interface_path("electronics")
+    interface.parent.mkdir(parents=True, exist_ok=True)
+    interface.write_text(json.dumps({"facts": {"duty_cycle": {
+        "sample": 0.003, "transmit": 0.0005, "sleep": 0.9965,
+    }}}))
+    return ctx
 
 
 def writes(proposal):

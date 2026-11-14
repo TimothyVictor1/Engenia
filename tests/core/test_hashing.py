@@ -155,7 +155,7 @@ def test_key_is_stable_and_well_formed(mech):
 def test_parts_are_reported_in_the_fixed_order(mech):
     keys = compute_keys(*mech)
     assert list(keys.parts) == [
-        "requirements", "upstream", "contract", "src", "stage_class", "container",
+        "requirements", "upstream", "contract", "src", "stage_class", "container", "declared",
     ]
 
 
@@ -446,6 +446,7 @@ def test_a_stage_that_is_not_spec_wide_ignores_requirements_that_do_not_name_it(
     root, project_dir, make_ctx, fake_stage, edit
 ):
     write_interface(project_dir, "architect", {})
+    write_interface(project_dir, "electronics", {})
     stage, ctx = fake_stage("firmware"), make_ctx("firmware")
     before = stage_key(stage, ctx)
     edit(project_dir / "spec" / "R-003.yaml", "value: 7", "value: 30")
@@ -456,6 +457,7 @@ def test_a_stage_can_opt_in_with_reads_all_requirements(
     root, project_dir, make_ctx, fake_stage, edit
 ):
     write_interface(project_dir, "architect", {})
+    write_interface(project_dir, "electronics", {})
     stage, ctx = fake_stage("firmware"), make_ctx("firmware")
     stage.reads_all_requirements = True
     before = stage_key(stage, ctx)
@@ -467,6 +469,7 @@ def test_reads_all_requirements_false_changes_nothing(
     root, project_dir, make_ctx, fake_stage, edit
 ):
     write_interface(project_dir, "architect", {})
+    write_interface(project_dir, "electronics", {})
     stage, ctx = fake_stage("firmware"), make_ctx("firmware")
     plain = stage_key(stage, ctx)
     stage.reads_all_requirements = False

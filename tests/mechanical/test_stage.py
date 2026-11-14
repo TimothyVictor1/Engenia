@@ -305,6 +305,9 @@ def test_cli_repeated_runs_publish_identical_mechanical_interfaces(tmp_path, mon
     ctx = StageContext(root=tmp_path, project="pipeline", stage="mechanical")
     ctx.project_dir.mkdir(parents=True)
     shutil.copytree(REPO / "projects" / "harbour-listener" / "spec", ctx.spec_dir)
+    from tests.core.pipeline_fixture import approve_fixture
+
+    approve_fixture(tmp_path, "pipeline")
     monkeypatch.setenv("ENGENIA_ROOT", str(tmp_path))
     runner = CliRunner()
     first = runner.invoke(app, ["run", "pipeline"])

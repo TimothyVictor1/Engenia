@@ -1,8 +1,8 @@
 """Wave-tilt verifier, judged on simulated evidence.
 
-The simulation interface publishes one entry per scenario under the ``scenarios`` fact::
+The simulation interface publishes one entry per scenario under the ``wave_tilt`` fact::
 
-    {"scenarios": {"calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 4.0}, ...}}
+    {"wave_tilt": {"calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 4.0}, ...}}
 
 The scenarios judged are the ones matching the requirement's conditions:
 
@@ -16,7 +16,7 @@ FORMULA:
     measured = the largest max_tilt_deg across the judged scenarios
     pass when measured satisfies ctx.limit, normally ``limit.max``
 
-The verdict's evidence level is "simulated". Missing facts give ``error``: no scenarios fact, a
+The verdict's evidence level is "simulated". Missing facts give ``error``: no wave_tilt fact, a
 judged scenario without a numeric ``max_tilt_deg`` (or, with a wave-height condition, without
 ``wave_height_m``), a named scenario the simulation never ran, or no scenario matching the
 condition at all. Errors are never passes.
@@ -83,12 +83,12 @@ def _selected(scenarios: dict[str, Any], condition: float | None) -> list[str]:
 @guard
 def run(ctx: CheckContext) -> Verdict:
     facts = read_interface(ctx)
-    if "scenarios" not in facts:
-        raise MissingInput("simulation interface has no 'scenarios' fact")
-    scenarios = facts["scenarios"]
+    if "wave_tilt" not in facts:
+        raise MissingInput("simulation interface has no 'wave_tilt' fact")
+    scenarios = facts["wave_tilt"]
     if not isinstance(scenarios, dict):
         raise MissingInput(
-            f"simulation 'scenarios' fact must map names to results, got {scenarios!r}"
+            f"simulation 'wave_tilt' fact must map names to results, got {scenarios!r}"
         )
     condition = _condition_m(ctx.params or {})
     selected = _selected(scenarios, condition)

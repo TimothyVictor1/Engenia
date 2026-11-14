@@ -64,15 +64,17 @@ def test_report_is_identical_between_runs(root, registry, project_dir):
     assert (project_dir / "build" / "gate" / "report.json").read_text() == first
 
 
-def test_failing_measurement_fails_g1(root, registry, project_dir):
+def test_failing_measurement_and_stored_verdict_fail_g1_and_g2(root, registry, project_dir):
     (project_dir / "src" / "mechanical" / "design.json").write_text(
         json.dumps({"dry_mass_g": 500.0, "wall_min_mm": 3.5}))
-    from engenia.core.engine import run_pipeline
+    from engenia.core.engine import RunFailed, run_pipeline
 
-    run_pipeline(PROJECT, root, registry=registry, store=root / "store2")
+    with pytest.raises(RunFailed, match="mass_budget: fail"):
+        run_pipeline(PROJECT, root, registry=registry, store=root / "store2")
     result = gate(root, registry)
     assert not result.passed
-    assert failed(result) == ["G1"]
+    assert failed(result) == ["G1", "G2"]
+    assert any("stored result is fail" in p for p in problems(result, "G2"))
     assert "R-001" in problems(result, "G1")[0]
 
 
@@ -280,7 +282,10 @@ def test_g4_error_verdict_does_not_cover(root, registry, project_dir):
     (project_dir / "src" / "mechanical").mkdir()
     (project_dir / "src" / "mechanical" / "design.json").write_text(
         json.dumps({"dry_mass_g": 280.0}))  # wall_min_mm is missing: wall check errors
-    run_pipeline_for(root, registry)
+    from engenia.core.engine import RunFailed
+
+    with pytest.raises(RunFailed, match="wall_thickness_min: error"):
+        run_pipeline_for(root, registry)
     result = gate(root, registry)
     assert "R-002: no pass or fail Verdict" in problems(result, "G4")
     assert "G1" in failed(result)

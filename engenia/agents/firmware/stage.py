@@ -75,10 +75,8 @@ def propose_firmware(ctx: StageContext) -> None:
     if not contract_path.is_file():
         contract_path = pack_file(ctx, "default_contract.json")
     contract = Contract.model_validate_json(contract_path.read_text())
-    duty = {"sample": 0.003, "transmit": 0.0005, "sleep": 0.9965}
-    electronics = ctx.build_dir.parent / "electronics/interface.json"
-    if electronics.is_file():
-        duty = json.loads(electronics.read_text())["facts"].get("duty_cycle", duty)
+    electronics = ctx.stage_interface_path("electronics")
+    duty = json.loads(electronics.read_text())["facts"]["duty_cycle"]
     detector_type = _detector_type(ctx)
     detector = propose_firmware_detector(
         ctx, _requirements(ctx), detector_type, lambda: default_detector(detector_type)
@@ -116,7 +114,7 @@ def propose_firmware(ctx: StageContext) -> None:
 
 class FirmwareStage:
     name = "firmware"
-    needs = ["architect"]
+    needs = ["architect", "electronics"]
     reads_contract = True
     checks = ["detection_rate", "false_alarm_rate"]
 

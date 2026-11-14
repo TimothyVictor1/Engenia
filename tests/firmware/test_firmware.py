@@ -50,9 +50,16 @@ def test_native_pipeline_and_reproduction(tmp_path):
     assert {p.name: p.read_bytes() for p in other.build_dir.iterdir()} == before
 
 
-def test_default_contract_and_duty(tmp_path):
+def test_missing_electronics_interface_is_an_error(tmp_path):
     ctx = StageContext(root=tmp_path, project='fixture', stage='firmware')
-    FirmwareStage().generate(ctx)
-    config = json.loads((ctx.src_dir / 'config.json').read_text())
-    assert config['pins_used'] == {'HYDROPHONE_ADC': 'GPIO34', 'LORA_CS': 'GPIO5'}
-    assert config['duty_cycle'] == {'sample': 0.003, 'transmit': 0.0005, 'sleep': 0.9965}
+    with pytest.raises(FileNotFoundError, match='electronics/interface.json'):
+        FirmwareStage().generate(ctx)
+
+
+def test_missing_duty_cycle_is_an_error(tmp_path):
+    ctx = StageContext(root=tmp_path, project='fixture', stage='firmware')
+    path = ctx.stage_interface_path('electronics')
+    path.parent.mkdir(parents=True)
+    path.write_text('{"facts": {}}')
+    with pytest.raises(KeyError, match='duty_cycle'):
+        FirmwareStage().generate(ctx)

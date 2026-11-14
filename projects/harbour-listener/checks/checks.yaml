@@ -1,0 +1,76 @@
+- check: mass_budget
+  id: C-001
+  limit:
+    max: 400.0
+  params: {}
+  requirement: R-001
+- check: print_bed_fit
+  id: C-002
+  limit:
+    equals: 1.0
+  params:
+    bed_mm:
+    - 220
+    - 220
+    - 250
+  requirement: R-002
+- check: battery_capacity
+  id: C-003
+  limit:
+    min: 7.0
+  params: {}
+  requirement: R-003
+- check: wall_thickness_min
+  id: C-004
+  limit:
+    min: 3.0
+  params: {}
+  requirement: R-004
+- check: buoyancy_margin
+  id: C-005
+  limit:
+    min: 0.2
+  params: {}
+  requirement: R-005
+- check: metacentric_height
+  id: C-006
+  limit:
+    min: 5.0
+  params: {}
+  requirement: R-006
+- check: power_budget
+  id: C-007
+  limit:
+    max: 25.0
+  params: {}
+  requirement: R-007
+- check: erc_clean
+  id: C-008
+  limit:
+    max: 0.0
+  params: {}
+  requirement: R-008
+- check: detection_rate
+  id: C-009
+  limit:
+    min: 0.9
+  params: {}
+  requirement: R-009
+- check: false_alarm_rate
+  id: C-010
+  limit:
+    max: 2.0
+  params: {}
+  requirement: R-010
+- check: wave_tilt
+  id: C-011
+  limit:
+    max: 30.0
+  params: {}
+  requirement: R-011
+- check: stress_safety_factor
+  id: C-012
+  limit:
+    min: 2.0
+  params: {}
+  requirement: R-012

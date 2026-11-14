@@ -23,6 +23,7 @@ not rebuild identically, no verdicts at all) ends the loop at once and is report
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -95,12 +96,11 @@ def run_with_repair(
     common = {"registry": registry, "store": store, "workers": workers}
     run = execute(project, root, on_result=on_result, resume=resume, **common)
     result = RepairReport(run=run, gate=None)
-    if not run.ok:
+    verdict_gate = _checked_gate(run, project, root, registry, gate)
+    if verdict_gate is None:
         result.reason = "stages failed; nothing to repair: " + "; ".join(run.failed.values())
         return result
     run_id = run.run_id
-
-    verdict_gate = gate(project, root, registry=registry)
     result.gate = verdict_gate
     rounds = 0
     no_model = False
@@ -123,12 +123,11 @@ def run_with_repair(
             break
         run = execute(project, root, on_result=on_result, run_id=run_id, **common)
         result.run = run
-        if not run.ok:
-            result.reason = "stages failed after repair: " + "; ".join(run.failed.values())
-            result.gate = None
-            break
-        verdict_gate = gate(project, root, registry=registry)
+        verdict_gate = _checked_gate(run, project, root, registry, gate)
         result.gate = verdict_gate
+        if verdict_gate is None:
+            result.reason = "stages failed after repair: " + "; ".join(run.failed.values())
+            break
 
     if result.gate is not None and not result.gate.passed:
         failures = failed_verdicts_by_stage(result.gate.report)
@@ -139,6 +138,28 @@ def run_with_repair(
     elif result.passed:
         _record(root, lambda s: s.finish_run(run_id, "done"))
     return result
+
+
+def _checked_gate(run, project, root, registry, gate):
+    """Use early scripted failures for repair; incomplete builds cannot run the full gate."""
+    if run.ok:
+        return gate(project, root, registry=registry)
+    from engenia.gate.gate import GateResult
+
+    entries = []
+    for name, message in run.failed.items():
+        if "failed in checks:" not in message:
+            return None  # generation/build exceptions still stop before model repair
+        path = root / "projects" / project / "build" / name / "verdict.json"
+        try:
+            stored = [Verdict.model_validate(v) for v in json.loads(path.read_text())]
+        except (OSError, ValueError, TypeError):
+            return None
+        failures = [v for v in stored if v.result != VerdictResult.PASS]
+        if not failures:
+            return None
+        entries += [dict(v.model_dump(mode="json"), stage=name) for v in failures]
+    return GateResult(passed=False, report={"passed": False, "verdicts": entries})
 
 
 def _record(root: Path, action: Callable[[RunStore], None]) -> None:

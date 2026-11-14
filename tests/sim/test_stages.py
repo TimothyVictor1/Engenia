@@ -108,6 +108,9 @@ def test_real_structure_module_absent_gives_not_run(root):
 def test_pipeline_gives_wave_tilt_for_every_scenario(tmp_path, monkeypatch):
     shutil.copytree(REPO / "projects/harbour-listener/spec",
                     tmp_path / "projects/harbour-listener/spec")
+    from tests.core.pipeline_fixture import approve_fixture
+
+    approve_fixture(tmp_path, "harbour-listener")
     monkeypatch.setenv("ENGENIA_ROOT", str(tmp_path))
     result = CliRunner().invoke(app, ["run", "harbour-listener"])
     assert result.exit_code == 0, result.output

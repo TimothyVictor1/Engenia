@@ -96,7 +96,7 @@ CASES: dict[str, CanaryCase] = {
         "simulation",
         {
             "simulation": {
-                "scenarios": {
+                "wave_tilt": {
                     "calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 8.0},
                     "baltic_winter": {"wave_height_m": 1.5, "max_tilt_deg": 45.0},
                 }

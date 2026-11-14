@@ -98,6 +98,7 @@ def run(
         f"done: {ran} ran, {len(report.results) - ran - skipped} from cache"
         + (f", {skipped} skipped (finished in run {report.run_id})" if skipped else "")
     )
+    # The engine records build errors and failed scripted/final checks alike.
     if report.failed:
         typer.echo(
             f"run {report.run_id} failed: {len(report.failed)} failed, "

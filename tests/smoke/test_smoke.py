@@ -28,7 +28,7 @@ EXPECTED_NEEDS = {
     "architect": ["verify_plan"],
     "mechanical": ["architect"],
     "electronics": ["architect"],
-    "firmware": ["architect"],
+    "firmware": ["architect", "electronics"],
     "redteam": [],
     "testplan": [],
     "simprep": ["redteam"],
@@ -46,6 +46,9 @@ def workdir(tmp_path, monkeypatch):
         REPO / "projects" / "harbour-listener" / "spec",
         tmp_path / "projects" / "harbour-listener" / "spec",
     )
+    from tests.core.pipeline_fixture import approve_fixture
+
+    approve_fixture(tmp_path, "harbour-listener")
     monkeypatch.setenv("ENGENIA_ROOT", str(tmp_path))
     return tmp_path
 
