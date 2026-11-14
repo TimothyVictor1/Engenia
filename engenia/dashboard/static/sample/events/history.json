@@ -1,0 +1,1581 @@
+[
+ {
+  "ts": "2026-11-14T10:00:00.000Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "verify_plan",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "plan"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:02.000Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "verify_plan",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "plan",
+   "duration_ms": 2000,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:02.000Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "verify_plan",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "generate"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:02.500Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "verify_plan",
+  "attempt": 1,
+  "kind": "decision",
+  "data": {
+   "title": "Check plan",
+   "choice": "14 checks for 12 requirements",
+   "reason": "every requirement has at least one scripted check",
+   "requirements": [
+    "R-001",
+    "R-005"
+   ]
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:05.500Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "verify_plan",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "generate",
+   "duration_ms": 3500,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:05.500Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "verify_plan",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "check"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:06.100Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "verify_plan",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "check",
+   "duration_ms": 600,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:06.300Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "verify_plan",
+  "attempt": 1,
+  "kind": "approval",
+  "data": {
+   "what": "spec",
+   "hash": "sha256:5f2c9a41d0b7e8aa",
+   "approved": true,
+   "approved_by": "timothy"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:06.500Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "verify_plan",
+  "attempt": 1,
+  "kind": "approval",
+  "data": {
+   "what": "checks",
+   "hash": "sha256:91ab04e77c3d52f0",
+   "approved": true,
+   "approved_by": "timothy"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:06.600Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "verify_plan",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "publish"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:06.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "verify_plan",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "publish",
+   "duration_ms": 300,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:07.000Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "cache",
+  "data": {
+   "hit": false,
+   "key": "sha256:arcarcarcarcarcarcarcarcarcarcarcarcarcarcarcarcarcarcarcarcarcab"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:07.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "plan"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:08.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "plan",
+   "duration_ms": 1000,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:08.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "propose"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:10.400Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "propose",
+   "duration_ms": 2200,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:10.400Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "decision",
+  "data": {
+   "title": "Mass split",
+   "choice": "300 g hull, 60 g electronics",
+   "reason": "totals.mass_g_max is 400 g",
+   "requirements": [
+    "R-003"
+   ]
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:10.400Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "generate"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:12.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "generate",
+   "duration_ms": 1800,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:12.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "check"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:12.700Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "check",
+   "duration_ms": 500,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:12.700Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "verdict",
+  "data": {
+   "check": "contract_valid",
+   "requirement": null,
+   "result": "pass",
+   "measured": null,
+   "limit": {},
+   "evidence_level": "calculated",
+   "message": null
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:12.700Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "publish"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:13.000Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "publish",
+   "duration_ms": 300,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:13.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "plan"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:13.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "plan"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:13.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "redteam",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "plan"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:13.300Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "testplan",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "plan"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:13.600Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "firmware",
+  "attempt": 1,
+  "kind": "cache",
+  "data": {
+   "hit": true,
+   "key": "sha256:firfirfirfirfirfirfirfirfirfirfirfirfirfirfirfirfirfirfirfirfirab"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:13.700Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "firmware",
+  "attempt": 1,
+  "kind": "change_request",
+  "data": {
+   "id": "CR-002",
+   "path": "budgets.firmware.flash_kb",
+   "requested": 1024,
+   "status": "rejected",
+   "reason": "would exceed the part's 512 kB flash"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:13.800Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "redteam",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "plan",
+   "duration_ms": 600,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:13.800Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "redteam",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "generate"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:13.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "testplan",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "plan",
+   "duration_ms": 600,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:13.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "testplan",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "generate"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:14.000Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "plan",
+   "duration_ms": 800,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:14.000Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "propose"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:14.100Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "plan",
+   "duration_ms": 900,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:14.100Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "propose"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:15.500Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "propose",
+   "duration_ms": 1400,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:15.500Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "generate"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:15.600Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "propose",
+   "duration_ms": 1600,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:15.600Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "decision",
+  "data": {
+   "title": "Wall thickness",
+   "choice": "wall 3.2 mm",
+   "reason": "R-004 needs at least 3 mm",
+   "requirements": [
+    "R-004"
+   ],
+   "rejected": [
+    {
+     "option": "wall 2.0 mm",
+     "why": "below the 3 mm minimum"
+    }
+   ]
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:15.600Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "generate"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:16.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "testplan",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "generate",
+   "duration_ms": 3000,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:16.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "testplan",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "publish"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:17.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "testplan",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "publish",
+   "duration_ms": 300,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:17.800Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "redteam",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "generate",
+   "duration_ms": 4000,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:17.800Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "redteam",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "check"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:18.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "redteam",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "check",
+   "duration_ms": 400,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:18.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "redteam",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "publish"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:18.500Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "redteam",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "publish",
+   "duration_ms": 300,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:18.600Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "generate",
+   "duration_ms": 3000,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:18.600Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "build"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:18.600Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simprep",
+  "attempt": 1,
+  "kind": "cache",
+  "data": {
+   "hit": false,
+   "key": "sha256:simsimsimsimsimsimsimsimsimsimsimsimsimsimsimsimsimsimsimsimsimab"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:18.700Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simprep",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "build"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:18.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "generate",
+   "duration_ms": 3400,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:18.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "change_request",
+  "data": {
+   "id": "CR-001",
+   "path": "budgets.electronics.bay_mm",
+   "requested": [
+    70,
+    40,
+    26
+   ],
+   "status": "open",
+   "reason": "battery height 24 mm"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:19.100Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "build"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:20.400Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "change_request",
+  "data": {
+   "id": "CR-001",
+   "path": "budgets.electronics.bay_mm",
+   "requested": [
+    70,
+    40,
+    26
+   ],
+   "status": "accepted",
+   "reason": "fits the mechanical envelope; contract version 2"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:20.700Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simprep",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "build",
+   "duration_ms": 2000,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:20.700Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simprep",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "publish"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:20.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simprep",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "publish",
+   "duration_ms": 200,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:22.100Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "build",
+   "duration_ms": 3000,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:22.100Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "check"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:22.800Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "build",
+   "duration_ms": 4200,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:22.800Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "check"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:22.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "check",
+   "duration_ms": 800,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:22.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "verdict",
+  "data": {
+   "check": "bay_fit",
+   "requirement": "R-006",
+   "result": "pass",
+   "measured": 1,
+   "limit": {
+    "equals": 1
+   },
+   "evidence_level": "calculated",
+   "message": null
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:22.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "publish"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:23.000Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "verdict",
+  "data": {
+   "check": "erc_clean",
+   "requirement": "R-007",
+   "result": "pass",
+   "measured": 0,
+   "limit": {
+    "max": 0
+   },
+   "evidence_level": "calculated",
+   "message": null
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:23.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "publish",
+   "duration_ms": 300,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:23.500Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "check",
+   "duration_ms": 700,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:23.500Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "verdict",
+  "data": {
+   "check": "wall_thickness_min",
+   "requirement": "R-004",
+   "result": "pass",
+   "measured": 3.2,
+   "limit": {
+    "min": 3
+   },
+   "evidence_level": "calculated",
+   "message": null
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:23.600Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "verdict",
+  "data": {
+   "check": "mass_budget",
+   "requirement": "R-003",
+   "result": "fail",
+   "measured": 318.4,
+   "limit": {
+    "max": 300
+   },
+   "evidence_level": "calculated",
+   "message": "318.4 g is over the 300 g budget"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:23.700Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "phase_start",
+  "data": {
+   "phase": "repair"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:25.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "repair",
+  "data": {
+   "summary": "Shorten the hull by 6 mm to recover 20 g",
+   "check": "mass_budget"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:26.100Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "phase_end",
+  "data": {
+   "phase": "repair",
+   "duration_ms": 2400,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:26.100Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "phase_start",
+  "data": {
+   "phase": "generate"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:28.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "phase_end",
+  "data": {
+   "phase": "generate",
+   "duration_ms": 2100,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:28.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "phase_start",
+  "data": {
+   "phase": "build"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:32.100Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "phase_end",
+  "data": {
+   "phase": "build",
+   "duration_ms": 3900,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:32.100Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "phase_start",
+  "data": {
+   "phase": "check"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:32.800Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "phase_end",
+  "data": {
+   "phase": "check",
+   "duration_ms": 700,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:32.800Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "verdict",
+  "data": {
+   "check": "mass_budget",
+   "requirement": "R-003",
+   "result": "pass",
+   "measured": 291.2,
+   "limit": {
+    "max": 300
+   },
+   "evidence_level": "calculated",
+   "message": null
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:32.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "verdict",
+  "data": {
+   "check": "buoyancy_margin",
+   "requirement": "R-005",
+   "result": "pass",
+   "measured": 0.27,
+   "limit": {
+    "min": 0.2
+   },
+   "evidence_level": "calculated",
+   "message": null
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:33.000Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "proposal",
+  "data": {
+   "requirement": "R-005",
+   "old_limit": {
+    "min": 0.2
+   },
+   "new_limit": {
+    "min": 0.25
+   },
+   "reason": "measured margin 0.27 supports a tighter limit",
+   "status": "draft"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:33.000Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "phase_start",
+  "data": {
+   "phase": "publish"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:33.400Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "phase_end",
+  "data": {
+   "phase": "publish",
+   "duration_ms": 400,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:33.400Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "preview",
+  "data": {
+   "stage": "mechanical",
+   "files": [
+    "hull.stl",
+    "lid.stl"
+   ]
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:33.700Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "integration",
+  "attempt": 1,
+  "kind": "cache",
+  "data": {
+   "hit": false,
+   "key": "sha256:intintintintintintintintintintintintintintintintintintintintintab"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:33.700Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "integration",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "build"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:36.300Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "integration",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "build",
+   "duration_ms": 2600,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:36.300Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "integration",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "check"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:36.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "integration",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "check",
+   "duration_ms": 600,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:36.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "integration",
+  "attempt": 1,
+  "kind": "verdict",
+  "data": {
+   "check": "mass_rollup",
+   "requirement": null,
+   "result": "pass",
+   "measured": 351.2,
+   "limit": {
+    "max": 400
+   },
+   "evidence_level": "calculated",
+   "message": null
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:36.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "integration",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "publish"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:37.100Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "integration",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "publish",
+   "duration_ms": 200,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:37.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simulation",
+  "attempt": 1,
+  "kind": "cache",
+  "data": {
+   "hit": false,
+   "key": "sha256:simsimsimsimsimsimsimsimsimsimsimsimsimsimsimsimsimsimsimsimsimab"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:37.300Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simulation",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "build"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:43.300Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simulation",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "build",
+   "duration_ms": 6000,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:43.300Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simulation",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "check"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:43.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simulation",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "check",
+   "duration_ms": 600,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:43.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simulation",
+  "attempt": 1,
+  "kind": "verdict",
+  "data": {
+   "check": "wave_tilt",
+   "requirement": "R-009",
+   "result": "pass",
+   "measured": 9.5,
+   "limit": {
+    "max": 12
+   },
+   "evidence_level": "simulated",
+   "message": null
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:43.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simulation",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "publish"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:44.000Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simulation",
+  "attempt": 1,
+  "kind": "verdict",
+  "data": {
+   "check": "stress_safety_factor",
+   "requirement": "R-012",
+   "result": "pass",
+   "measured": 2.4,
+   "limit": {
+    "min": 2
+   },
+   "evidence_level": "simulated",
+   "message": null
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:44.100Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "simulation",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "publish",
+   "duration_ms": 200,
+   "result": "ok"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:44.600Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "final",
+  "attempt": 1,
+  "kind": "gate_step",
+  "data": {
+   "step": "G1",
+   "title": "Every check run",
+   "result": "running",
+   "detail": "",
+   "duration_ms": 0
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:47.600Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "final",
+  "attempt": 1,
+  "kind": "gate_step",
+  "data": {
+   "step": "G1",
+   "title": "Every check run",
+   "result": "pass",
+   "detail": "24 checks run by the verifiers they name",
+   "duration_ms": 3000
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:47.600Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "final",
+  "attempt": 1,
+  "kind": "gate_step",
+  "data": {
+   "step": "G2",
+   "title": "Results recomputed",
+   "result": "running",
+   "detail": "",
+   "duration_ms": 0
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:48.800Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "final",
+  "attempt": 1,
+  "kind": "gate_step",
+  "data": {
+   "step": "G2",
+   "title": "Results recomputed",
+   "result": "pass",
+   "detail": "every verdict agrees with its measured value and limit",
+   "duration_ms": 1200
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:48.800Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "final",
+  "attempt": 1,
+  "kind": "gate_step",
+  "data": {
+   "step": "G3",
+   "title": "Rebuild identical",
+   "result": "running",
+   "detail": "",
+   "duration_ms": 0
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:57.800Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "final",
+  "attempt": 1,
+  "kind": "gate_step",
+  "data": {
+   "step": "G3",
+   "title": "Rebuild identical",
+   "result": "pass",
+   "detail": "rebuilt electronics: byte-identical",
+   "duration_ms": 9000
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:57.800Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "final",
+  "attempt": 1,
+  "kind": "gate_step",
+  "data": {
+   "step": "G4",
+   "title": "Every requirement judged",
+   "result": "running",
+   "detail": "",
+   "duration_ms": 0
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:58.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "final",
+  "attempt": 1,
+  "kind": "gate_step",
+  "data": {
+   "step": "G4",
+   "title": "Every requirement judged",
+   "result": "pass",
+   "detail": "12 of 12 approved requirements have a verdict",
+   "duration_ms": 400
+  }
+ },
+ {
+  "ts": "2026-11-14T10:00:58.200Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "final",
+  "attempt": 1,
+  "kind": "gate_step",
+  "data": {
+   "step": "G5",
+   "title": "Canaries fail as they should",
+   "result": "running",
+   "detail": "",
+   "duration_ms": 0
+  }
+ },
+ {
+  "ts": "2026-11-14T10:01:00.700Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "final",
+  "attempt": 1,
+  "kind": "gate_step",
+  "data": {
+   "step": "G5",
+   "title": "Canaries fail as they should",
+   "result": "pass",
+   "detail": "14 of 14 verifiers failed their known-bad fixture",
+   "duration_ms": 2500
+  }
+ },
+ {
+  "ts": "2026-11-14T10:01:01.000Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "final",
+  "attempt": 1,
+  "kind": "gate_step",
+  "data": {
+   "step": "audit",
+   "title": "Final audit",
+   "result": "pass",
+   "detail": "every requirement has a result",
+   "duration_ms": 800
+  }
+ },
+ {
+  "ts": "2026-11-14T10:01:01.900Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "report",
+  "attempt": 1,
+  "kind": "phase_start",
+  "data": {
+   "phase": "publish"
+  }
+ },
+ {
+  "ts": "2026-11-14T10:01:02.500Z",
+  "run_id": 7,
+  "project": "harbour-listener",
+  "stage": "report",
+  "attempt": 1,
+  "kind": "phase_end",
+  "data": {
+   "phase": "publish",
+   "duration_ms": 600,
+   "result": "ok"
+  }
+ }
+]

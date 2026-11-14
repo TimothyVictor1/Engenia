@@ -1,0 +1,9 @@
+{
+ "faults": [
+  {
+   "id": "F01-wall-1mm",
+   "description": "Hull wall set to 1 mm",
+   "stage": "mechanical"
+  }
+ ]
+}

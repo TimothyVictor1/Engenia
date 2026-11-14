@@ -1,0 +1,267 @@
+{
+ "run_id": 7,
+ "project": "harbour-listener",
+ "status": "done",
+ "started": "2026-11-14T10:00:00.000Z",
+ "finished": "2026-11-14T10:01:02.700Z",
+ "stages": [
+  {
+   "name": "verify_plan",
+   "status": "done",
+   "attempts": 1,
+   "started": null,
+   "finished": null,
+   "duration_ms": 6400,
+   "cache_hit": false,
+   "phases": [],
+   "checks": []
+  },
+  {
+   "name": "architect",
+   "status": "done",
+   "attempts": 1,
+   "started": null,
+   "finished": null,
+   "duration_ms": 5800,
+   "cache_hit": false,
+   "phases": [],
+   "checks": [
+    {
+     "check": "contract_valid",
+     "requirement": null,
+     "result": "pass"
+    }
+   ]
+  },
+  {
+   "name": "mechanical",
+   "status": "done",
+   "attempts": 2,
+   "started": null,
+   "finished": null,
+   "duration_ms": 25000,
+   "cache_hit": false,
+   "phases": [],
+   "checks": [
+    {
+     "check": "wall_thickness_min",
+     "requirement": "R-004",
+     "result": "pass"
+    },
+    {
+     "check": "mass_budget",
+     "requirement": "R-003",
+     "result": "pass"
+    },
+    {
+     "check": "buoyancy_margin",
+     "requirement": "R-005",
+     "result": "pass"
+    }
+   ]
+  },
+  {
+   "name": "electronics",
+   "status": "done",
+   "attempts": 1,
+   "started": null,
+   "finished": null,
+   "duration_ms": 12000,
+   "cache_hit": false,
+   "phases": [],
+   "checks": [
+    {
+     "check": "bay_fit",
+     "requirement": "R-006",
+     "result": "pass"
+    },
+    {
+     "check": "erc_clean",
+     "requirement": "R-007",
+     "result": "pass"
+    }
+   ]
+  },
+  {
+   "name": "firmware",
+   "status": "cached",
+   "attempts": 0,
+   "started": null,
+   "finished": null,
+   "duration_ms": 0,
+   "cache_hit": true,
+   "phases": [],
+   "checks": []
+  },
+  {
+   "name": "redteam",
+   "status": "done",
+   "attempts": 1,
+   "started": null,
+   "finished": null,
+   "duration_ms": 5300,
+   "cache_hit": false,
+   "phases": [],
+   "checks": []
+  },
+  {
+   "name": "testplan",
+   "status": "done",
+   "attempts": 1,
+   "started": null,
+   "finished": null,
+   "duration_ms": 3900,
+   "cache_hit": false,
+   "phases": [],
+   "checks": []
+  },
+  {
+   "name": "simprep",
+   "status": "done",
+   "attempts": 1,
+   "started": null,
+   "finished": null,
+   "duration_ms": 2200,
+   "cache_hit": false,
+   "phases": [],
+   "checks": []
+  },
+  {
+   "name": "integration",
+   "status": "done",
+   "attempts": 1,
+   "started": null,
+   "finished": null,
+   "duration_ms": 3400,
+   "cache_hit": false,
+   "phases": [],
+   "checks": [
+    {
+     "check": "mass_rollup",
+     "requirement": null,
+     "result": "pass"
+    }
+   ]
+  },
+  {
+   "name": "simulation",
+   "status": "done",
+   "attempts": 1,
+   "started": null,
+   "finished": null,
+   "duration_ms": 6800,
+   "cache_hit": false,
+   "phases": [],
+   "checks": [
+    {
+     "check": "wave_tilt",
+     "requirement": "R-009",
+     "result": "pass"
+    },
+    {
+     "check": "stress_safety_factor",
+     "requirement": "R-012",
+     "result": "pass"
+    }
+   ]
+  },
+  {
+   "name": "final",
+   "status": "done",
+   "attempts": 1,
+   "started": null,
+   "finished": null,
+   "duration_ms": 17000,
+   "cache_hit": false,
+   "phases": [],
+   "checks": []
+  },
+  {
+   "name": "report",
+   "status": "done",
+   "attempts": 1,
+   "started": null,
+   "finished": null,
+   "duration_ms": 600,
+   "cache_hit": false,
+   "phases": [],
+   "checks": []
+  }
+ ],
+ "before": {
+  "verify_plan": {
+   "model": "verify-model-b",
+   "family": "family-b",
+   "result": "pass",
+   "requirements": 12,
+   "checks": 14
+  },
+  "approval": {
+   "hash": "sha256:91ab04e77c3d52f0",
+   "approved": true,
+   "approved_by": "timothy",
+   "approved_at": "2026-11-14T10:00:07.000Z"
+  }
+ },
+ "during": {
+  "checks_total": 9,
+  "passed": 9,
+  "failed": 0
+ },
+ "after": {
+  "gate": [
+   {
+    "step": "G1",
+    "title": "Every check run",
+    "result": "pass",
+    "detail": "24 checks run"
+   },
+   {
+    "step": "G2",
+    "title": "Results recomputed",
+    "result": "pass",
+    "detail": "all agree"
+   },
+   {
+    "step": "G3",
+    "title": "Rebuild identical",
+    "result": "pass",
+    "detail": "byte-identical"
+   },
+   {
+    "step": "G4",
+    "title": "Every requirement judged",
+    "result": "pass",
+    "detail": "12 of 12"
+   },
+   {
+    "step": "G5",
+    "title": "Canaries fail as they should",
+    "result": "pass",
+    "detail": "14 of 14"
+   }
+  ],
+  "audit": {
+   "result": "pass",
+   "detail": "every requirement has a result"
+  }
+ },
+ "loops": {
+  "repair": {
+   "attempts": 2,
+   "fixed": 1
+  },
+  "change_requests": {
+   "open": 0,
+   "accepted": 1,
+   "rejected": 1
+  },
+  "proposals": {
+   "draft": 1
+  },
+  "calibration": {
+   "measurements": 0,
+   "applied": 0
+  }
+ }
+}

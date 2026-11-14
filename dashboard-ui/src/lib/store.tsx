@@ -72,6 +72,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         setConnection("live");
         if (wasOffline) { wasOffline = false; bump(AREAS); } // events may have been missed
       };
+      // Change notifications arrive as plain messages; the design log arrives as named
+      // `design` events, which onmessage never sees, so it needs its own listener.
       source.onmessage = (message) => {
         let data: unknown;
         try { data = JSON.parse(message.data); } catch { return; }
@@ -80,6 +82,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         const event = parseEvent(data);
         if (event) setLiveEvents((all) => all.concat(event).slice(-MAX_EVENTS));
       };
+      source.addEventListener("design", (message) => {
+        let data: unknown;
+        try { data = JSON.parse((message as MessageEvent).data); } catch { return; }
+        const event = parseEvent(data);
+        if (event) setLiveEvents((all) => all.concat(event).slice(-MAX_EVENTS));
+      });
       source.onerror = () => {
         setConnection("offline");
         wasOffline = true;

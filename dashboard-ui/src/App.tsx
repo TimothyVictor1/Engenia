@@ -1,11 +1,13 @@
 import { Suspense, lazy, type ComponentType } from "react";
-import { Box, FileSignature, FlaskConical, ListChecks, Radio, Workflow, type LucideIcon } from "lucide-react";
+import { Box, Gauge, FileSignature, FlaskConical, ListChecks, Radio, Workflow, type LucideIcon } from "lucide-react";
 import brand from "./assets/engenia-mark.png";
 import { DashboardProvider, useDash, useResource } from "./lib/store";
 import { VIEWS, useRoute, type View } from "./lib/route";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Loading } from "./components/States";
+import { Mission } from "./views/Mission";
 import { Pipeline } from "./views/Pipeline";
+import { usePresentation } from "./lib/present";
 import { Requirements } from "./views/Requirements";
 import { Contract } from "./views/Contract";
 import { Scenarios } from "./views/Scenarios";
@@ -15,6 +17,7 @@ const Design = lazy(() => import("./views/Design").then((m) => ({ default: m.Des
 const Studio = lazy(() => import("./views/Studio").then((m) => ({ default: m.Studio })));
 
 const NAV: Record<View, { title: string; icon: LucideIcon }> = {
+  mission: { title: "Mission Control", icon: Gauge },
   pipeline: { title: "Pipeline", icon: Workflow },
   requirements: { title: "Requirements", icon: ListChecks },
   design: { title: "Design", icon: Box },
@@ -50,7 +53,18 @@ function Header() {
 function Shell() {
   const { view, param } = useRoute();
   const { sample } = useDash();
-  const Page = ({ pipeline: Pipeline, requirements: Requirements, design: Design, contract: Contract, scenarios: Scenarios, studio: Studio } as Record<View, ComponentType<{ param: string }>>)[view];
+  const [present] = usePresentation();
+  const Page = ({ mission: Mission, pipeline: Pipeline, requirements: Requirements, design: Design, contract: Contract, scenarios: Scenarios, studio: Studio } as Record<View, ComponentType<{ param: string }>>)[view];
+  if (present && view === "mission") {
+    // Presentation mode: no sidebar or header, only the view.
+    return (
+      <main id="main" className="min-h-screen w-full p-4 sm:p-6">
+        <ErrorBoundary resetKey="present">
+          {sample === null ? <Loading text="Connecting…" /> : <Suspense fallback={<Loading />}><Mission /></Suspense>}
+        </ErrorBoundary>
+      </main>
+    );
+  }
   return (
     <div className="flex min-h-screen w-full flex-col md:flex-row">
       <aside className="shrink-0 border-b bg-surface md:w-56 md:border-b-0 md:border-r">

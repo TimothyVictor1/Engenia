@@ -27,3 +27,15 @@ refreshes the other views. Field names inside `data` that the UI uses:
 | repair | `summary` (or `reason`) |
 
 `public/sample/live-events.json` is a sample run used for replay.
+
+## Mission Control
+
+The default view (`#/mission`). It shows only real data: events from `/api/events` (live, as named
+`design` SSE messages) and `/api/events/history` (replay), plus `/api/agents` and
+`/api/run/summary`. The shapes it needs are in `docs/mission-api.md`. A value the server does not
+send is shown as "not recorded yet"; a route that answers 404 or 501 is reported as not available.
+`public/sample/` holds fixtures that follow that document; they are used only in sample mode and in
+tests, and the page labels them "Sample data".
+
+Presentation mode (button, `p` key, or `?present=1`) hides the navigation and bigger type; `Esc`
+leaves it.

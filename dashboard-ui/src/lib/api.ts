@@ -4,6 +4,7 @@
 import type {
   ContractData, Pipeline, Requirement, ScenariosData, StageDetail,
 } from "./types";
+import type { AgentsResponse, RunSummary } from "./mission";
 
 export class ApiError extends Error {
   status: number | null;
@@ -65,6 +66,27 @@ async function sampleStage(name: string): Promise<StageDetail> {
   return { name, status: stage.status, facts: {}, verdicts: [] };
 }
 
+export interface AvailableFault { id: string; description: string; stage: string }
+
+/** POST /api/demo-fault. Resolves to the run id and fault; ApiError carries 409/404/501. */
+async function postFault(faultId?: string): Promise<{ run_id: number; fault: AvailableFault }> {
+  let res: Response;
+  try {
+    res = await fetch("api/demo-fault", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(faultId ? { fault_id: faultId } : {}),
+    });
+  } catch {
+    throw new ApiError("Cannot reach the server.", { network: true });
+  }
+  if (!res.ok) {
+    let detail = `Server answered ${res.status}`;
+    try { detail = (await res.json()).detail ?? detail; } catch { /* keep the status text */ }
+    throw new ApiError(String(detail), { status: res.status });
+  }
+  return res.json();
+}
+
 export const makeApi = (sample: boolean) => ({
   pipeline: () => json<Pipeline>("/api/pipeline", sample),
   requirements: () => json<{ requirements: Requirement[] }>("/api/requirements", sample),
@@ -72,6 +94,13 @@ export const makeApi = (sample: boolean) => ({
     sample ? sampleStage(name) : json<StageDetail>(`/api/stages/${enc(name)}`, false),
   contract: () => json<ContractData>("/api/contract", sample),
   scenarios: () => json<ScenariosData>("/api/scenarios", sample),
+  agents: () => json<AgentsResponse>("/api/agents", sample),
+  runSummary: (runId?: number | string | null) =>
+    json<RunSummary>(`/api/run/summary${runId != null && !sample ? `?run_id=${enc(String(runId))}` : ""}`, sample),
+  eventsHistory: () => json<{ run_id: number | null; events: unknown[] }>("/api/events/history", sample)
+    .then((r) => (Array.isArray(r) ? { run_id: null, events: r } : r)),
+  demoFaults: () => json<{ faults: AvailableFault[] }>("/api/demo-fault", sample),
+  breakIt: postFault,
   /** URL of a raw build file. `version` busts the cache after the design changes. */
   fileUrl: (stage: string, file: string, version = 0) => {
     const base = resolve(`/api/files/${enc(stage)}/${enc(file)}`, sample);

@@ -4,12 +4,15 @@
 
 export const KINDS = [
   "message", "tool_call", "tool_result", "code", "decision", "preview", "verdict", "repair",
+  // Mission Control (docs/mission-api.md)
+  "phase_start", "phase_end", "cache", "gate_step", "approval", "change_request", "proposal", "fault",
 ] as const;
 export type Kind = (typeof KINDS)[number];
 
 export interface LiveEvent {
   ts: string;
   run_id: string | number;
+  project?: string;
   stage: string;
   attempt: number;
   kind: Kind;
@@ -26,6 +29,7 @@ export function parseEvent(value: unknown): LiveEvent | null {
   return {
     ts: e.ts,
     run_id: typeof e.run_id === "number" || typeof e.run_id === "string" ? e.run_id : "",
+    project: typeof e.project === "string" ? e.project : undefined,
     stage: e.stage,
     attempt: typeof e.attempt === "number" ? e.attempt : 1,
     kind: e.kind as Kind,

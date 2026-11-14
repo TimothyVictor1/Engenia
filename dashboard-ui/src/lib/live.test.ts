@@ -69,7 +69,7 @@ describe("api paths", () => {
   });
   it("parses routes and falls back to the pipeline", () => {
     expect(parseHash("#/requirements/R-005")).toEqual({ view: "requirements", param: "R-005" });
-    expect(parseHash("#/nope")).toEqual({ view: "pipeline", param: "" });
+    expect(parseHash("#/nope")).toEqual({ view: "mission", param: "" });
     expect(parseHash("#/pipeline/%E0%A4%A")).toMatchObject({ view: "pipeline" });
   });
 });
