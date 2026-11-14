@@ -5,3 +5,4 @@ projects/*/build/
 __pycache__
 projects/*/src/*/placeholder.txt
 release/
+dashboard-ui/node_modules/

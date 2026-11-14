@@ -1,0 +1,272 @@
+[
+ {
+  "ts": "2026-11-13T10:00:00Z",
+  "run_id": 7,
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "message",
+  "data": {
+   "text": "Reading the verified plan and the requirements."
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:03Z",
+  "run_id": 7,
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "decision",
+  "data": {
+   "title": "Cylindrical hull",
+   "choice": "Single cylinder, domed lid",
+   "reason": "Simplest shape that stays upright and prints in one piece.",
+   "rejected": [
+    {
+     "option": "Spherical hull",
+     "why": "Does not fit the print bed"
+    },
+    {
+     "option": "Square hull",
+     "why": "Rolls poorly in waves"
+    }
+   ],
+   "requirements": [
+    "R-001",
+    "R-005"
+   ]
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:06Z",
+  "run_id": 7,
+  "stage": "architect",
+  "attempt": 1,
+  "kind": "verdict",
+  "data": {
+   "check": "contract_valid",
+   "requirement": null,
+   "result": "pass",
+   "measured": null,
+   "message": "Contract written"
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:10Z",
+  "run_id": 7,
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "message",
+  "data": {
+   "text": "Generating the hull from the contract budgets (300 g, 160 x 160 x 220 mm)."
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:12Z",
+  "run_id": 7,
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "tool_call",
+  "data": {
+   "name": "cad.build",
+   "args": "wall_mm=2.4"
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:16Z",
+  "run_id": 7,
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "code",
+  "data": {
+   "path": "src/mechanical/hull.py",
+   "language": "python",
+   "code": "WALL_MM = 2.4\nRADIUS_MM = 70\nHEIGHT_MM = 200\n\ndef build():\n    hull = cylinder(RADIUS_MM, HEIGHT_MM)\n    return hull.shell(WALL_MM)\n"
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:20Z",
+  "run_id": 7,
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "tool_result",
+  "data": {
+   "summary": "hull.stl written, 22 KB"
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:21Z",
+  "run_id": 7,
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "preview",
+  "data": {
+   "stage": "mechanical",
+   "files": [
+    "hull.stl",
+    "lid.stl"
+   ]
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:24Z",
+  "run_id": 7,
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "verdict",
+  "data": {
+   "check": "mass_budget",
+   "requirement": "R-003",
+   "result": "fail",
+   "measured": 318.4,
+   "limit": {
+    "max": 300
+   },
+   "evidence_level": "calculated",
+   "message": "318.4 g is over the 300 g budget"
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:25Z",
+  "run_id": 7,
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "verdict",
+  "data": {
+   "check": "buoyancy_margin",
+   "requirement": "R-005",
+   "result": "pass",
+   "measured": 0.27,
+   "limit": {
+    "min": 0.2
+   },
+   "evidence_level": "calculated",
+   "message": null
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:28Z",
+  "run_id": 7,
+  "stage": "mechanical",
+  "attempt": 1,
+  "kind": "repair",
+  "data": {
+   "summary": "Thin the wall from 2.4 mm to 2.0 mm to recover about 20 g.",
+   "reason": "mass_budget failed"
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:30Z",
+  "run_id": 7,
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "decision",
+  "data": {
+   "title": "Thinner wall",
+   "choice": "Wall 2.0 mm",
+   "reason": "Saves mass while staying above the 1.6 mm print minimum.",
+   "rejected": [
+    {
+     "option": "Hollow lid",
+     "why": "Weakens the seal"
+    },
+    {
+     "option": "Lighter material",
+     "why": "Not printable on the lab printer"
+    }
+   ],
+   "requirements": [
+    "R-003",
+    "R-008"
+   ]
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:34Z",
+  "run_id": 7,
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "code",
+  "data": {
+   "path": "src/mechanical/hull.py",
+   "language": "python",
+   "code": "WALL_MM = 2.0\nRADIUS_MM = 70\nHEIGHT_MM = 200\n\ndef build():\n    hull = cylinder(RADIUS_MM, HEIGHT_MM)\n    return hull.shell(WALL_MM)\n"
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:38Z",
+  "run_id": 7,
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "preview",
+  "data": {
+   "stage": "mechanical",
+   "files": [
+    "hull.stl",
+    "lid.stl"
+   ]
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:41Z",
+  "run_id": 7,
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "verdict",
+  "data": {
+   "check": "mass_budget",
+   "requirement": "R-003",
+   "result": "pass",
+   "measured": 291.2,
+   "limit": {
+    "max": 300
+   },
+   "evidence_level": "calculated",
+   "message": null
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:42Z",
+  "run_id": 7,
+  "stage": "mechanical",
+  "attempt": 2,
+  "kind": "verdict",
+  "data": {
+   "check": "wall_thickness_min",
+   "requirement": "R-008",
+   "result": "pass",
+   "measured": 2.0,
+   "limit": {
+    "min": 1.6
+   },
+   "evidence_level": "calculated",
+   "message": null
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:44Z",
+  "run_id": 7,
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "message",
+  "data": {
+   "text": "Placing the board in the 70 x 40 x 22 mm bay."
+  }
+ },
+ {
+  "ts": "2026-11-13T10:00:52Z",
+  "run_id": 7,
+  "stage": "electronics",
+  "attempt": 1,
+  "kind": "verdict",
+  "data": {
+   "check": "bay_fit",
+   "requirement": "R-006",
+   "result": "pass",
+   "measured": 1,
+   "limit": {
+    "equals": 1
+   },
+   "evidence_level": "calculated",
+   "message": null
+  }
+ }
+]

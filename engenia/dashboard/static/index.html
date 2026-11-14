@@ -1,47 +1,21 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <title>Engenia dashboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
-  <link rel="stylesheet" href="styles.css">
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-    }
-  }
-  </script>
-  <script type="module" src="app.js"></script>
-</head>
-<body>
-  <a class="skip-link" href="#main">Skip to content</a>
-  <div class="app">
-    <header class="topbar">
-      <span class="brand">Engenia</span>
-      <span class="topbar-sep" aria-hidden="true"></span>
-      <span class="project" id="project-name">Loading…</span>
-      <span class="spacer"></span>
-      <span class="sample-tag" id="sample-tag" hidden>sample data</span>
-      <span class="conn" id="conn" hidden></span>
-      <span class="updated" id="updated"></span>
-    </header>
-
-    <nav class="nav" aria-label="Views">
-      <a href="#/pipeline" data-view="pipeline">Pipeline</a>
-      <a href="#/requirements" data-view="requirements">Requirements</a>
-      <a href="#/design" data-view="design">Design</a>
-      <a href="#/contract" data-view="contract">Contract</a>
-      <a href="#/scenarios" data-view="scenarios">Scenarios</a>
-    </nav>
-
-    <main id="main" tabindex="-1"></main>
-  </div>
-  <noscript><p class="noscript">The Engenia dashboard needs JavaScript.</p></noscript>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Engenia dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+    />
+    <script type="module" crossorigin src="./assets/index-C67fN6-G.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-8w2R8GAD.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>The Engenia dashboard needs JavaScript.</noscript>
+  </body>
 </html>

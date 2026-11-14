@@ -1,0 +1,22 @@
+{
+  "name": "mechanical",
+  "status": "failed",
+  "facts": {
+    "dry_mass_g": 318.4,
+    "buoyancy_margin": 0.17
+  },
+  "verdicts": [
+    {
+      "check": "buoyancy_margin",
+      "requirement": "R-005",
+      "measured": 0.17,
+      "limit": {
+        "min": 0.2
+      },
+      "result": "fail",
+      "evidence_level": "calculated",
+      "artifact": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "message": "Calculated buoyancy margin is below the required minimum."
+    }
+  ]
+}
