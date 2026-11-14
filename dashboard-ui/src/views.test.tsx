@@ -11,11 +11,17 @@ const ok = (body: unknown) => new Response(typeof body === "string" ? body : JSO
 
 class FakeEventSource {
   static CLOSED = 2;
+  static instances: FakeEventSource[] = [];
   readyState = 0;
   onopen: (() => void) | null = null;
   onmessage: ((e: { data: string }) => void) | null = null;
   onerror: (() => void) | null = null;
+  listeners = new Map<string, ((e: { data: string }) => void)[]>();
+  constructor() { FakeEventSource.instances.push(this); }
+  addEventListener(name: string, fn: (e: { data: string }) => void) { this.listeners.set(name, [...(this.listeners.get(name) ?? []), fn]); }
   close() { this.readyState = 2; }
+  /** Deliver a named SSE message, as the server does for the design log. */
+  emit(name: string, data: unknown) { this.listeners.get(name)?.forEach((fn) => fn({ data: JSON.stringify(data) })); }
 }
 
 function install(handler: (url: string) => Response | Promise<Response>) {
