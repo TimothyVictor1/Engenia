@@ -32,6 +32,13 @@ from engenia.harness.tools import Toolbox, ToolError
 
 CONTRACT_FILE = "contract.json"
 META_FILE = "meta.json"
+SOURCES_FILE = "budget_sources.json"  # next to contract.json: the Contract model has no room for it
+
+# Budgets derived from a total-mass requirement keep this share of the total back for what no
+# stage budgets (wiring, fasteners, sealant) and as margin against the measured numbers.
+MASS_RESERVE = 0.10
+# Energy budgets derived from an average-power requirement keep this margin.
+POWER_MARGIN = 0.10
 
 SYSTEM_PROMPT = """\
 You are the architect of an engineering project. Propose the contract: the budgets and interfaces
@@ -51,6 +58,11 @@ with write_file, in exactly this shape:
   },
   "totals": {"mass_g_max": 400}
 }
+
+Derive every budget a requirement sets from that requirement (for example a total-mass limit
+becomes totals.mass_g_max and is split between the mechanical and electronics budgets with some
+margin); use the pack defaults only for budgets no requirement sets. A script re-derives those
+budgets from the requirements after you finish, so a number that contradicts them is replaced.
 
 The mechanical and electronics mass budgets must add up to no more than totals.mass_g_max, the
 electronics bay must fit inside the mechanical envelope, the board holes must lie inside the bay,
@@ -142,6 +154,82 @@ def check_contract(text: str) -> ContractReport:
     return report
 
 
+# --- budgets from this project's requirements ---------------------------------------------------
+
+
+def _limit_max(requirement) -> float | None:
+    limit = requirement.verify.limit
+    if limit is not None and limit.max is not None:
+        return float(limit.max)
+    if limit is None and requirement.value is not None:
+        return float(requirement.value)
+    return None
+
+
+def derive_budgets(
+    contract: dict[str, Any],
+    requirements: list,
+    default: dict[str, Any],
+    *,
+    base: str = "pack default",
+) -> tuple[dict[str, Any], dict[str, str]]:
+    """Set the budgets that an approved requirement governs, from that requirement.
+
+    Returns the new contract (a copy) and, for every budget path, where its number came from: a
+    requirement id, or `base` ("pack default", or "model" for a budget the model proposed and no
+    requirement governs). Pure function.
+
+    - mass_budget with a maximum (the total mass): totals.mass_g_max is that maximum; the usable
+      part (1 - MASS_RESERVE) is split between mechanical and electronics in the proportion of
+      the pack default.
+    - power_budget with a maximum in mW: energy_mwh_per_day = mW x 24 x (1 - POWER_MARGIN).
+    """
+    result = json.loads(json.dumps(contract))
+    budgets, totals = result["budgets"], result["totals"]
+    approved = [r for r in requirements if r.status == RequirementStatus.APPROVED]
+
+    def strictest(check: str):
+        found = [(v, r) for r in approved if r.verify.check == check
+                 and (v := _limit_max(r)) is not None]
+        return min(found, key=lambda pair: (pair[0], pair[1].id)) if found else None
+
+    sources = dict.fromkeys(
+        (
+            "totals.mass_g_max",
+            "budgets.mechanical.mass_g",
+            "budgets.electronics.mass_g",
+            "budgets.electronics.energy_mwh_per_day",
+            "budgets.mechanical.outer_envelope_mm",
+            "budgets.electronics.bay_mm",
+            "budgets.firmware.flash_kb",
+            "budgets.firmware.ram_kb",
+        ),
+        base,
+    )
+
+    mass = strictest("mass_budget")
+    if mass is not None:
+        total, requirement = mass
+        d_mech = default["budgets"]["mechanical"]["mass_g"]
+        d_elec = default["budgets"]["electronics"]["mass_g"]
+        usable = total * (1 - MASS_RESERVE)
+        electronics = round(usable * d_elec / (d_mech + d_elec), 1)
+        totals["mass_g_max"] = total
+        budgets["electronics"]["mass_g"] = electronics
+        budgets["mechanical"]["mass_g"] = round(usable - electronics, 1)
+        for path in ("totals.mass_g_max", "budgets.mechanical.mass_g",
+                     "budgets.electronics.mass_g"):
+            sources[path] = requirement.id
+    power = strictest("power_budget")
+    if power is not None and power[1].unit == "mW":
+        milliwatts, requirement = power
+        budgets["electronics"]["energy_mwh_per_day"] = round(
+            milliwatts * 24 * (1 - POWER_MARGIN), 1
+        )
+        sources["budgets.electronics.energy_mwh_per_day"] = requirement.id
+    return result, sources
+
+
 def _feedback(report: ContractReport) -> str:
     return (
         "The contract did not pass the script check.\n"
@@ -202,14 +290,33 @@ class ArchitectStage:
         check_model_families(model=model)
         if model and self._propose(ctx, model):
             source = "model"
+        default_path = _pack_file(ctx, "default_contract.json")
         if source == "default":
             ctx.contract_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(_pack_file(ctx, "default_contract.json"), ctx.contract_path)
+            shutil.copyfile(default_path, ctx.contract_path)
+
+        # This project's approved requirements set the budgets they govern, whoever proposed the
+        # rest; the record of where each number came from sits beside the contract.
+        requirements = list(load_requirements(ctx.spec_dir).values())
+        derived, sources = derive_budgets(
+            json.loads(ctx.contract_path.read_text("utf-8")),
+            requirements,
+            json.loads(default_path.read_text("utf-8")),
+            base="model" if source == "model" else "pack default",
+        )
+        if check_contract(json.dumps(derived)).ok:
+            ctx.contract_path.write_text(json.dumps(derived, indent=2) + "\n", encoding="utf-8")
+        else:  # the derived numbers do not fit together: keep what was proposed, claim nothing
+            sources = dict.fromkeys(sources, "model" if source == "model" else "pack default")
+        (ctx.contract_path.parent / SOURCES_FILE).write_text(
+            json.dumps(sources, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
 
         ctx.src_dir.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ctx.contract_path, ctx.src_dir / CONTRACT_FILE)
         (ctx.src_dir / META_FILE).write_text(
-            json.dumps({"source": source}, sort_keys=True) + "\n", encoding="utf-8"
+            json.dumps({"source": source, "budget_sources": sources}, sort_keys=True) + "\n",
+            encoding="utf-8",
         )
 
     def _propose(self, ctx: StageContext, model: str) -> bool:
@@ -271,13 +378,15 @@ class ArchitectStage:
 
     def interface(self, ctx: StageContext) -> dict[str, Any]:
         report = check_contract(ctx.contract_path.read_text("utf-8"))
-        source = "unknown"
+        source, budget_sources = "unknown", {}
         try:
-            source = json.loads((ctx.src_dir / META_FILE).read_text("utf-8")).get("source", source)
+            meta = json.loads((ctx.src_dir / META_FILE).read_text("utf-8"))
+            source, budget_sources = meta.get("source", source), meta.get("budget_sources", {})
         except (OSError, ValueError):
             pass
         return {
             "source": source,
+            "budget_sources": budget_sources,
             "contract_sha256": file_hash(ctx.contract_path),
             **report.sums,
         }

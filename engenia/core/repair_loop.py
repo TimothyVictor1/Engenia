@@ -78,11 +78,19 @@ def run_with_repair(
     gate: Callable[..., Any] | None = None,
     repair: Callable[..., str] | None = None,
     propose: Callable[..., Path] | None = None,
+    initial_run: RunReport | None = None,
+    stages_only: bool = False,
 ) -> RepairReport:
     """Run the pipeline and the gate, repairing failed stages. See the module docstring.
 
     `gate`, `repair` and `propose` default to the real run_gate, repair_stage and propose_change;
     they are parameters so tests can stand in for the model.
+
+    `initial_run` is a pipeline run that already happened (the loop does not run it again).
+    `stages_only` repairs scripted stage-check failures only: once every stage builds and passes
+    its own checks the loop returns without the gate, and the run is left as execute left it.
+    `engenia new` uses both, so a stage that fails mass_budget is repaired before the check plan
+    is approved; the stages that need it stay blocked until it passes.
     """
     root = Path(root)
     if gate is None:
@@ -95,7 +103,9 @@ def run_with_repair(
         from engenia.stages.registry import REGISTRY as registry
 
     common = {"registry": registry, "store": store, "workers": workers}
-    run = execute(project, root, on_result=on_result, resume=resume, **common)
+    if stages_only:
+        gate = _passing_gate
+    run = initial_run or execute(project, root, on_result=on_result, resume=resume, **common)
     result = RepairReport(run=run, gate=None)
     verdict_gate = _checked_gate(run, project, root, registry, gate)
     if verdict_gate is None:
@@ -145,9 +155,15 @@ def run_with_repair(
         if not result.reason:
             result.reason = f"the gate still fails after {rounds} repair round(s)"
         _record_failure(root, run_id, failures, result)
-    elif result.passed:
+    elif result.passed and not stages_only:
         _record(root, lambda s: s.finish_run(run_id, "done"))
     return result
+
+
+def _passing_gate(project, root, **kwargs):
+    from engenia.gate.gate import GateResult
+
+    return GateResult(passed=True, report={"passed": True, "verdicts": []})
 
 
 def _checked_gate(run, project, root, registry, gate):

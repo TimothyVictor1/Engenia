@@ -5,8 +5,10 @@ plan. The other stages are fakes (their own lanes test them) and the gate is a s
 verdict is chosen by each test; release is the real one.
 """
 
+import json
 import shutil
 import zipfile
+from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -15,6 +17,10 @@ from typer.testing import CliRunner
 
 from engenia.agents.verification.stage import VerifyPlanStage
 from engenia.core.cli import app
+from engenia.core.new_project import new_project, summary
+from engenia.harness.llm import FakeLLM, text_response, tool_call_response
+from engenia.harness.repair import repair_stage
+from tests.core.conftest import FakeStage
 
 runner = CliRunner()
 REPO = Path(__file__).resolve().parents[2]
@@ -165,3 +171,81 @@ def test_the_enclosure_pack_has_its_own_intake_rules(world):
     assert checks == {"mass_budget", "wall_thickness_min", "print_bed_fit"}
     assert "enclosure pack has no stage support yet" in result.output
     assert (world.root / "projects" / PROJECT / "contract" / "contract.json").is_file()
+
+
+# --- stage-level repair inside `engenia new` ---------------------------------------------------
+
+class MassStage(FakeStage):
+    """A mechanical stage whose design.txt sets its mass. The real mass_budget verifier checks it
+    against the contract's 300 g mechanical budget."""
+
+    checks = ["mass_budget"]
+
+    def generate(self, ctx):
+        super().generate(ctx)
+        (ctx.src_dir / "design.txt").write_text("mass=860")
+
+    def build(self, ctx):
+        super().build(ctx)
+        mass = float((ctx.src_dir / "design.txt").read_text().split("=")[1])
+        interface = {"stage": "mechanical", "key": "sha256:" + "0" * 64,
+                     "facts": {"dry_mass_g": mass}}
+        (ctx.build_dir / "interface.json").write_text(json.dumps(interface))
+
+    def interface(self, ctx):
+        mass = float((ctx.src_dir / "design.txt").read_text().split("=")[1])
+        return {"dry_mass_g": mass}
+
+
+def mass_world(world, fake_registry, recorder):
+    registry = fake_registry()
+    real = registry["mechanical"]
+    registry["mechanical"] = MassStage(
+        "mechanical", real.needs, recorder, reads_contract=real.reads_contract
+    )
+    registry["verify_plan"] = VerifyPlanStage()
+    return registry
+
+
+def run_new(world, registry, repair):
+    return new_project(
+        REQUEST, PROJECT, world.root, confirm=lambda question, lines: True,
+        registry=registry, repair=repair,
+    )
+
+
+def test_a_stage_failing_mass_budget_is_repaired_and_its_dependants_then_run(
+    world, fake_registry, recorder
+):
+    registry = mass_world(world, fake_registry, recorder)
+    llm = FakeLLM([
+        tool_call_response(("write_file", {"path": "design.txt", "content": "mass=280"}),
+                           ("run_build", {})),
+        text_response("lowered the mass"),
+    ])
+    repair = partial(repair_stage, model="test-model", chat_fn=llm)
+
+    report = run_new(world, registry, repair)
+
+    assert report.ok, report.stopped
+    assert report.repairs == [{"round": 1, "stage": "mechanical", "outcome": "repaired"}]
+    assert recorder.count("build", "integration") == 1  # blocked at first, built after the repair
+    assert "failed" not in report.stages and "blocked" not in report.stages
+    assert "repairs:      1 round(s)" in "\n".join(summary(report))
+
+
+def test_a_stage_that_cannot_be_repaired_gets_a_proposal_and_its_dependants_stay_blocked(
+    world, fake_registry, recorder
+):
+    registry = mass_world(world, fake_registry, recorder)
+    rounds = [text_response("no change")] * 9  # three attempts a round, three rounds
+    repair = partial(repair_stage, model="test-model", chat_fn=FakeLLM(rounds))
+
+    report = run_new(world, registry, repair)
+
+    assert not report.ok and report.stopped.startswith("stages failed")
+    assert [r["round"] for r in report.repairs] == [1, 2, 3]
+    assert all(r["outcome"] == "exhausted" for r in report.repairs)
+    assert [p.name for p in report.proposals] == ["R-001.yaml"]
+    assert recorder.count("build", "integration") == 0
+    assert report.release_path is None

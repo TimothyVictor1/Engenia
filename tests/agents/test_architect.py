@@ -51,8 +51,13 @@ def test_model_contract_is_used(root, architect_ctx, monkeypatch):
     stage.build(architect_ctx)
     assert llm.calls[0].model == "design-model"
     assert stage.interface(architect_ctx)["source"] == "model"
-    assert json.loads(architect_ctx.contract_path.read_text())["budgets"]["mechanical"][
-        "mass_g"] == 280
+    # R-001 (total mass 400 g) governs the mass budgets, so the model's 280/50 split is replaced
+    # by the derived 300/60; the budgets no requirement sets stay the model's.
+    budgets = json.loads(architect_ctx.contract_path.read_text())["budgets"]
+    assert budgets["mechanical"]["mass_g"] == 300 and budgets["electronics"]["mass_g"] == 60
+    sources = stage.interface(architect_ctx)["budget_sources"]
+    assert sources["budgets.mechanical.mass_g"] == "R-001"
+    assert sources["budgets.firmware.flash_kb"] == "model"
     first_user = [m["content"] for m in llm.calls[0].messages if m["role"] == "user"][0]
     assert "R-001" in first_user and "PETG" in first_user  # requirements and pack.yaml
 
@@ -146,3 +151,70 @@ def test_build_rejects_an_invalid_contract(root, architect_ctx):
     architect_ctx.contract_path.write_text(contract_text(root, mech=390, elec=60))
     with pytest.raises(ValueError, match="mass_g_sum"):
         ArchitectStage().build(architect_ctx)
+
+
+def set_requirement(root, number, check, limit, unit="g"):
+    import yaml
+
+    from tests.agents.conftest import requirement
+
+    req = requirement(number, check, limit)
+    req["unit"] = unit
+    (root / "projects" / "demo" / "spec" / f"R-{number:03d}.yaml").write_text(
+        yaml.safe_dump(req), encoding="utf-8"
+    )
+
+
+def test_budgets_come_from_this_projects_mass_requirement(root, architect_ctx):
+    set_requirement(root, 1, "mass_budget", {"max": 250})
+    stage = ArchitectStage()
+    stage.generate(architect_ctx)
+    stage.build(architect_ctx)
+    contract = json.loads(architect_ctx.contract_path.read_text())
+    budgets = contract["budgets"]
+    mech, elec = budgets["mechanical"]["mass_g"], budgets["electronics"]["mass_g"]
+    assert contract["totals"]["mass_g_max"] == 250
+    assert mech + elec <= 250 * 0.9 + 0.01  # a margin is kept back
+    assert mech > elec > 0
+    assert check_contract(architect_ctx.contract_path.read_text()).ok
+    sources = stage.interface(architect_ctx)["budget_sources"]
+    assert sources["totals.mass_g_max"] == sources["budgets.mechanical.mass_g"] == "R-001"
+    assert sources["budgets.electronics.mass_g"] == "R-001"
+    assert sources["budgets.firmware.ram_kb"] == "pack default"  # no requirement sets it
+    beside = json.loads((architect_ctx.contract_path.parent / "budget_sources.json").read_text())
+    assert beside == sources
+
+
+def test_the_strictest_mass_requirement_wins(root, architect_ctx):
+    set_requirement(root, 5, "mass_budget", {"max": 320})
+    ArchitectStage().generate(architect_ctx)
+    contract = json.loads(architect_ctx.contract_path.read_text())
+    assert contract["totals"]["mass_g_max"] == 320  # R-005 is stricter than R-001's 400
+
+
+def test_a_draft_requirement_sets_no_budget(root, architect_ctx):
+    set_requirement(root, 5, "mass_budget", {"max": 100})
+    import yaml
+
+    path = root / "projects" / "demo" / "spec" / "R-005.yaml"
+    data = yaml.safe_load(path.read_text())
+    data["status"] = "draft"
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+    ArchitectStage().generate(architect_ctx)
+    assert json.loads(architect_ctx.contract_path.read_text())["totals"]["mass_g_max"] == 400
+
+
+def test_a_power_requirement_sets_the_energy_budget(root, architect_ctx):
+    set_requirement(root, 6, "power_budget", {"max": 5}, unit="mW")
+    stage = ArchitectStage()
+    stage.generate(architect_ctx)
+    contract = json.loads(architect_ctx.contract_path.read_text())
+    assert contract["budgets"]["electronics"]["energy_mwh_per_day"] == 108  # 5 mW x 24 h x 0.9
+    sources = json.loads((architect_ctx.contract_path.parent / "budget_sources.json").read_text())
+    assert sources["budgets.electronics.energy_mwh_per_day"] == "R-006"
+
+
+def test_without_a_mass_requirement_the_pack_default_stays(root, architect_ctx):
+    (root / "projects" / "demo" / "spec" / "R-001.yaml").unlink()
+    ArchitectStage().generate(architect_ctx)
+    assert json.loads(architect_ctx.contract_path.read_text()) == default(root)

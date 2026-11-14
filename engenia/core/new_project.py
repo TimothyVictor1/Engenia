@@ -149,6 +149,25 @@ def new_project(
     )
     echo(f"4. run: {', '.join(f'{n} {k}' for k, n in report.stages.items())}")
     if not run.ok:
+        # A stage that failed its own scripted checks (mass_budget, ...) is repaired now, up to 3
+        # rounds, then a change is proposed. The stages that need it stay blocked until it passes.
+        from engenia.core.repair_loop import run_with_repair
+
+        fixing = run_with_repair(
+            project, root, registry=registry, store=store, workers=workers, gate=gate,
+            repair=repair, propose=propose, initial_run=run, stages_only=True,
+        )
+        report.repairs += fixing.rounds
+        report.proposals += fixing.proposals
+        run = fixing.run
+        report.stages = _count(
+            [("ran" if r.status.value == "ran" else "cached") for r in run.results]
+            + ["failed"] * len(run.failed) + ["blocked"] * len(run.blocked)
+        )
+        if fixing.rounds:
+            echo(f"4. repair: {len(fixing.rounds)} round(s); now "
+                 f"{', '.join(f'{n} {k}' for k, n in report.stages.items())}")
+    if not run.ok:
         report.stopped = "stages failed: " + "; ".join(run.failed.values())
         return report
 
@@ -171,8 +190,8 @@ def new_project(
         project, root, registry=registry, store=store, workers=workers,
         gate=gate, repair=repair, propose=propose,
     )
-    report.repairs = loop.rounds
-    report.proposals = loop.proposals
+    report.repairs += loop.rounds
+    report.proposals += loop.proposals
     if loop.gate is not None:
         verdicts = loop.gate.report.get("verdicts", [])
         report.verdicts = _count([v["result"] for v in verdicts])
