@@ -142,18 +142,38 @@ def test_every_stage_that_reads_another_stages_output_lists_it_in_needs():
     assert not missing, "\n".join(missing)
 
 
-def test_a_library_that_installs_a_signal_handler_can_run_in_a_worker(root, fake_registry):
-    """gmsh calls signal.signal when it starts; in a worker thread that raises ValueError."""
-    import signal
+def test_main_thread_stage_runs_on_the_main_thread_and_alone():
+    class Heavy(Node):
+        main_thread = True
 
-    registry = fake_registry()
-    original = registry["firmware"].build
+    reg = {"a": Node("a"), "b": Node("b"), "heavy": Heavy("heavy", ["a"]), "c": Node("c", ["a"])}
+    lock, active, seen = threading.Lock(), set(), {}
 
-    def build(ctx):
-        signal.signal(signal.SIGUSR2, signal.SIG_DFL)  # raises in a plain worker thread
-        original(ctx)
+    def work(name):
+        with lock:
+            seen[name] = (threading.current_thread() is threading.main_thread(), set(active))
+            active.add(name)
+        threading.Event().wait(0.05)
+        with lock:
+            active.discard(name)
 
-    registry["firmware"].build = build
-    assert execute(PROJECT, root, registry=registry, workers=3).ok
-    assert signal.signal.__name__ == "signal"  # the real function is back afterwards
-    assert signal.signal(signal.SIGUSR2, signal.SIG_DFL) == signal.SIG_DFL  # main thread works
+    outcome = schedule(["a", "b", "heavy", "c"], reg, work, workers=4)
+    assert set(outcome.done) == set(reg) and not outcome.failed
+    on_main, others = seen["heavy"]
+    assert on_main and others == set()  # nothing else was running when it started
+    assert not any(seen[n][0] for n in ("a", "b", "c"))
+    # nothing started while it ran (work() is inline, so c starts only after it returned)
+    assert "heavy" not in seen["c"][1]
+
+
+def test_main_thread_stage_failure_blocks_its_dependants():
+    class Heavy(Node):
+        main_thread = True
+
+    reg = {"heavy": Heavy("heavy"), "after": Node("after", ["heavy"])}
+
+    def work(name):
+        raise RuntimeError("boom")
+
+    outcome = schedule(["heavy", "after"], reg, work, workers=2)
+    assert list(outcome.failed) == ["heavy"] and outcome.blocked == {"after": ["heavy"]}

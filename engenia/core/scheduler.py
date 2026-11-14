@@ -5,6 +5,9 @@ function that runs one stage, and a set of hooks, and it does three things:
 
 * starts a stage only when every stage it needs finished successfully;
 * keeps up to `workers` stages running at once;
+* runs a stage that declares `main_thread = True` on the calling (main) thread, alone: it starts
+  only when no other stage is running and nothing else starts until it ends (gmsh and capytaine
+  need the main thread and are process-global);
 * when a stage fails, marks every stage that needs it (directly or through others) as blocked
   and carries on with everything else.
 
@@ -79,14 +82,33 @@ def schedule[T](
                     pending.remove(name)
                     outcome.blocked[name] = causes
                     hooks.blocked(name, causes)
+            ran_inline = False
             for name in list(pending):
                 if len(running) >= workers:
                     break
-                if all(need in outcome.done for need in registry[name].needs):
+                if not all(need in outcome.done for need in registry[name].needs):
+                    continue
+                if getattr(registry[name], "main_thread", False):
+                    if running:
+                        break  # let the running stages drain, start nothing new meanwhile
                     pending.remove(name)
                     hooks.started(name)
-                    running[pool.submit(work, name)] = name
+                    try:
+                        result = work(name)
+                    except Exception as exc:  # a stage failing is an outcome, not a crash
+                        outcome.failed[name] = exc
+                        hooks.failed(name, exc)
+                    else:
+                        outcome.done[name] = result
+                        hooks.done(name, result)
+                    ran_inline = True
+                    break
+                pending.remove(name)
+                hooks.started(name)
+                running[pool.submit(work, name)] = name
             if not running:
+                if ran_inline:
+                    continue
                 break  # nothing can start: only possible if the graph was not a DAG
             finished, _ = wait(running, return_when=FIRST_COMPLETED)
             for future in sorted(finished, key=lambda f: position[running[f]]):

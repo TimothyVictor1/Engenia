@@ -34,7 +34,7 @@ def _mesh(step: Path) -> MeshTet:
         raise RuntimeError(
             "structural simulation not_run: gmsh needs its system libraries, including GLU"
         ) from exc
-    gmsh.initialize()
+    gmsh.initialize(interruptible=False)  # no signal handler: off the main thread is safe
     try:
         gmsh.option.setNumber("General.Terminal", 0)
         gmsh.option.setNumber("Mesh.RandomSeed", 0)

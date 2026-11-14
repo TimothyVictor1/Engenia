@@ -36,12 +36,9 @@ propagation.
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import shutil
-import signal
-import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -211,29 +208,6 @@ class RunReport:
         return any(d.status.value == "accepted" for d in self.decisions)
 
 
-@contextlib.contextmanager
-def _signals_in_worker_threads():
-    """Let libraries that install signal handlers (gmsh does, when it starts) run in a worker.
-
-    `signal.signal` only works in the main thread and raises ValueError anywhere else. Stages run
-    in worker threads, so for the length of a run a call from a worker is accepted and ignored: the
-    handler it wanted (Ctrl-C handling inside the library) is not needed there, because Ctrl-C goes
-    to the main thread, which is the scheduler. Calls from the main thread are untouched.
-    """
-    original = signal.signal
-
-    def guarded(signalnum, handler):
-        if threading.current_thread() is threading.main_thread():
-            return original(signalnum, handler)
-        return signal.getsignal(signalnum)
-
-    signal.signal = guarded
-    try:
-        yield
-    finally:
-        signal.signal = original
-
-
 def default_workers() -> int:
     return max(1, min(os.cpu_count() or 1, 4))
 
@@ -329,10 +303,9 @@ def execute(
             started=started,
             done=done, failed=fail, blocked=block,
         )
-        with _signals_in_worker_threads():
-            outcome = schedule(
-                order, reg, work, workers=workers or default_workers(), hooks=hooks
-            )
+        outcome = schedule(
+            order, reg, work, workers=workers or default_workers(), hooks=hooks
+        )
         state.finish_run(run_id, "failed" if failed else "done")
     finally:
         state.close()

@@ -57,6 +57,7 @@ class SimulationStage:
     needs = ["integration", "redteam", "simprep"]
     reads_contract = False
     checks: list[str] = []
+    main_thread = True  # gmsh needs the main thread; gmsh and capytaine are process-global
 
     def generate(self, ctx: StageContext) -> None:
         ctx.src_dir.mkdir(parents=True, exist_ok=True)
