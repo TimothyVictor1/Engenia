@@ -27,7 +27,12 @@ import yaml
 from engenia.core import approval, graph
 from engenia.core.engine import RunReport, execute
 from engenia.core.errors import CoreError
-from engenia.core.intake_run import IntakeFailed, run_intake
+from engenia.core.intake_run import (
+    INTENTS_TITLE,
+    IntakeFailed,
+    requirement_lines,
+    run_intake,
+)
 from engenia.core.lint import Severity, lint_spec_dir
 from engenia.core.release import ReleaseError, release
 
@@ -133,7 +138,10 @@ def new_project(
     echo(f"2. intake: {len(drafts)} draft requirement(s) from the {intake.how}")
 
     # 3. approve the requirements
-    shown = [f"{d['id']}: {d['statement']}  [{d['check']}]" for d in drafts]
+    shown = [line for p in intake.paths for line in requirement_lines(p)]
+    if intake.intents:
+        shown.append(INTENTS_TITLE)
+        shown.extend(f"  - {i.get('intent')} ({i.get('reason')})" for i in intake.intents)
     if not confirm("Approve these requirements?", shown):
         report.stopped = "the requirements were not approved (drafts are in spec/)"
         return report

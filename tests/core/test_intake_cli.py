@@ -85,3 +85,45 @@ def test_with_model_keys_the_model_is_used(root, monkeypatch):
     result = runner.invoke(app, ["intake", "Anything.", "--project", "newbuoy"])
     assert seen == [("Anything.", "newbuoy")]
     assert "from the model" in result.output
+
+
+def test_intake_prints_check_value_unit_and_limit_for_each_requirement(root, monkeypatch):
+    for name in ("ENGENIA_LLM_API_KEY", "ENGENIA_LLM_BASE_URL", "ENGENIA_DESIGN_MODEL"):
+        monkeypatch.delenv(name, raising=False)
+    result = runner.invoke(app, ["intake", "It must weigh at most 250 g. Tilt within 30 degrees.",
+                                 "--project", "newbuoy"])
+    assert result.exit_code == 0, result.output
+    assert "check: mass_budget; value: 250 g; limit: max 250" in result.output
+    assert "check: wave_tilt; value: 30 deg; limit: max 30" in result.output
+    assert "design intents" not in result.output  # none, so no empty list
+
+
+def test_design_intents_print_as_a_separate_not_verified_list(root, monkeypatch):
+    from engenia.contracts.models import Requirement
+
+    for name in ("ENGENIA_LLM_API_KEY", "ENGENIA_LLM_BASE_URL", "ENGENIA_DESIGN_MODEL"):
+        monkeypatch.setenv(name, "x")
+
+    def fake(text, project):
+        build = root / "projects" / project / "build" / "intake"
+        build.mkdir(parents=True)
+        (build / "design_intents.yaml").write_text(yaml.safe_dump(
+            [{"intent": "The buoy uses a hydrophone.", "reason": "no check measures it"}]
+        ))
+        data = {
+            "id": "R-001", "statement": "The buoy shall weigh at most 400 g.", "value": 400,
+            "unit": "g", "verify": {"method": "analysis", "check": "mass_budget",
+                                    "limit": {"max": 400}},
+            "affects": ["mechanical"], "status": "draft",
+        }
+        (root / "projects" / project / "spec").mkdir(parents=True, exist_ok=True)
+        (root / "projects" / project / "spec" / "R-001.yaml").write_text(yaml.safe_dump(data))
+        return [Requirement.model_validate(data)]
+
+    monkeypatch.setattr("engenia.agents.intake.intake", fake)
+    out = runner.invoke(app, ["intake", "Anything.", "--project", "newbuoy"]).output
+    assert "check: mass_budget; value: 400 g; limit: max 400" in out
+    assert "design intents (not verified):" in out
+    listing = out.split("design intents (not verified):")[1]
+    assert "The buoy uses a hydrophone. (no check measures it)" in listing
+    assert "R-001" not in listing  # intents are not mixed into the requirements

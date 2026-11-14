@@ -138,7 +138,7 @@ def intake(
     Uses the design model when ENGENIA_LLM_API_KEY, ENGENIA_LLM_BASE_URL and ENGENIA_DESIGN_MODEL
     are set; otherwise a deterministic template from the pack. Files are always drafts.
     """
-    from engenia.core.intake_run import IntakeFailed, run_intake
+    from engenia.core.intake_run import IntakeFailed, run_intake, summary_lines
 
     root = find_root()
     try:
@@ -150,6 +150,8 @@ def intake(
     for path in written:
         typer.echo(f"wrote {path.relative_to(root)}")
     typer.echo(f"intake: {len(written)} draft requirement(s) from the {how}")
+    for line in summary_lines(written, result.intents):
+        typer.echo(f"  {line}")
     spec_dir = root / "projects" / project / "spec"
     findings = lint_spec_dir(spec_dir, root / "verifiers")
     if any(f.severity is Severity.ERROR for f in findings):
