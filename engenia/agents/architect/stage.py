@@ -28,11 +28,11 @@ from engenia.core.hashing import file_hash
 from engenia.harness.limits import Limits
 from engenia.harness.llm import ChatFn, chat
 from engenia.harness.loop import run_agent
+from engenia.harness.packs import pack_file, project_pack
 from engenia.harness.tools import Toolbox, ToolError
 
 CONTRACT_FILE = "contract.json"
 META_FILE = "meta.json"
-REPO = Path(__file__).resolve().parents[3]
 
 SYSTEM_PROMPT = """\
 You are the architect of an engineering project. Propose the contract: the budgets and interfaces
@@ -110,8 +110,10 @@ def check_contract(text: str) -> ContractReport:
         "budgets.firmware.flash_kb": firm.flash_kb,
         "budgets.firmware.ram_kb": firm.ram_kb,
         "totals.mass_g_max": maximum,
-        **{f"budgets.mechanical.outer_envelope_mm[{i}]": v
-           for i, v in enumerate(mech.outer_envelope_mm)},
+        **{
+            f"budgets.mechanical.outer_envelope_mm[{i}]": v
+            for i, v in enumerate(mech.outer_envelope_mm)
+        },
         **{f"budgets.electronics.bay_mm[{i}]": v for i, v in enumerate(elec.bay_mm)},
     }
     for path, value in positives.items():
@@ -158,8 +160,7 @@ def _only_contract_file(relative: Path, content: str) -> None:
 
 
 def _pack_file(ctx: StageContext, name: str) -> Path:
-    local = ctx.root / "packs" / "buoy" / name
-    return local if local.is_file() else REPO / "packs" / "buoy" / name
+    return pack_file(ctx, name)
 
 
 def _task(ctx: StageContext) -> str:
@@ -171,7 +172,11 @@ def _task(ctx: StageContext) -> str:
         lines.append(f"- {requirement.id}: {requirement.statement}{value}")
     pack = _pack_file(ctx, "pack.yaml")
     if pack.is_file():
-        lines += ["", "Product pack (packs/buoy/pack.yaml):", pack.read_text("utf-8")]
+        lines += [
+            "",
+            f"Product pack (packs/{project_pack(ctx)}/pack.yaml):",
+            pack.read_text("utf-8"),
+        ]
     return "\n".join(lines)
 
 
@@ -229,8 +234,14 @@ class ArchitectStage:
         history = None
         for attempt in range(1, limits.max_attempts + 1):
             agent = run_agent(
-                SYSTEM_PROMPT, message, tools, model, limits,
-                transcript_dir=transcripts, attempt=attempt, history=history,
+                SYSTEM_PROMPT,
+                message,
+                tools,
+                model,
+                limits,
+                transcript_dir=transcripts,
+                attempt=attempt,
+                history=history,
                 chat_fn=self._chat_fn,
             )
             if agent.status == "error":

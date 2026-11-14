@@ -7,11 +7,8 @@ lid as separate single solids, the same contract as packs/buoy/templates/hull.py
 mast_housing.py.
 
 The parameter names match the mechanical stage's proposal fields (outer_diameter_mm carries
-the shared "housing width" meaning, as in mast_housing), so a per-project pack hook can
-wire this template into src/mechanical/model.py without renaming anything.
-
-NOTE (T4-S3): the mechanical stage still resolves templates from packs/buoy only, so
-`engenia run` does not load this file yet. It ships ready for that hook.
+the shared "housing width" meaning, as in mast_housing). The mechanical stage
+uses this template when the project selects the enclosure pack.
 """
 
 from __future__ import annotations

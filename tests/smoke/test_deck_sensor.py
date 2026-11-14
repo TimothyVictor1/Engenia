@@ -37,7 +37,8 @@ def workdir(tmp_path_factory):
     root = tmp_path_factory.mktemp("deck-sensor")
     shutil.copytree(REPO / "projects" / PROJECT, root / "projects" / PROJECT)
     shutil.copytree(
-        REPO / "verifiers", root / "verifiers",
+        REPO / "verifiers",
+        root / "verifiers",
         ignore=shutil.ignore_patterns("__pycache__"),
     )
     previous = os.environ.get("ENGENIA_ROOT")
@@ -59,8 +60,18 @@ def test_pipeline_completes(workdir):
     ran = [line.split()[1] for line in result.output.splitlines() if line.startswith("ran")]
     hit = [line.split()[1] for line in result.output.splitlines() if line.startswith("hit")]
     assert sorted(ran + hit) == [
-        "architect", "electronics", "final", "firmware", "integration", "mechanical",
-        "redteam", "report", "simprep", "simulation", "testplan", "verify_plan",
+        "architect",
+        "electronics",
+        "final",
+        "firmware",
+        "integration",
+        "mechanical",
+        "redteam",
+        "report",
+        "simprep",
+        "simulation",
+        "testplan",
+        "verify_plan",
     ]
     for name in ran:  # every stage that ran produced an interface and a verdict list
         assert (build / name / "interface.json").is_file(), name
@@ -71,10 +82,52 @@ def test_pipeline_completes(workdir):
 def test_pipeline_used_the_project_scenarios(workdir):
     root, _ = workdir
     built = sorted(
-        path.stem for path in
-        (root / "projects" / PROJECT / "build" / "redteam" / "scenarios").glob("*.yaml")
+        path.stem
+        for path in (root / "projects" / PROJECT / "build" / "redteam" / "scenarios").glob("*.yaml")
     )
     assert built == ["cold_snap", "heat_soak", "transport_vibration", "washdown"]
+
+
+def test_mechanical_built_the_enclosure(workdir):
+    root, _ = workdir
+    project = root / "projects" / PROJECT
+    source = (project / "src" / "mechanical" / "model.py").read_text()
+    assert "build_deck_enclosure" in source
+    build = project / "build" / "mechanical"
+    assert (build / "body.step").is_file()
+    assert (build / "body.stl").is_file()
+    assert not (build / "hull.step").exists()
+    facts = json.loads((build / "interface.json").read_text())["facts"]
+    assert "displaced_volume_cm3" not in facts
+
+
+def test_electronics_selected_from_the_enclosure_pack(workdir):
+    root, _ = workdir
+    selection = yaml.safe_load(
+        (root / "projects" / PROJECT / "src" / "electronics" / "selection.yaml").read_text()
+    )
+    assert selection["parts"] == {
+        "battery": "LP503450",
+        "environment_sensor": "BME280",
+        "lora": "RFM95W-868S2",
+        "microcontroller": "ESP32-WROVER-B",
+        "regulator": "S7V8F3",
+        "vibration_amp": "MAX4466EUK",
+    }
+    assert selection["target_endurance_days"] == 14.0
+
+
+def test_firmware_generated_the_pack_threshold_detector(workdir):
+    root, _ = workdir
+    firmware = root / "projects" / PROJECT / "src" / "firmware"
+    config = json.loads((firmware / "config.json").read_text())
+    assert config["detector_type"] == "threshold"
+    assert config["detector"] == {"threshold": 0.25, "hold_s": 0.15}
+    assert "rms" in (firmware / "src" / "detector.c").read_text()
+    metrics = json.loads(
+        (root / "projects" / PROJECT / "build" / "firmware" / "metrics.json").read_text()
+    )
+    assert metrics["detection_rate"] == 1.0
 
 
 def test_gate_passes_after_the_run(workdir):

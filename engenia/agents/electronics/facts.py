@@ -10,12 +10,16 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+DUTY_MODES = ("sample", "transmit", "sleep")
+FIXED_FUNCTIONS = ("battery", "regulator")  # never driven by the duty-cycle power model
+_IDENTIFIER = re.compile(r"[a-z][a-z0-9_]*")
+
 
 class PartFact(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     id: str = Field(min_length=1)
-    function: Literal["microcontroller", "lora", "audio", "battery", "regulator"]
+    function: str = Field(pattern=r"[a-z][a-z0-9_]*")
     approved: Literal[True]
     mass_g: float = Field(gt=0)
     size_mm: tuple[float, float, float]
@@ -66,6 +70,15 @@ class DesignProfile(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     duty_cycle: dict[str, float]
+    # Per function, the duty modes in which it draws active_current_ma; absent entries
+    # and modes draw sleep_current_ma. Battery and regulator are modelled separately.
+    active_modes: dict[str, list[str]] = Field(
+        default_factory=lambda: {
+            "microcontroller": ["sample", "transmit"],
+            "lora": ["transmit"],
+            "audio": list(DUTY_MODES),
+        }
+    )
     regulator_efficiency: float = Field(gt=0, le=1)
     usable_capacity_fraction: float = Field(gt=0, le=1)
     board_mm: tuple[float, float, float]
@@ -82,6 +95,17 @@ class DesignProfile(BaseModel):
             raise ValueError("duty fractions must be finite and between zero and one")
         if not math.isclose(sum(self.duty_cycle.values()), 1, abs_tol=1e-12):
             raise ValueError("duty fractions must sum to one")
+        for function, modes in self.active_modes.items():
+            if not _IDENTIFIER.fullmatch(function):
+                raise ValueError(f"active_modes: {function!r} is not a part function name")
+            unknown = sorted(set(modes) - set(DUTY_MODES))
+            if unknown:
+                raise ValueError(f"active_modes[{function}]: unknown duty modes {unknown}")
+            if len(set(modes)) != len(modes):
+                raise ValueError(f"active_modes[{function}]: repeated duty mode")
+        regulated = {"battery", "regulator"} & set(self.active_modes)
+        if regulated:
+            raise ValueError(f"active_modes must not name {sorted(regulated)}")
         if any(x <= 0 for x in self.board_mm) or not self.source.strip():
             raise ValueError("profile needs positive board dimensions and a source")
         return self
@@ -97,10 +121,17 @@ class Facts(BaseModel):
         ids = [p.id for p in self.parts]
         if len(ids) != len(set(ids)):
             raise ValueError("duplicate part id")
-        for function in ("microcontroller", "lora", "audio", "regulator", "battery"):
-            if not any(p.function == function for p in self.parts):
-                raise ValueError(f"missing {function} parts")
+        required = required_functions(self)
+        available = {p.function for p in self.parts}
+        missing = sorted(required - available)
+        if missing:
+            raise ValueError(f"missing parts for {missing}")
         return self
+
+
+def required_functions(facts: Facts) -> frozenset[str]:
+    """Every function the pack's design needs: the powered ones plus battery and regulator."""
+    return frozenset(facts.design.active_modes) | set(FIXED_FUNCTIONS)
 
 
 def load_facts(path: Path) -> Facts:

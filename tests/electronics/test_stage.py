@@ -174,7 +174,8 @@ def test_erc_reports_real_disconnected_supply(tmp_path):
     stage.generate(ctx)
     script = ctx.src_dir / "circuit.py"
     text = script.read_text(encoding="utf-8")
-    script.write_text(text.replace('mcu["VCC"], radio["VCC"]', 'radio["VCC"]'), encoding="utf-8")
+    script.write_text(text.replace('vcc += reg["VOUT"], mcu["VCC"]', 'vcc += reg["VOUT"]'),
+                      encoding="utf-8")
     stage.build(ctx)
     assert stage.interface(ctx)["erc_errors"] > 0
     assert "Unconnected pin" in (ctx.build_dir / "erc.txt").read_text()

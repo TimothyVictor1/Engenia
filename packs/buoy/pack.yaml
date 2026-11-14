@@ -6,6 +6,8 @@ templates:
     checks: [mass_budget, buoyancy_margin, print_bed_fit, wall_thickness_min]
   mast_housing:
     checks: [mass_budget, print_bed_fit, wall_thickness_min]
+firmware:
+  detector: tone  # Goertzel-like tone detector; the other family is "threshold".
 structure:
   youngs_modulus_mpa: 2100  # Assumption: representative printed PETG elastic modulus.
   poisson_ratio: 0.38  # Assumption: isotropic PETG Poisson ratio.

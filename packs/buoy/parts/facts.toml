@@ -2,6 +2,10 @@
 # operating conditions, derived allowances, and limitations (not lab measurements).
 [design]
 duty_cycle = { sample = 0.003, transmit = 0.0005, sleep = 0.9965 }
+# Which functions draw active current in which duty mode; everything else sleeps.
+# The hydrophone channel must stay powered to catch events, the MCU sleeps between
+# them, and the radio wakes only to transmit.
+active_modes = { microcontroller = ["sample", "transmit"], lora = ["transmit"], audio = ["sample", "transmit", "sleep"] }
 regulator_efficiency = 0.85
 usable_capacity_fraction = 0.8
 board_mm = [70.0, 40.0, 8.0]

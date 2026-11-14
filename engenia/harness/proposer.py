@@ -51,7 +51,7 @@ short summary and no tool calls.
 
 
 def proposer_fact(ctx: StageContext) -> str:
-    """"model" or "deterministic", as recorded by the last call of `propose` for this stage."""
+    """ "model" or "deterministic", as recorded by the last call of `propose` for this stage."""
     try:
         return json.loads((ctx.src_dir / RECORD_FILE).read_text("utf-8"))["proposer"]
     except (OSError, ValueError, KeyError):
@@ -155,9 +155,14 @@ def _ask_model(
 
         try:
             status = generate_until_pass(
-                stage, scratch, model=model, limits=limits or Limits.from_env(),
-                system_prompt=PROPOSER_PROMPT.format(stage=ctx.stage), task=task,
-                chat_fn=chat_fn, run_checks=run_checks,
+                stage,
+                scratch,
+                model=model,
+                limits=limits or Limits.from_env(),
+                system_prompt=PROPOSER_PROMPT.format(stage=ctx.stage),
+                task=task,
+                chat_fn=chat_fn,
+                run_checks=run_checks,
             )
         except (LLMError, OSError, RuntimeError):
             return None
@@ -172,8 +177,13 @@ def _ask_model(
 
 def _failure(check: str, message: str) -> Verdict:
     return Verdict(
-        check=check, requirement=None, measured=None, limit=Limit(),
-        result=VerdictResult.FAIL, evidence_level=EvidenceLevel.CALCULATED, message=message,
+        check=check,
+        requirement=None,
+        measured=None,
+        limit=Limit(),
+        result=VerdictResult.FAIL,
+        evidence_level=EvidenceLevel.CALCULATED,
+        message=message,
     )
 
 
@@ -184,8 +194,11 @@ def _number(check: str, measured: float, limit: Limit, message: str | None = Non
     if ok and limit.max is not None:
         ok = measured <= limit.max
     return Verdict(
-        check=check, requirement=None, measured=measured if math.isfinite(measured) else None,
-        limit=limit, result=VerdictResult.PASS if ok else VerdictResult.FAIL,
+        check=check,
+        requirement=None,
+        measured=measured if math.isfinite(measured) else None,
+        limit=limit,
+        result=VerdictResult.PASS if ok else VerdictResult.FAIL,
         evidence_level=EvidenceLevel.CALCULATED,
         message=None if ok else (message or f"{check}: {measured} is outside the limit"),
     )
@@ -237,16 +250,40 @@ def mechanical_validator(contract: Contract, wall_minimum: float | None) -> Vali
             malformed = _failure("hull_fields", f"missing or malformed field: {exc!r}")
             return [*verdicts, malformed]
         widest = min(ex, ey)
-        verdicts.append(_number("hull_diameter_mm", diameter, Limit(max=widest),
-                                f"outer diameter {diameter} mm exceeds the {widest} mm envelope"))
-        verdicts.append(_number("hull_assembled_height_mm", height, Limit(max=ez),
-                                f"hull plus lid {height} mm exceeds the {ez} mm limit"))
+        verdicts.append(
+            _number(
+                "hull_diameter_mm",
+                diameter,
+                Limit(max=widest),
+                f"outer diameter {diameter} mm exceeds the {widest} mm envelope",
+            )
+        )
+        verdicts.append(
+            _number(
+                "hull_assembled_height_mm",
+                height,
+                Limit(max=ez),
+                f"hull plus lid {height} mm exceeds the {ez} mm limit",
+            )
+        )
         slack = min(p - b for p, b in zip(proposed_bay, bay, strict=True))
-        verdicts.append(_number("hull_bay_slack_mm", slack, Limit(min=0),
-                                f"bay {proposed_bay} is smaller than {list(bay)}"))
+        verdicts.append(
+            _number(
+                "hull_bay_slack_mm",
+                slack,
+                Limit(min=0),
+                f"bay {proposed_bay} is smaller than {list(bay)}",
+            )
+        )
         if wall_minimum is not None:
-            verdicts.append(_number("hull_wall_mm", wall, Limit(min=wall_minimum),
-                                    f"wall {wall} mm is under the {wall_minimum} mm minimum"))
+            verdicts.append(
+                _number(
+                    "hull_wall_mm",
+                    wall,
+                    Limit(min=wall_minimum),
+                    f"wall {wall} mm is under the {wall_minimum} mm minimum",
+                )
+            )
         return verdicts
 
     return validate
@@ -273,9 +310,12 @@ def propose_mechanical_params(
     design model proposes hull parameters that pass the scripted checks."""
     c = contract if isinstance(contract, Contract) else Contract.model_validate(contract)
     walls = [
-        r.verify.limit.min for r in requirements
-        if r.status.value == "approved" and r.verify.check == "wall_thickness_min"
-        and r.verify.limit is not None and r.verify.limit.min is not None
+        r.verify.limit.min
+        for r in requirements
+        if r.status.value == "approved"
+        and r.verify.check == "wall_thickness_min"
+        and r.verify.limit is not None
+        and r.verify.limit.min is not None
     ]
     return propose(
         ctx,
@@ -292,9 +332,9 @@ def propose_mechanical_params(
 
 ELECTRONICS_TASK = """\
 Stage: electronics. Choose one part for each function. Write a JSON object
-{{"parts": {{"microcontroller": id, "lora": id, "audio": id, "battery": id, "regulator": id}}}}
+{{"parts": {{{roles_example}}}}}
 using ids from the catalogue below. Scripts compute power and size from your choice and check
-that the battery voltage suits the regulator, that the design lasts at least {target} days, and
+that the battery voltage suits the regulator, that the design lasts {target_text}, and
 that the assembly fits the bay {bay} mm.
 
 {requirements}
@@ -303,19 +343,31 @@ Catalogue:
 {catalogue}
 """
 
-ROLES = ("microcontroller", "lora", "audio", "battery", "regulator")
+
+def _roles_example(roles: set[str]) -> str:
+    return ", ".join(f'"{role}": id' for role in sorted(roles))
+
+
+def _required_functions(facts: Any) -> set[str]:
+    """The part functions the design needs, from the pack's catalogue."""
+    from engenia.agents.electronics.facts import required_functions
+
+    return set(required_functions(facts))
 
 
 def _selection_from_parts(contract: Contract, facts: Any, target: float, parts_ids: Any) -> dict:
     """The same record `propose_selection` returns, computed from the chosen part ids.
-    Raises ValueError saying what is wrong with the choice."""
+    Raises ValueError saying what is wrong with the choice. A None target (no endurance
+    requirement) is recorded as zero days, so downstream formatting stays numeric."""
     from engenia.agents.electronics.selection import assembly_size, power_facts
 
-    if not isinstance(parts_ids, dict) or set(parts_ids) != set(ROLES):
-        raise ValueError(f"parts must name exactly {list(ROLES)}")
+    target = 0.0 if target is None else target
+    roles = _required_functions(facts)
+    if not isinstance(parts_ids, dict) or set(parts_ids) != roles:
+        raise ValueError(f"parts must name exactly {sorted(roles)}")
     by_id = {p.id: p for p in facts.parts}
     parts = {}
-    for role in ROLES:
+    for role in sorted(roles):
         part = by_id.get(parts_ids[role])
         if part is None:
             raise ValueError(f"{role}: unknown part id {parts_ids[role]!r}")
@@ -326,7 +378,7 @@ def _selection_from_parts(contract: Contract, facts: Any, target: float, parts_i
     lo, hi = regulator.supply_voltage_v
     if not lo <= battery.supply_voltage_v[0] <= battery.supply_voltage_v[1] <= hi:
         raise ValueError(f"{battery.id} voltage range is outside the regulator input {lo}-{hi} V")
-    for role in ("microcontroller", "lora", "audio"):
+    for role in sorted(roles - {"battery", "regulator"}):
         p = parts[role]
         if not p.supply_voltage_v[0] <= regulator.output_voltage_v <= p.supply_voltage_v[1]:
             raise ValueError(f"{p.id}: incompatible regulated voltage")
@@ -349,7 +401,7 @@ def _selection_from_parts(contract: Contract, facts: Any, target: float, parts_i
     return chosen
 
 
-def electronics_validator(contract: Contract, facts: Any, target: float) -> Validator:
+def electronics_validator(contract: Contract, facts: Any, target: float | None) -> Validator:
     def validate(proposal: dict[str, Any]) -> list[Verdict]:
         try:
             chosen = _selection_from_parts(contract, facts, target, proposal.get("parts"))
@@ -357,12 +409,25 @@ def electronics_validator(contract: Contract, facts: Any, target: float) -> Vali
             return [_failure("selection_valid", str(exc))]
         bay = contract.budgets.electronics.bay_mm
         slack = min(b - s for s, b in zip(chosen["assembly_mm"], bay, strict=True))
-        return [
-            _number("endurance_days", chosen["endurance_days"], Limit(min=target),
-                    f"endurance {chosen['endurance_days']:.2f} days is under {target} days"),
-            _number("bay_slack_mm", slack, Limit(min=0),
-                    f"assembly {chosen['assembly_mm']} mm does not fit the bay {list(bay)} mm"),
-        ]
+        verdicts = []
+        if target is not None:
+            verdicts.append(
+                _number(
+                    "endurance_days",
+                    chosen["endurance_days"],
+                    Limit(min=target),
+                    f"endurance {chosen['endurance_days']:.2f} days is under {target} days",
+                )
+            )
+        verdicts.append(
+            _number(
+                "bay_slack_mm",
+                slack,
+                Limit(min=0),
+                f"assembly {chosen['assembly_mm']} mm does not fit the bay {list(bay)} mm",
+            )
+        )
+        return verdicts
 
     return validate
 
@@ -381,6 +446,7 @@ def propose_electronics_selection(
     from engenia.agents.electronics.selection import endurance_target
 
     target = endurance_target(requirements)
+    roles = _required_functions(facts)
     catalogue = "\n".join(
         f"- {p.id} ({p.function}): {p.supply_voltage_v[0]}-{p.supply_voltage_v[1]} V, "
         f"{p.mass_g} g, size {list(p.size_mm)} mm, capacity {p.capacity_mah} mAh"
@@ -389,8 +455,13 @@ def propose_electronics_selection(
     return propose(
         ctx,
         task=ELECTRONICS_TASK.format(
-            target=target, bay=list(contract.budgets.electronics.bay_mm),
-            requirements=_requirement_lines(requirements), catalogue=catalogue,
+            roles_example=_roles_example(roles),
+            target_text=(
+                f"at least {target:g} days" if target is not None else "as long as possible"
+            ),
+            bay=list(contract.budgets.electronics.bay_mm),
+            requirements=_requirement_lines(requirements),
+            catalogue=catalogue,
         ),
         validate=electronics_validator(contract, facts, target),
         finish=lambda proposal: _selection_from_parts(contract, facts, target, proposal["parts"]),
@@ -402,34 +473,55 @@ def propose_electronics_selection(
 # --- firmware ----------------------------------------------------------------------------------
 
 FIRMWARE_TASK = """\
-Stage: firmware. Propose the tone detector's settings as a JSON object with exactly these keys:
-frequency_hz (the tone to detect), threshold (amplitude, relative to full scale), hold_s
-(seconds the tone must continue before an event fires). The audio is mono, sampled at 2000 Hz.
-Scripts check the ranges: frequency_hz from 20 to 900, threshold above 0 and below 1, hold_s from
-0.01 to 5. The firmware is then built and its detection and false-alarm checks run on your numbers.
+Stage: firmware. Propose the {detector} detector's settings as a JSON object with exactly
+these keys: {keys_doc}. {extra_doc} The audio is mono, sampled at 2000 Hz.
+Scripts check the ranges: {ranges}. The firmware is then built and its detection and
+false-alarm checks run on your numbers.
 
 {requirements}
 """
 
-FIRMWARE_KEYS = ("frequency_hz", "threshold", "hold_s")
+FIRMWARE_KEYS = {
+    "tone": ("frequency_hz", "threshold", "hold_s"),
+    "threshold": ("threshold", "hold_s"),
+}
+
+FIRMWARE_RANGES = {
+    "frequency_hz": (
+        "detector_frequency_hz",
+        20,
+        900,
+        "frequency {value} Hz is outside 20 to 900 Hz",
+    ),
+    "threshold": (
+        "detector_threshold",
+        1e-6,
+        0.999999,
+        "threshold {value} must be above 0 and below 1",
+    ),
+    "hold_s": ("detector_hold_s", 0.01, 5, "hold {value} s is outside 0.01 to 5 s"),
+}
 
 
-def firmware_validator() -> Validator:
+def firmware_validator(detector_type: str = "tone") -> Validator:
+    keys = FIRMWARE_KEYS[detector_type]
+
     def validate(proposal: dict[str, Any]) -> list[Verdict]:
-        if set(proposal) != set(FIRMWARE_KEYS):
-            return [_failure("detector_fields", f"keys must be exactly {list(FIRMWARE_KEYS)}")]
+        if set(proposal) != set(keys):
+            return [_failure("detector_fields", f"keys must be exactly {list(keys)}")]
         try:
-            frequency, threshold, hold = (float(proposal[key]) for key in FIRMWARE_KEYS)
+            values = {key: float(proposal[key]) for key in keys}
         except (TypeError, ValueError):
             return [_failure("detector_fields", "every value must be a number")]
-        return [
-            _number("detector_frequency_hz", frequency, Limit(min=20, max=900),
-                    f"frequency {frequency} Hz is outside 20 to 900 Hz"),
-            _number("detector_threshold", threshold, Limit(min=1e-6, max=0.999999),
-                    f"threshold {threshold} must be above 0 and below 1"),
-            _number("detector_hold_s", hold, Limit(min=0.01, max=5),
-                    f"hold {hold} s is outside 0.01 to 5 s"),
-        ]
+        verdicts = []
+        for key in keys:
+            check, low, high, message = FIRMWARE_RANGES[key]
+            verdicts.append(
+                _number(
+                    check, values[key], Limit(min=low, max=high), message.format(value=values[key])
+                )
+            )
+        return verdicts
 
     return validate
 
@@ -437,16 +529,37 @@ def firmware_validator() -> Validator:
 def propose_firmware_detector(
     ctx: StageContext,
     requirements: list[Requirement],
+    detector_type: str,
     fallback: Callable[[], dict[str, Any]],
     **kwargs: Any,
 ) -> dict[str, Any]:
     """The firmware stage's hook: returns what `fallback()` would (the default detector
     settings) unless the design model proposes settings that pass the scripted range checks."""
+    keys_doc = {
+        "tone": "frequency_hz (the tone to detect), threshold (amplitude, relative to full "
+        "scale), hold_s (seconds the tone must continue before an event fires)",
+        "threshold": "threshold (block RMS amplitude, relative to full scale), hold_s (seconds "
+        "the level must stay above the threshold before an event fires)",
+    }
+    extra = {
+        "tone": "",
+        "threshold": "The detector fires on sustained signal level; there is no frequency setting.",
+    }
+    ranges = ", ".join(
+        f"{name} from {low:g} to {high:g}" if low > 1e-9 else f"{name} above 0 and below {high:g}"
+        for name, low, high, _ in (FIRMWARE_RANGES[key] for key in FIRMWARE_KEYS[detector_type])
+    )
     return propose(
         ctx,
-        task=FIRMWARE_TASK.format(requirements=_requirement_lines(requirements)),
-        validate=firmware_validator(),
-        finish=lambda proposal: {key: float(proposal[key]) for key in FIRMWARE_KEYS},
+        task=FIRMWARE_TASK.format(
+            detector=detector_type,
+            keys_doc=keys_doc[detector_type],
+            extra_doc=extra[detector_type],
+            ranges=ranges,
+            requirements=_requirement_lines(requirements),
+        ),
+        validate=firmware_validator(detector_type),
+        finish=lambda proposal: {key: float(proposal[key]) for key in FIRMWARE_KEYS[detector_type]},
         fallback=fallback,
         **kwargs,
     )

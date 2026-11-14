@@ -2,16 +2,17 @@ Mechanical stage (T3-S1)
 =======================
 
 `MechanicalStage` implements the frozen Stage protocol. `generate()` validates
-project requirements and reads the project contract, falling back to
-`packs/buoy/default_contract.json` (PROJECT.md section 6). The replaceable
+project requirements and reads the project contract, falling back to the selected
+pack's `default_contract.json` (PROJECT.md section 6). The replaceable
 `propose_params(contract, requirements)` function sizes the hull around the bay
 and mount holes, rejecting dimensions outside the contract envelope. Approved
 requirements whose check is `wall_thickness_min` supply their `verify.limit.min`
 as the wall thickness; if several apply, the strongest minimum wins. Without
 such a requirement the wall defaults to 3.0 mm. This sprint uses no model calls.
 
-Generated `src/mechanical/model.py` imports `packs.buoy.templates.hull` and reads
-its adjacent `params.yaml`. `build()` executes that source in a fresh Python
+Generated `src/mechanical/model.py` imports the selected pack's template and reads
+its adjacent `params.yaml`. The buoy pack uses the hull; the enclosure pack uses
+the deck enclosure body. `build()` executes that source in a fresh Python
 worker, exports four CAD artifacts, and publishes a schema-valid
 `build/mechanical/interface.json`. `interface()` returns its facts for the core
 scheduler. Run from a repository checkout so the pack templates are available.

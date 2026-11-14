@@ -5,11 +5,16 @@ from __future__ import annotations
 import math
 from itertools import permutations
 
-from engenia.agents.electronics.facts import Facts, PartFact
+from engenia.agents.electronics.facts import Facts, PartFact, required_functions
 from engenia.contracts.models import Contract, Requirement
 
 
-def endurance_target(requirements: list[Requirement]) -> float:
+def endurance_target(requirements: list[Requirement]) -> float | None:
+    """The binding endurance in days, or None when no requirement asks for one.
+
+    A project without a battery_capacity requirement still builds: the smallest
+    fitting battery is chosen and no endurance is promised.
+    """
     targets = []
     for req in requirements:
         if req.status != "approved" or req.verify.check != "battery_capacity":
@@ -24,23 +29,36 @@ def endurance_target(requirements: list[Requirement]) -> float:
         if not math.isfinite(target) or target <= 0:
             raise ValueError(f"{req.id}: endurance must be positive")
         targets.append(target)
-    if not targets:
-        raise ValueError("an approved battery_capacity requirement is required")
-    return max(targets)
+    return max(targets) if targets else None
 
 
 def power_facts(parts: dict[str, PartFact], facts: Facts, duty: dict[str, float]) -> dict:
     """Battery-side average mW, including converter losses and quiescent current."""
     reg, battery = parts["regulator"], parts["battery"]
+    active_modes = facts.design.active_modes
+    buoy = set(parts) == {"microcontroller", "lora", "audio", "battery", "regulator"}
+    # Powered functions in the pack's declared order, then any remainder (the passive
+    # battery cells draw zero), so the floating-point sum order is stable per pack.
+    order = (
+        ("microcontroller", "lora", "audio")
+        if buoy
+        else [name for name in active_modes if name in parts and name != "regulator"]
+    )
+    if not buoy:
+        order += [name for name in sorted(parts) if name != "regulator" and name not in order]
     mode_power = {}
     for mode in duty:
         current = facts.design.support_current_ma
-        for function in ("microcontroller", "lora", "audio"):
+        for function in order:
             part = parts[function]
             active = (
-                function == "audio"
-                or (function == "microcontroller" and mode != "sleep")
-                or (function == "lora" and mode == "transmit")
+                (
+                    function == "audio"
+                    or (function == "microcontroller" and mode != "sleep")
+                    or (function == "lora" and mode == "transmit")
+                )
+                if buoy
+                else mode in active_modes.get(function, ())
             )
             current += part.active_current_ma if active else part.sleep_current_ma
         quiescent = reg.sleep_current_ma if mode == "sleep" else reg.active_current_ma
@@ -85,19 +103,25 @@ def propose_selection(contract: Contract, requirements: list[Requirement], facts
     If no endurance-capable assembly fits, minimize required bay volume increase
     among capable cells. If capacity is impossible too, maximize endurance and
     leave that shortfall visible; a larger bay alone cannot solve it.
+
+    Without a battery_capacity requirement no endurance is promised: the target is
+    zero, so the smallest battery that fits the bay wins.
     """
     bay = contract.budgets.electronics.bay_mm
     if any(not math.isfinite(x) or x <= 0 for x in bay):
         raise ValueError("bay_mm must be finite and positive")
-    target = endurance_target(requirements)
+    target = endurance_target(requirements) or 0.0
+    required = set(required_functions(facts))
     fixed = {}
-    for function in ("microcontroller", "lora", "audio", "regulator"):
-        fixed[function] = min(
-            (p for p in facts.parts if p.function == function), key=lambda p: p.id
-        )
+    for function in sorted(required - {"battery"}):
+        options = [p for p in facts.parts if p.function == function]
+        if not options:
+            raise ValueError(f"missing {function} parts")
+        fixed[function] = min(options, key=lambda p: p.id)
     voltage = fixed["regulator"].output_voltage_v
-    for function in ("microcontroller", "lora", "audio"):
-        p = fixed[function]
+    for function, p in fixed.items():
+        if function == "regulator":
+            continue
         if not p.supply_voltage_v[0] <= voltage <= p.supply_voltage_v[1]:
             raise ValueError(f"{p.id}: incompatible regulated voltage")
     # All modules must individually fit the declared board envelope.
