@@ -13,6 +13,8 @@ class Stage(Protocol):
     needs: list[str]  # upstream stage names
     reads_contract: bool
     checks: list[str]  # verifier names run after build
+    # Optional, default False: a stage that sets `main_thread = True` runs on the main thread,
+    # alone (scheduler). Use it for gmsh and capytaine. Read with getattr, so it is not required.
 
     def generate(self, ctx: StageContext) -> None:
         """Agent writes src/<stage>/."""
