@@ -1,18 +1,20 @@
 # Dashboard visual QA
 
 Every view (Mission Control, Pipeline, Requirements, Design, Contract, Scenarios, Files, Live studio)
-was captured with headless Chromium (Playwright) at 1920x1080 and 1280x720, in light and dark, with a
-real run loaded (`harbour-listener`, `deck-sensor`, both run in deterministic mode) and in sample
-mode. `before/` is `main`, `after/` is this branch. Files are named
-`<source>-<theme>-<size>-<view>.jpg`; `hl` = harbour-listener, `ds` = deck-sensor. Images are
-downscaled JPEGs; `projector` shots exist only in `after/` because the theme is new.
+was checked with headless Chromium (Playwright) at 1920x1080 and 1280x720, in light, dark and
+projector themes, with a real run loaded (`harbour-listener`, `deck-sensor`, both run in deterministic
+mode) and in sample mode. `after/` keeps the 8 most useful shots (`harbour-listener`, 1920x1080,
+compressed JPEG, under 2 MB in total): Mission Control in light, dark and projector, and the
+Pipeline, Requirements, Design, Contract and Live studio views in light. The rest are not stored:
+`shoot.mjs` regenerates every combination (see Reproduce). Mission Control now draws its graph from
+the live `phase_start`/`phase_end` events and shows the real agent registry from `/api/agents`.
 
 ## What was fixed
 
 | Problem seen | Fix |
 |---|---|
 | Mission page scrolled sideways by about 40 px (an invisible tooltip stuck out of the right edge) | Horizontal overflow is clipped on the page shell |
-| Every graph node said "started" for a finished run (a real server sends only start/done messages, no phases) | A stage with no phases takes the server's stage status (done, failed, blocked) |
+| Every graph node said "started" for a finished run (a real server sends only start/done messages, no phases) | Stage status from the server only when a run has no phase events at all; otherwise live phases decide |
 | Graph shrank to 63% and was unreadable; node text tiny | Graph height follows the window; larger stage names and status text |
 | Graph zoom buttons covered the last stage; lane label overlapped a repair arc | Buttons moved to the bottom-right; lane label raised |
 | Dark theme: graph canvas, sidebar and 3D viewer stayed light, logo text unreadable | Dark `--surface` token; 3D canvas is transparent so the themed grid shows through |
@@ -41,8 +43,5 @@ uv run engenia run harbour-listener && uv run engenia run deck-sensor
 uv run python -m engenia.dashboard --project harbour-listener --port 8081 &
 uv run python -m engenia.dashboard --project deck-sensor --port 8082 &
 npm i playwright && npx playwright install chromium-headless-shell
-node docs/ui-qa/shoot.mjs out light,dark,projector
+node docs/ui-qa/shoot.mjs out light,dark,projector 1920x1080,1280x720  # writes PNGs to ./out
 ```
-
-Not changed: the Agents panel reads "not available yet" on `main` because `/api/agents` is not served
-there; that is the honest state, and it fills in once the agent registry lands.

@@ -41,12 +41,13 @@ function usePoll<T>(load: () => Promise<T>, ms: number, key: string): Polled<T> 
   return state;
 }
 
-function nodeStatus(state: StageState | undefined, api: string | undefined, fromEvents: boolean): NodeStatus {
+function nodeStatus(state: StageState | undefined, api: string | undefined, fromEvents: boolean, runHasPhases: boolean): NodeStatus {
   if (state?.active) return "running";
   if (state) {
     if (state.cacheHit === true) return "cached";
-    // A server that streams only "started"/"done" messages gives no phases: trust its stage status.
-    if (state.phases.length === 0 && (api === "done" || api === "failed" || api === "blocked")) return api;
+    // Live phase events win. Only a run with no phase events at all (an old server that streams
+    // "started"/"done" messages) falls back to the server's stage status.
+    if (!runHasPhases && (api === "done" || api === "failed" || api === "blocked")) return api;
     const failing = state.checks.some((c) => c.result !== "pass");
     const published = state.phases.some((p) => p.phase === "publish" && p.result === "ok");
     if (failing && !published) return "failed";
@@ -133,9 +134,10 @@ export function Mission() {
   }, [pipeline.data, mission.stages]);
   const nodes: NodeView[] = useMemo(() => {
     const api_ = new Map((pipeline.data?.stages ?? []).map((s) => [s.name, s]));
+    const runHasPhases = Object.values(mission.stages).some((s) => s.phases.length > 0);
     return [...names].map((name) => ({
       name, needs: api_.get(name)?.needs ?? [], state: mission.stages[name] ?? null, attempts: api_.get(name)?.attempts ?? null,
-      status: nodeStatus(mission.stages[name], api_.get(name)?.status, replaying || sample === true || events.length > 0),
+      status: nodeStatus(mission.stages[name], api_.get(name)?.status, replaying || sample === true || events.length > 0, runHasPhases),
     }));
   }, [names, pipeline.data, mission.stages, replaying, sample, events.length]);
   // The summary describes the end of the run. While replaying it must not leak that end state

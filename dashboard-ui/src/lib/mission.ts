@@ -20,6 +20,33 @@ export interface AgentsResponse {
   run_id: number | null; agents: Agent[];
   families: { design: string[]; verify: string[]; independent: boolean };
 }
+/** What the real server sends from /api/agents (engenia/dashboard/schemas.py: AgentInfo). */
+interface ServerAgent {
+  name: string; role: string; model: string; family: string; kind: Agent["kind"];
+  status: "idle" | "running" | "waiting"; stage: string | null; phase: string | null; counts: Record<string, number>;
+}
+
+/** Accept either the bundled sample shape or the real server's, and return the one the UI draws. */
+export function normalizeAgents(raw: unknown): AgentsResponse {
+  const r = raw as { agents?: unknown[]; run_id?: number | null; families?: AgentsResponse["families"] };
+  const list = Array.isArray(r?.agents) ? r.agents : [];
+  if (r.families && list.every((a) => "id" in (a as object))) return r as AgentsResponse;
+  const agents: Agent[] = (list as ServerAgent[]).map((a) => {
+    const side = a.kind !== "llm" ? null : /verif|redteam/.test(a.role + " " + a.name) ? "verify" : "design";
+    return {
+      id: a.name, name: a.name, role: a.role, kind: a.kind, model: a.model || null, family: a.family || null, side,
+      status: a.status === "idle" ? "idle" : "active", stage: a.stage, phase: a.phase,
+      calls: a.counts?.model_calls ?? 0, tool_calls: a.counts?.tool_calls ?? 0, repairs: a.counts?.repairs ?? 0,
+    };
+  });
+  const fam = (side: "design" | "verify") => [...new Set(agents.filter((a) => a.side === side && a.family).map((a) => a.family as string))];
+  const design = fam("design"), verify = fam("verify");
+  return {
+    run_id: r.run_id ?? null, agents,
+    families: { design, verify, independent: design.length > 0 && verify.length > 0 && !design.some((f) => verify.includes(f)) },
+  };
+}
+
 export interface RunSummary {
   run_id: number; project: string; status: string; started: string | null; finished: string | null;
   stages: { name: string; status: string; attempts: number; cache_hit: boolean; duration_ms: number | null;
