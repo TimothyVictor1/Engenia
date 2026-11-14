@@ -85,7 +85,7 @@ def test_gives_up_after_three_fix_rounds(root, requirement_text):
     llm = FakeLLM([tool_call_response(write("R-001.yaml", bad)), text_response("done")] * 4)
 
     with pytest.raises(IntakeError, match="3 fix rounds"):
-        run(llm)
+        intake("Make it good.", "demo", model="test-model", chat_fn=llm)  # nothing to fall back to
     assert llm.remaining == 0  # one initial round plus three fix rounds, no more
 
 
