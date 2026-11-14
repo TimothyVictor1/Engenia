@@ -8,14 +8,13 @@ build, then the stage's verifiers. The decision to stop with "pass" comes only f
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Callable
 from typing import Literal
 
 import yaml
 
 from engenia.contracts.models import Requirement, StageContext, Verdict
-from engenia.core.events import Emitter
+from engenia.core.events import Emitter, agent_context
 from engenia.harness.build import preserved_dir, run_captured
 from engenia.harness.checks import (
     BUILD_CHECK_NAME,
@@ -26,7 +25,7 @@ from engenia.harness.checks import (
     write_verdicts,
 )
 from engenia.harness.limits import Limits
-from engenia.harness.llm import ChatFn, chat, check_model_families
+from engenia.harness.llm import ChatFn, agent_model, chat, check_model_families
 from engenia.harness.loop import run_agent
 from engenia.harness.tools import Toolbox
 from engenia.stages.base import Stage
@@ -47,8 +46,8 @@ reply with a short summary and no tool calls.
 """
 
 
-def _model_from_env() -> str:
-    model = os.environ.get("ENGENIA_DESIGN_MODEL", "").strip()
+def _model_from_env(agent: str) -> str:
+    model = agent_model(agent)
     if not model:
         raise RuntimeError("ENGENIA_DESIGN_MODEL is not set and no model was given")
     return model
@@ -105,6 +104,7 @@ def generate_until_pass(
     ctx: StageContext,
     *,
     model: str | None = None,
+    agent: str | None = None,
     limits: Limits | None = None,
     system_prompt: str | None = None,
     task: str | None = None,
@@ -119,46 +119,49 @@ def generate_until_pass(
     """
     check_model_families()  # refuses a design model in the verification model's family
     limits = limits or Limits.from_env()
-    model = model or _model_from_env()
-    system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT.format(stage=stage.name)
-    next_message = task if task is not None else default_task(stage, ctx)
+    agent = agent or stage.name
+    model = model or _model_from_env(agent)
+    check_model_families(model=model)
+    with agent_context(agent, model):
+        system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT.format(stage=stage.name)
+        next_message = task if task is not None else default_task(stage, ctx)
 
-    transcript_dir = ctx.build_dir / "transcripts"
+        transcript_dir = ctx.build_dir / "transcripts"
 
-    def build() -> None:
-        # build() may replace build/<stage>/, which would take the transcripts with it.
-        with preserved_dir(transcript_dir):
-            stage.build(ctx)
+        def build() -> None:
+            # build() may replace build/<stage>/, which would take the transcripts with it.
+            with preserved_dir(transcript_dir):
+                stage.build(ctx)
 
-    ctx.src_dir.mkdir(parents=True, exist_ok=True)
-    tools = Toolbox(ctx.src_dir, build=build, verdicts_path=verdict_path(ctx),
-                   events=Emitter(ctx.root, ctx.stage))
+        ctx.src_dir.mkdir(parents=True, exist_ok=True)
+        tools = Toolbox(ctx.src_dir, build=build, verdicts_path=verdict_path(ctx),
+                       events=Emitter(ctx.root, ctx.stage, agent=agent))
 
-    history = None
-    for attempt in range(1, limits.max_attempts + 1):
-        agent = run_agent(
-            system_prompt,
-            next_message,
-            tools,
-            model,
-            limits,
-            transcript_dir=transcript_dir,
-            attempt=attempt,
-            history=history,
-            chat_fn=chat_fn,
-        )
-        history = agent.messages
+        history = None
+        for attempt in range(1, limits.max_attempts + 1):
+            result = run_agent(
+                system_prompt,
+                next_message,
+                tools,
+                model,
+                limits,
+                transcript_dir=transcript_dir,
+                attempt=attempt,
+                history=history,
+                chat_fn=chat_fn,
+            )
+            history = result.messages
 
-        built = run_captured(build)
-        if built.exit_code != 0:
-            detail = (built.stderr or built.stdout).strip()
-            message = f"build exited {built.exit_code}: {detail}"
-            verdicts = [error_verdict(BUILD_CHECK_NAME, message)]
-        else:
-            verdicts = run_checks(stage, ctx)
-        write_verdicts(ctx, verdicts)
+            built = run_captured(build)
+            if built.exit_code != 0:
+                detail = (built.stderr or built.stdout).strip()
+                message = f"build exited {built.exit_code}: {detail}"
+                verdicts = [error_verdict(BUILD_CHECK_NAME, message)]
+            else:
+                verdicts = run_checks(stage, ctx)
+            write_verdicts(ctx, verdicts)
 
-        if all_pass(verdicts):
-            return "pass"
-        next_message = feedback_message(attempt, verdicts)
-    return "exhausted"
+            if all_pass(verdicts):
+                return "pass"
+            next_message = feedback_message(attempt, verdicts)
+        return "exhausted"

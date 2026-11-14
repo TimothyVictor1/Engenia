@@ -12,7 +12,6 @@ Rules the code enforces itself, whatever the model does:
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 
@@ -21,7 +20,7 @@ import yaml
 from engenia.contracts.models import STAGE_NAMES, Requirement, RequirementStatus
 from engenia.harness.build import run_captured
 from engenia.harness.limits import Limits
-from engenia.harness.llm import ChatFn, chat
+from engenia.harness.llm import ChatFn, agent_model, chat, check_model_families
 from engenia.harness.loop import run_agent
 from engenia.harness.tools import Toolbox, ToolError
 
@@ -118,9 +117,10 @@ def intake(
     """
     if not PROJECT_NAME.fullmatch(project):
         raise IntakeError(f"invalid project name: {project!r}")
-    model = model or os.environ.get("ENGENIA_DESIGN_MODEL", "").strip()
+    model = model or agent_model("intake")
     if not model:
         raise IntakeError("ENGENIA_DESIGN_MODEL is not set and no model was given")
+    check_model_families(model=model)
     limits = limits or Limits.from_env()
 
     root = _find_root()
@@ -157,6 +157,7 @@ def intake(
             model,
             limits,
             transcript_dir=transcript_dir,
+            agent="intake",
             attempt=round_number + 1,
             history=history,
             chat_fn=chat_fn,

@@ -17,7 +17,7 @@ from typer.testing import CliRunner
 
 from engenia.core.cli import app
 from engenia.evidence.doctor import DoctorResult, Row, read_env_file, run_doctor
-from engenia.harness.llm import text_response, tool_call_response
+from engenia.harness.llm import DESIGN_AGENTS, text_response, tool_call_response
 
 KEY = "sk-doctor-test-key-000"
 BASE_URL = "https://llm.test/v1/"
@@ -65,7 +65,7 @@ def _text_handler(_request: httpx.Request) -> httpx.Response:
 
 @pytest.fixture
 def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in ENV_VARS:
+    for name in (*ENV_VARS, *(f"ENGENIA_MODEL_{a.upper()}" for a in DESIGN_AGENTS)):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -406,3 +406,79 @@ def test_cli_doctor_exit_zero(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_cli_lists_the_doctor_command() -> None:
     assert "doctor" in CliRunner().invoke(app, ["--help"]).stdout
+
+
+@pytest.mark.parametrize("agent", DESIGN_AGENTS)
+def test_doctor_lists_and_probes_each_override(endpoint, monkeypatch, tmp_path, agent):
+    monkeypatch.setenv(f"ENGENIA_MODEL_{agent.upper()}", "Individual/model")
+    models = []
+
+    def handler(request):
+        models.append(json.loads(request.content)["model"])
+        return _tool_call_handler(request)
+
+    result = run_doctor(tmp_path, client=_client(handler), sleep=_sleep_noop,
+                        run_command=_tools_ok, import_module=_imports_ok)
+    assert result.exit_code == 0
+    assert sorted(models) == sorted([DESIGN_MODEL, VERIFY_MODEL, "Individual/model"])
+    assert "Individual/model" in row_of(result, f"{agent} model").detail
+    assert "individual" in row_of(result, f"{agent} model").detail
+    for name in DESIGN_AGENTS:
+        assert row_of(result, f"{name} model call").result == "pass"
+
+
+def test_doctor_deduplicates_shared_and_verification_models(endpoint, monkeypatch, tmp_path):
+    for agent in DESIGN_AGENTS:
+        monkeypatch.setenv(f"ENGENIA_MODEL_{agent.upper()}", VERIFY_MODEL)
+    monkeypatch.setenv("ENGENIA_ALLOW_SAME_FAMILY", "1")
+    models = []
+
+    def handler(request):
+        models.append(json.loads(request.content)["model"])
+        return _tool_call_handler(request)
+
+    result = run_doctor(tmp_path, client=_client(handler), sleep=_sleep_noop,
+                        run_command=_tools_ok, import_module=_imports_ok)
+    assert models == [DESIGN_MODEL, VERIFY_MODEL]
+    assert result.exit_code == 0
+    assert all(row_of(result, f"{agent} model families").result == "warn"
+               for agent in DESIGN_AGENTS)
+
+
+def test_doctor_rejects_override_family_collision(endpoint, monkeypatch, tmp_path):
+    monkeypatch.setenv("ENGENIA_MODEL_REPAIR", "Meta/other")
+    result = run_doctor(tmp_path, client=_client(_tool_call_handler), sleep=_sleep_noop,
+                        run_command=_tools_ok, import_module=_imports_ok)
+    assert result.exit_code == 1
+    assert row_of(result, "repair model families").result == "fail"
+
+
+def test_doctor_env_file_override_is_listed_but_not_probed(endpoint, tmp_path):
+    (tmp_path / ".env").write_text("ENGENIA_MODEL_REPAIR=File/model\n")
+    models = []
+
+    def handler(request):
+        models.append(json.loads(request.content)["model"])
+        return _tool_call_handler(request)
+
+    result = run_doctor(tmp_path, client=_client(handler), sleep=_sleep_noop,
+                        run_command=_tools_ok, import_module=_imports_ok)
+    assert row_of(result, "repair model").result == "warn"
+    assert "File/model" in row_of(result, "repair model").detail
+    assert models == [DESIGN_MODEL, VERIFY_MODEL]
+
+
+def test_doctor_accepts_all_agent_overrides_without_shared_default(endpoint, monkeypatch, tmp_path):
+    monkeypatch.delenv("ENGENIA_DESIGN_MODEL")
+    for agent in DESIGN_AGENTS:
+        monkeypatch.setenv(f"ENGENIA_MODEL_{agent.upper()}", "Individual/model")
+    models = []
+
+    def handler(request):
+        models.append(json.loads(request.content)["model"])
+        return _tool_call_handler(request)
+
+    result = run_doctor(tmp_path, client=_client(handler), sleep=_sleep_noop,
+                        run_command=_tools_ok, import_module=_imports_ok)
+    assert result.exit_code == 0
+    assert models == [VERIFY_MODEL, "Individual/model"]

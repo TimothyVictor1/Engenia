@@ -34,7 +34,14 @@ from typing import Literal
 
 import httpx
 
-from engenia.harness.llm import ALLOW_SAME_FAMILY_ENV, chat, message_of, model_family
+from engenia.harness.llm import (
+    ALLOW_SAME_FAMILY_ENV,
+    DESIGN_AGENTS,
+    agent_model,
+    chat,
+    message_of,
+    model_family,
+)
 
 #: The model-configuration variables checked from the process environment and from .env.
 CONFIG_VARS = (
@@ -42,6 +49,7 @@ CONFIG_VARS = (
     "ENGENIA_LLM_API_KEY",
     "ENGENIA_DESIGN_MODEL",
     "ENGENIA_VERIFY_MODEL",
+    *(f"ENGENIA_MODEL_{agent.upper()}" for agent in DESIGN_AGENTS),
 )
 
 MIN_REDACT_CHARS = 8     # shorter values are never treated as secrets when scrubbing
@@ -378,22 +386,29 @@ def run_doctor(
     design, design_source = _lookup("ENGENIA_DESIGN_MODEL", env_file)
     verify, verify_source = _lookup("ENGENIA_VERIFY_MODEL", env_file)
 
+    probes: dict[str, Row] = {}
+
+    def probe(label: str, model: str) -> Row:
+        if model not in probes:
+            probes[model] = _probe_row(
+                label, model, live=live, client=client, sleep=sleep, secrets=secrets,
+            )
+        row = probes[model]
+        return Row(label, row.result, row.detail)
+
     rows = [
         _env_file_row(env_file),
         _base_url_row(env_file, secrets),
         _api_key_row(env_file),
-        _model_row("ENGENIA_DESIGN_MODEL", design, design_source, live),
+        _model_row(
+            "ENGENIA_DESIGN_MODEL", design, design_source,
+            live and any(not agent_model(agent) for agent in DESIGN_AGENTS),
+        ),
         _model_row("ENGENIA_VERIFY_MODEL", verify, verify_source, live),
         _family_row(design, verify, secrets),
         _mode_row(key_env, base_env, env_file, secrets),
-        _probe_row(
-            "design model call", design_env,
-            live=live, client=client, sleep=sleep, secrets=secrets,
-        ),
-        _probe_row(
-            "verify model call", verify_env,
-            live=live, client=client, sleep=sleep, secrets=secrets,
-        ),
+        probe("design model call", design_env),
+        probe("verify model call", verify_env),
         _command_row("uv", [["uv", "--version"]], run_command, secrets),
         _command_row(
             "pio", [["pio", "--version"], ["platformio", "--version"]], run_command, secrets
@@ -401,5 +416,16 @@ def run_doctor(
         _gmsh_row(import_module, secrets),
         _module_row("capytaine", import_module, secrets),
     ]
+    for agent in DESIGN_AGENTS:
+        variable = f"ENGENIA_MODEL_{agent.upper()}"
+        override, source = _lookup(variable, env_file)
+        model = override or design
+        source = source if override else design_source
+        rows.append(_model_row(f"{agent} model", model, source, live))
+        family = _family_row(model, verify, secrets)
+        rows.append(Row(f"{agent} model families", family.result, family.detail))
+        rows.append(probe(f"{agent} model call", agent_model(agent)))
+    for agent in ("verify_plan", "final"):
+        rows.append(_model_row(f"{agent} model", verify, verify_source, live))
     exit_code = 1 if any(row.result == "fail" for row in rows) else 0
     return DoctorResult(rows=tuple(rows), text=_render(root, rows), exit_code=exit_code)

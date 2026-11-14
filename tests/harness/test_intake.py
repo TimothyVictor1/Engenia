@@ -213,3 +213,12 @@ def test_a_transcript_is_saved_for_every_round(root, requirement_text):
     run(llm)
     directory = root / "projects" / "demo" / "build" / "intake" / "transcripts"
     assert sorted(p.name for p in directory.iterdir()) == ["attempt-01.json", "attempt-02.json"]
+
+
+def test_intake_uses_its_model_override(root, requirement_text, monkeypatch):
+    monkeypatch.setenv("ENGENIA_DESIGN_MODEL", "Default/model")
+    monkeypatch.setenv("ENGENIA_MODEL_INTAKE", "Intake/model")
+    llm = FakeLLM([tool_call_response(write("R-001.yaml", requirement_text(1))),
+                   text_response("done")])
+    assert intake(REQUEST, "demo", chat_fn=llm)[0].id == "R-001"
+    assert {call.model for call in llm.calls} == {"Intake/model"}

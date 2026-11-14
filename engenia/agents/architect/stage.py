@@ -14,7 +14,6 @@ No pass or fail decision comes from a model.
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -26,7 +25,7 @@ from engenia.agents.verification.stage import load_requirements
 from engenia.contracts.models import Contract, RequirementStatus, StageContext
 from engenia.core.hashing import file_hash
 from engenia.harness.limits import Limits
-from engenia.harness.llm import ChatFn, chat
+from engenia.harness.llm import ChatFn, agent_model, chat, check_model_families
 from engenia.harness.loop import run_agent
 from engenia.harness.packs import pack_file, project_pack
 from engenia.harness.tools import Toolbox, ToolError
@@ -199,7 +198,8 @@ class ArchitectStage:
 
     def generate(self, ctx: StageContext) -> None:
         source = "default"
-        model = self._model or os.environ.get("ENGENIA_DESIGN_MODEL", "").strip()
+        model = self._model or agent_model("architect")
+        check_model_families(model=model)
         if model and self._propose(ctx, model):
             source = "model"
         if source == "default":
@@ -240,6 +240,7 @@ class ArchitectStage:
                 model,
                 limits,
                 transcript_dir=transcripts,
+                agent="architect",
                 attempt=attempt,
                 history=history,
                 chat_fn=self._chat_fn,

@@ -33,7 +33,7 @@ from engenia.contracts.models import (
 )
 from engenia.harness.design_loop import generate_until_pass
 from engenia.harness.limits import Limits
-from engenia.harness.llm import ChatFn, LLMError, chat, check_model_families
+from engenia.harness.llm import ChatFn, LLMError, agent_model, chat, check_model_families
 
 PROPOSAL_FILE = "proposal.json"
 RECORD_FILE = "proposer.json"
@@ -99,8 +99,8 @@ def _load_proposal(path: Path) -> dict[str, Any] | str:
     return loaded if isinstance(loaded, dict) else f"{PROPOSAL_FILE} must hold a JSON object"
 
 
-def _model_available(model: str | None, chat_fn: ChatFn) -> str | None:
-    name = model or os.environ.get("ENGENIA_DESIGN_MODEL", "").strip()
+def _model_available(model: str | None, chat_fn: ChatFn, agent: str) -> str | None:
+    name = model or agent_model(agent)
     if not name:
         return None
     if chat_fn is chat and not os.environ.get("ENGENIA_LLM_BASE_URL", "").strip():
@@ -125,7 +125,8 @@ def propose(
     numbers computed by script). It runs after validation.
     """
     check_model_families()
-    name = _model_available(model, chat_fn)
+    name = _model_available(model, chat_fn, ctx.stage)
+    check_model_families(model=name)
     if name is not None:
         accepted = _ask_model(ctx, name, task, validate, limits, chat_fn)
         if accepted is not None:
