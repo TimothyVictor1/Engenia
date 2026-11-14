@@ -32,6 +32,9 @@ _BUILTIN_NAMES = (
     "false_alarm_rate",
     "wave_tilt",
     "stress_safety_factor",
+    "measured_mass",
+    "measured_waterline",
+    "measured_tilt",
 )
 
 REGISTRY: dict[str, Runner] = {}

@@ -31,6 +31,10 @@ class CanaryCase:
     interfaces: dict[str, dict[str, Any]]  # stage -> facts
     limit: dict[str, float]
     params: dict[str, Any] = field(default_factory=dict)
+    # Project-relative file names -> YAML data, written into the scratch project before the
+    # verifier runs. A verifier that reads a project file rather than an interface (such as
+    # the measurements `engenia measure` records) gets its fixture here.
+    files: dict[str, Any] = field(default_factory=dict)
 
 
 CASES: dict[str, CanaryCase] = {
@@ -102,5 +106,17 @@ CASES: dict[str, CanaryCase] = {
     ),
     "stress_safety_factor": CanaryCase(
         "simulation", {"simulation": {"safety_factor": 1.2}}, {"min": 2.0}
+    ),
+    "measured_mass": CanaryCase(
+        "mechanical", {}, {"max": 400.0},
+        files={"measurements.yaml": {"mass_g": 500.0}},
+    ),
+    "measured_waterline": CanaryCase(
+        "mechanical", {}, {"max": 60.0},
+        files={"measurements.yaml": {"waterline_mm": 95.0}},
+    ),
+    "measured_tilt": CanaryCase(
+        "simulation", {}, {"max": 30.0},
+        files={"measurements.yaml": {"tilt_deg": 42.0}},
     ),
 }

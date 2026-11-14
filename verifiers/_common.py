@@ -13,6 +13,8 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from engenia.contracts.models import (
     CheckContext,
     EvidenceLevel,
@@ -191,6 +193,33 @@ def water_density_g_cm3(ctx: CheckContext) -> float:
     return value
 
 
+MEASUREMENTS_FILE = "measurements.yaml"
+
+
+def read_measurements(ctx: CheckContext) -> dict[str, Any]:
+    """Read ``projects/<p>/measurements.yaml``, the file ``engenia measure`` writes."""
+    path = ctx.project_dir / MEASUREMENTS_FILE
+    if not path.is_file():
+        raise MissingInput(f"missing {MEASUREMENTS_FILE}: {_shown_path(ctx, path)}")
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise MissingInput(
+            f"cannot read {MEASUREMENTS_FILE} {_shown_path(ctx, path)}: {exc}"
+        ) from exc
+    if not isinstance(data, dict):
+        raise MissingInput(f"{MEASUREMENTS_FILE} {_shown_path(ctx, path)} must be a mapping")
+    return data
+
+
+def read_measurement(ctx: CheckContext, key: str) -> float:
+    """One measured number from measurements.yaml, or :class:`MissingInput`."""
+    data = read_measurements(ctx)
+    if key not in data:
+        raise MissingInput(f"{MEASUREMENTS_FILE} has no '{key}' measurement")
+    return as_number(data[key], f"measurements.{key}")
+
+
 def derating_factor(ctx: CheckContext, default: float = 0.8) -> float:
     """Return the battery derating factor from params, defaulting to 0.8."""
     params = ctx.params or {}
@@ -324,6 +353,25 @@ def checked_simulated_verdict(
     result = compare(measured, selected)
     message = None if result == VerdictResult.PASS else comparison_message(measured, selected)
     return simulated_verdict(ctx, measured, result, limit=selected, message=message)
+
+
+def checked_measured_verdict(
+    ctx: CheckContext,
+    measured: float,
+    *,
+    limit: Limit | None = None,
+) -> Verdict:
+    """Like :func:`checked_verdict`, but with ``evidence_level`` "measured".
+
+    The measured value comes from the printed prototype (measurements.yaml), not from the
+    design or a simulation.
+    """
+    selected = limit if limit is not None else ctx.limit
+    result = compare(measured, selected)
+    message = None if result == VerdictResult.PASS else comparison_message(measured, selected)
+    return _verdict_with_level(
+        ctx, measured, result, EvidenceLevel.MEASURED, limit=selected, message=message
+    )
 
 
 def error_verdict(ctx: CheckContext, message: str) -> Verdict:

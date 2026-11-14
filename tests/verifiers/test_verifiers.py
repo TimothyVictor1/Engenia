@@ -751,3 +751,120 @@ def test_stress_safety_factor_non_positive_is_an_error(write_interface, make_ctx
     )
     assert verdict.result == "error"
     assert "must be positive" in (verdict.message or "")
+
+
+# --- measured_* ---------------------------------------------------------------------------------
+
+
+def measured_ctx(make_ctx, check, limit):
+    return make_ctx(stage="mechanical", check=check, requirement="R-101", limit=limit)
+
+
+def test_measured_mass_pass(write_measurements, make_ctx):
+    write_measurements({"mass_g": 352.1, "waterline_mm": 48.2, "date": "2026-11-13"})
+    verdict = load("measured_mass")(measured_ctx(make_ctx, "measured_mass", Limit(max=400)))
+    assert verdict.result == "pass"
+    assert verdict.measured == 352.1
+    assert verdict.evidence_level == "measured"
+    assert verdict.message is None
+
+
+def test_measured_mass_fail(write_measurements, make_ctx):
+    write_measurements({"mass_g": 430.0})
+    verdict = load("measured_mass")(measured_ctx(make_ctx, "measured_mass", Limit(max=400)))
+    assert verdict.result == "fail"
+    assert verdict.measured == 430.0
+    assert verdict.evidence_level == "measured"
+    assert "above max 400" in (verdict.message or "")
+
+
+def test_measured_mass_min_limit(write_measurements, make_ctx):
+    write_measurements({"mass_g": 280.0})
+    verdict = load("measured_mass")(measured_ctx(make_ctx, "measured_mass", Limit(min=300)))
+    assert verdict.result == "fail"
+    assert "below min 300" in (verdict.message or "")
+
+
+@pytest.mark.parametrize("mass", [0.0, -3.0, "heavy"])
+def test_measured_mass_unusable_value_is_an_error(write_measurements, make_ctx, mass):
+    write_measurements({"mass_g": mass})
+    verdict = load("measured_mass")(measured_ctx(make_ctx, "measured_mass", Limit(max=400)))
+    assert verdict.result == "error"
+
+
+def test_measured_mass_without_measurements_file(make_ctx):
+    verdict = load("measured_mass")(measured_ctx(make_ctx, "measured_mass", Limit(max=400)))
+    assert verdict.result == "error"
+    assert "missing measurements.yaml" in (verdict.message or "")
+
+
+def test_measured_mass_without_the_key(write_measurements, make_ctx):
+    write_measurements({"waterline_mm": 48.2})
+    verdict = load("measured_mass")(measured_ctx(make_ctx, "measured_mass", Limit(max=400)))
+    assert verdict.result == "error"
+    assert "no 'mass_g' measurement" in (verdict.message or "")
+
+
+def test_measured_waterline_pass(write_measurements, make_ctx):
+    write_measurements({"waterline_mm": 48.2, "date": "2026-11-13"})
+    verdict = load("measured_waterline")(
+        measured_ctx(make_ctx, "measured_waterline", Limit(max=60))
+    )
+    assert verdict.result == "pass"
+    assert verdict.measured == 48.2
+    assert verdict.evidence_level == "measured"
+
+
+def test_measured_waterline_fail(write_measurements, make_ctx):
+    write_measurements({"waterline_mm": 95.0})
+    verdict = load("measured_waterline")(
+        measured_ctx(make_ctx, "measured_waterline", Limit(max=60))
+    )
+    assert verdict.result == "fail"
+    assert verdict.measured == 95.0
+    assert verdict.evidence_level == "measured"
+
+
+def test_measured_waterline_without_measurements(make_ctx):
+    verdict = load("measured_waterline")(
+        measured_ctx(make_ctx, "measured_waterline", Limit(max=60))
+    )
+    assert verdict.result == "error"
+
+
+def test_measured_tilt_pass(write_measurements, make_ctx):
+    write_measurements({"tilt_deg": 6.5, "date": "2026-11-13"})
+    verdict = load("measured_tilt")(measured_ctx(make_ctx, "measured_tilt", Limit(max=30)))
+    assert verdict.result == "pass"
+    assert verdict.measured == 6.5
+    assert verdict.evidence_level == "measured"
+
+
+def test_measured_tilt_zero_is_a_valid_reading(write_measurements, make_ctx):
+    write_measurements({"tilt_deg": 0.0})
+    verdict = load("measured_tilt")(measured_ctx(make_ctx, "measured_tilt", Limit(max=30)))
+    assert verdict.result == "pass"
+    assert verdict.measured == 0.0
+
+
+def test_measured_tilt_fail(write_measurements, make_ctx):
+    write_measurements({"tilt_deg": 42.0})
+    verdict = load("measured_tilt")(measured_ctx(make_ctx, "measured_tilt", Limit(max=30)))
+    assert verdict.result == "fail"
+    assert verdict.measured == 42.0
+    assert verdict.evidence_level == "measured"
+
+
+def test_measured_tilt_negative_is_an_error(write_measurements, make_ctx):
+    write_measurements({"tilt_deg": -2.0})
+    verdict = load("measured_tilt")(measured_ctx(make_ctx, "measured_tilt", Limit(max=30)))
+    assert verdict.result == "error"
+    assert "cannot be negative" in (verdict.message or "")
+
+
+def test_measured_tilt_without_a_tilt_measurement_is_an_error(write_measurements, make_ctx):
+    """`engenia measure` without --tilt-deg records no tilt_deg key; the check errors."""
+    write_measurements({"mass_g": 352.1})
+    verdict = load("measured_tilt")(measured_ctx(make_ctx, "measured_tilt", Limit(max=30)))
+    assert verdict.result == "error"
+    assert "no 'tilt_deg' measurement" in (verdict.message or "")

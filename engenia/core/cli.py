@@ -1,6 +1,6 @@
 """The engenia command line (PROJECT.md section 6, CLI commands).
 
-lint, run, gate and matrix work; plan and status print "not implemented".
+lint, run, gate, matrix and measure work; plan and status print "not implemented".
 """
 
 from __future__ import annotations
@@ -129,6 +129,81 @@ def matrix(project: str) -> None:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from None
     typer.echo(text)
+
+
+@app.command()
+def measure(
+    project: str,
+    mass_g: float = typer.Option(..., "--mass-g", help="Mass of the printed prototype, in grams."),
+    waterline_mm: float = typer.Option(
+        ..., "--waterline-mm",
+        help="Waterline height above the hull base of the printed prototype, in millimetres.",
+    ),
+    tilt_deg: float | None = typer.Option(
+        None, "--tilt-deg", help="Tilt of the printed prototype at rest, in degrees."
+    ),
+    measured_on: str | None = typer.Option(
+        None, "--date", help="Date of the measurement, YYYY-MM-DD. Default: today."
+    ),
+) -> None:
+    """Record the printed prototype's measurements, compare with the predictions, calibrate."""
+    from datetime import date as date_type
+
+    from engenia.core.spec import SpecError
+    from engenia.evidence.measure import MeasureError, measure
+
+    root = find_root()
+    _project_dir(project)
+    try:
+        result = measure(
+            project,
+            root,
+            mass_g=mass_g,
+            waterline_mm=waterline_mm,
+            tilt_deg=tilt_deg,
+            date_text=measured_on or date_type.today().isoformat(),
+        )
+    except SpecError as exc:
+        for problem in exc.problems:
+            typer.echo(f"error: {problem}", err=True)
+        raise typer.Exit(1) from None
+    except MeasureError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from None
+
+    def show(path: Path) -> str:
+        try:
+            return str(path.relative_to(root))
+        except ValueError:
+            return str(path)
+
+    typer.echo(f"measurements -> {show(result.measurements_path)}")
+    typer.echo(
+        f"predicted mass {result.predictions.mass_g:.6g} g,"
+        f" measured {result.measurements['mass_g']:.6g} g,"
+        f" factor {result.calibration.mass_factor:.6g}"
+    )
+    typer.echo(
+        f"predicted waterline {result.predictions.waterline_mm:.6g} mm,"
+        f" measured {result.measurements['waterline_mm']:.6g} mm,"
+        f" offset {result.calibration.waterline_offset_mm:.6g} mm"
+    )
+    typer.echo(f"calibration -> {show(result.calibration_path)} ({result.calibration.source})")
+    for requirement_id, reason in sorted(result.skipped.items()):
+        typer.echo(f"skipped {requirement_id}: {reason}")
+    for verdict in result.verdicts:
+        limit = verdict.limit.model_dump(exclude_none=True)
+        typer.echo(
+            f"{verdict.requirement} {verdict.check}: {verdict.result.value}"
+            f" (measured {verdict.measured}, limit {limit},"
+            f" evidence {verdict.evidence_level.value})"
+        )
+    for requirement_id, path in sorted(result.proposals.items()):
+        typer.echo(f"proposal {requirement_id} -> {show(path)}")
+    for requirement_id, message in sorted(result.proposal_errors.items()):
+        typer.echo(f"error: {requirement_id}: {message}", err=True)
+    typer.echo(f"measure {project}: {'fail' if result.exit_code else 'pass'}")
+    raise typer.Exit(result.exit_code)
 
 
 @app.command()
