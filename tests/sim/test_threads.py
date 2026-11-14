@@ -3,6 +3,7 @@
 import json
 import shutil
 
+import pytest
 from typer.testing import CliRunner
 
 from engenia.core.cli import app
@@ -25,6 +26,7 @@ def test_simulation_stage_declares_main_thread():
     assert SimulationStage.main_thread is True
 
 
+@pytest.mark.slow
 def test_parallel_run_fills_structure_and_waves_and_is_byte_identical(tmp_path, monkeypatch):
     first = _run(tmp_path, monkeypatch, "one")
     second = _run(tmp_path, monkeypatch, "two")

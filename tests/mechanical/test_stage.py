@@ -217,6 +217,7 @@ def test_pack_density_and_infill_are_applied(built):
     )
 
 
+@pytest.mark.slow
 def test_calibration_scales_mass(built):
     stage, ctx = built
     custom = StageContext(root=ctx.root, project="calibrated", stage="mechanical")
