@@ -1,0 +1,35 @@
+- check: prop_clearance
+  id: C-001
+  limit:
+    max: 2.0
+    min: 1.0
+  params: {}
+  requirement: R-001
+- check: bending_stress
+  id: C-002
+  limit:
+    min: 3.0
+  params: {}
+  requirement: R-002
+- check: mass_budget
+  id: C-003
+  limit:
+    max: 150.0
+  params: {}
+  requirement: R-003
+- check: wall_thickness_min
+  id: C-004
+  limit:
+    min: 1.5
+  params: {}
+  requirement: R-004
+- check: print_bed_fit
+  id: C-005
+  limit:
+    equals: 1.0
+  params:
+    bed_mm:
+    - 220
+    - 220
+    - 250
+  requirement: R-005

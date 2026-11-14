@@ -1,0 +1,11 @@
+id: R-002
+statement: The 4 x M4 flange shall carry 15 N of thrust with a bending safety factor
+  of at least 3.
+value: 3
+unit: ratio
+verify:
+  method: analysis
+  check: bending_stress
+  limit: {min: 3}
+affects: [mechanical]
+status: approved

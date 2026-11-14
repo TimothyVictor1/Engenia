@@ -114,6 +114,13 @@ CASES: dict[str, CanaryCase] = {
         files={"spec/R-000.yaml": {
             "statement": "The bracket shall hold a 2 kg load 150 mm from the wall."}},
     ),
+    "prop_clearance": CanaryCase(
+        "mechanical",
+        {"mechanical": {"duct_inner_diameter_mm": 70.4}},
+        {"min": 1.0, "max": 2.0},
+        files={"spec/R-000.yaml": {
+            "statement": "The duct shall fit a 70 mm propeller with 1 to 2 mm tip clearance."}},
+    ),
     "measured_mass": CanaryCase(
         "mechanical", {}, {"max": 400.0},
         files={"measurements.yaml": {"mass_g": 500.0}},

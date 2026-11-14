@@ -1,0 +1,41 @@
+# Thruster-duct product pack: a printed PETG nozzle ring (duct) around a small thruster
+# propeller, with a bolted mounting flange. The profile is Kort-nozzle-like: a flared inlet that
+# contracts to a short straight throat at the propeller plane, then a gentle diffuser.
+# A project selects it with `pack: thruster_duct` in projects/<p>/project.yaml. A duct has no
+# electronics and no firmware, so the pack skips both stages.
+materials: {PETG: {density_g_cm3: 1.27}}
+# Infill 1.0 means solid walls.
+printing: {infill_factor: 1.0, bed_mm: [220, 220, 250]}
+skip_stages: [electronics, firmware]
+templates:
+  duct:
+    module: packs.thruster_duct.templates.duct
+    checks: [mass_budget, print_bed_fit, wall_thickness_min, prop_clearance, bending_stress]
+# Material for the bending_stress verifier (the flange under thrust): allowable = allowable_stress
+# x printed_knock_down.
+structure:
+  youngs_modulus_mpa: 2100  # Assumption: representative printed PETG elastic modulus.
+  poisson_ratio: 0.38  # Assumption: isotropic PETG Poisson ratio.
+  allowable_stress_mpa: 35  # Assumption: PETG yield-based allowable stress.
+  printed_knock_down_factor: 0.60  # Assumption: reduction for layer bonding and defects.
+# Rules the deterministic proposer sizes from. Every number is a rule, not a dimension: the
+# dimensions come out of the propeller, the clearance limits, the thrust and the contract.
+duct:
+  min_wall_mm: 1.6  # four perimeter lines of a 0.4 mm nozzle; the thinnest wall printed.
+  step_mm: 0.4  # walls and flange thickness are rounded up to a whole line width.
+  clearance_grid_mm: 0.05  # tip clearance is chosen on this grid.
+  clearance_margin_mm: 0.5  # when a requirement gives only one clearance bound, aim this far in.
+  stress_margin: 1.15  # on top of the requirement's safety factor, for the printed layers.
+  length_ratio: 0.5  # nozzle length over throat diameter (Kort 19A is about 0.5).
+  plane_ratio: 0.45  # propeller plane, as a fraction of the length from the inlet.
+  land_ratio: 0.12  # straight throat land, as a multiple of the propeller diameter.
+  inlet_angle_deg: 15.0  # half-angle of the contracting inlet.
+  diffuser_angle_deg: 7.0  # half-angle of the expanding exit.
+  lip_ratio: 0.45  # inlet lip fillet, as a multiple of the wall.
+  flange:
+    default_bolts: 4  # used when no requirement names a flange ("4 x M4").
+    default_bolt_mm: 4.0
+    bolt_clearance_mm: 0.5  # clearance hole over the bolt size
+    edge_ratio: 1.0  # material from a hole to the flange edge, as a multiple of the hole
+    min_thickness_ratio: 0.8  # flange thickness is at least this multiple of the bolt size
+    fillet_ratio: 1.0  # wall-to-flange fillet, as a multiple of the wall

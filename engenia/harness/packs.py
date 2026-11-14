@@ -48,6 +48,12 @@ def pack_file(ctx: StageContext, name: str) -> Path:
     return local if local.is_file() else REPO / "packs" / pack / name
 
 
+def pack_dir(ctx: StageContext) -> Path:
+    """packs/<pack>/ for the project, preferring the run root's copy over the repository's.
+    A verifier reads the pack's static files (scenarios, material) through this."""
+    return pack_file(ctx, "pack.yaml").parent
+
+
 # Stages a product can leave out. A bracket has no electronics and so no firmware to write.
 SKIPPABLE = ("electronics", "firmware")
 

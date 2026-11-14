@@ -144,6 +144,14 @@ _KNOWN: tuple[CheckInfo, ...] = (
              "mast axis'): the verifier reads them from it",
     ),
     CheckInfo(
+        "prop_clearance", "propeller tip clearance, (duct inner diameter - propeller diameter) "
+        "/ 2, held inside a band", "mm", "min and max", "analysis", ("mechanical",),
+        _example("R-015", "The duct shall fit a 70 mm propeller with a tip clearance of 1 to 2 "
+                 "mm.", 1, "mm", "prop_clearance", "analysis", "min", "mechanical"),
+        note="give both bounds (verify.limit {min: 1, max: 2}); the statement must name the "
+             "propeller ('a 70 mm propeller'): the verifier reads it from there",
+    ),
+    CheckInfo(
         "bay_fit", "whether the board and battery fit the electronics bay (1 fits, 0 does not)",
         "ratio", "equals", "analysis", ("electronics", "mechanical"),
         _example("R-012", "The board and battery shall fit the electronics bay.", 1, "ratio",

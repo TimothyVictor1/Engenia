@@ -36,10 +36,10 @@ from engenia.core.intake_run import (
 from engenia.core.lint import Severity, lint_spec_dir
 from engenia.core.release import ReleaseError, release
 
-PACKS = ("buoy", "enclosure", "pressure_housing", "bracket")
+PACKS = ("buoy", "enclosure", "pressure_housing", "bracket", "thruster_duct")
 # Packs whose project.yaml `engenia new` writes, so the stages build from the pack. The
 # enclosure pack predates this: its projects add project.yaml by hand.
-STAGE_PACKS = ("pressure_housing", "bracket")
+STAGE_PACKS = ("pressure_housing", "bracket", "thruster_duct")
 Confirm = Callable[[str, list[str]], bool]  # (question, lines to show) -> approved?
 
 

@@ -1,0 +1,11 @@
+name: debris_and_swell
+water_temp_c: 8.0
+extra:
+  clearance_shift_mm: 0.1
+  grain_mm: 1.0
+rationale: Sand and weed pass the blade tips, and printed PETG takes up water and swells inward.
+  A 0.1 mm inward shift of the throat is an allowance for it (an assumption, not a moisture
+  measurement). The tip clearance must stay at or above its minimum after the shift, so the
+  blade cannot bind, and at or below its maximum without it, so the duct still works. The pack
+  aims the clearance for it and the prop_clearance verifier applies the same shift.
+target_checks: [prop_clearance, wall_thickness_min]

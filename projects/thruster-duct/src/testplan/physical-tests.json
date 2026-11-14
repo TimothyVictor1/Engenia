@@ -1,0 +1,75 @@
+{
+  "not_covered": [
+    {
+      "check": "prop_clearance",
+      "reason": "no physical test template for the check 'prop_clearance'",
+      "requirement": "R-001"
+    },
+    {
+      "check": "bending_stress",
+      "reason": "no physical test template for the check 'bending_stress'",
+      "requirement": "R-002"
+    },
+    {
+      "check": "wall_thickness_min",
+      "reason": "needs a cut section of the print; measure it from a sacrificial part",
+      "requirement": "R-004"
+    }
+  ],
+  "project": "thruster-duct",
+  "tests": [
+    {
+      "check": "mass_budget",
+      "expected": {
+        "text": "<= 150 g",
+        "unit": "g",
+        "value": 150.0
+      },
+      "id": "T-003",
+      "instrument": "Digital scale, 0.1 g resolution or better, calibrated with a known mass",
+      "limit": {
+        "max": 150.0
+      },
+      "measure_option": "--mass-g",
+      "measurement_key": "mass_g",
+      "pass_rule": "Pass when the measured value is <= 150 g.",
+      "procedure": [
+        "Assemble the prototype as it will be deployed: hull, lid, electronics, battery, seals.",
+        "Zero the scale. Place the assembled prototype on it and wait for a stable reading.",
+        "Record the mass in grams. Repeat three times, removing the prototype each time.",
+        "Use the mean of the three readings as the measured mass.",
+        "Record it with `engenia measure <project> --mass-g <value> --waterline-mm <value>`."
+      ],
+      "quantity": "mass",
+      "requirement": "R-003",
+      "statement": "The total mass of the duct shall not exceed 150 g.",
+      "title": "Mass of the assembled prototype"
+    },
+    {
+      "check": "print_bed_fit",
+      "expected": {
+        "text": "= 1 ratio",
+        "unit": "ratio",
+        "value": 1.0
+      },
+      "id": "T-005",
+      "instrument": "Calipers or steel ruler, 0.1 mm resolution; the printer's stated bed size",
+      "limit": {
+        "equals": 1.0
+      },
+      "measure_option": null,
+      "measurement_key": null,
+      "pass_rule": "Pass when the measured value is = 1 ratio.",
+      "procedure": [
+        "Measure the printed hull's three bounding dimensions in millimetres. Do this on the printed part, not on the CAD file.",
+        "Sort the three dimensions and the three bed dimensions in ascending order.",
+        "The part fits if each sorted dimension is no larger than the matching bed dimension.",
+        "Record the result as 1 (fits) or 0 (does not fit), with the dimensions."
+      ],
+      "quantity": "fit",
+      "requirement": "R-005",
+      "statement": "The duct shall fit within the print bed.",
+      "title": "Printed hull fits the print bed"
+    }
+  ]
+}

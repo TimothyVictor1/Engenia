@@ -166,7 +166,8 @@ def new(
     request: str = typer.Argument(..., help="The product request, in plain language."),
     project: str = typer.Option(..., "--project", "-p", help="Name of the new project."),
     pack: str = typer.Option(
-        "buoy", "--pack", help="Product pack: buoy, enclosure, pressure_housing or bracket."
+        "buoy", "--pack",
+        help="Product pack: buoy, enclosure, pressure_housing, bracket or thruster_duct.",
     ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Approve every step without asking."),
     workers: int = typer.Option(default_workers(), "--workers", "-j", min=1),

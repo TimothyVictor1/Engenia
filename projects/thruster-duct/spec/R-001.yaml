@@ -1,0 +1,10 @@
+id: R-001
+statement: The duct shall fit a 70 mm propeller with a tip clearance of 1 to 2 mm.
+value: 1
+unit: mm
+verify:
+  method: analysis
+  check: prop_clearance
+  limit: {min: 1, max: 2}
+affects: [mechanical]
+status: approved
