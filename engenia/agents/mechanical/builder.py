@@ -54,6 +54,10 @@ def build(src_dir: Path, build_dir: Path, density_g_cm3: float) -> None:
         "displaced_volume_cm3": round(closed_volume / 1000, 6),
         "internal_volume_cm3": round((closed_volume - volume) / 1000, 6),
         "battery_bay_mm": list(params.battery_bay_mm),
+        "battery_bay_centre_mm": [
+            0.0, 0.0, round(params.wall_thickness_mm + params.battery_bay_mm[2] / 2, 6)
+        ],
+        "outer_diameter_mm": params.outer_diameter_mm,
         "wall_min_mm": params.wall_thickness_mm,
         "bbox_mm": [round(v, 6) for v in size],
         "centre_of_mass_mm": [round(v, 6) for v in centre],

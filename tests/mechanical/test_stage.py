@@ -5,16 +5,25 @@ import json
 import math
 import shutil
 import struct
+import sys
 from dataclasses import replace
+from types import ModuleType, SimpleNamespace
 
 import pytest
 import yaml
 from build123d import Align, Box, CenterOf, Cylinder, Pos, import_step
 
 from engenia.agents.mechanical.builder import ARTIFACTS, STEP_TIMESTAMP
-from engenia.agents.mechanical.stage import CHECKS, REPO, MechanicalStage, propose_params
+from engenia.agents.mechanical.stage import (
+    CHECKS,
+    REPO,
+    MechanicalStage,
+    _request_budget,
+    propose_params,
+)
 from engenia.contracts.models import Contract, Interface, Requirement, StageContext
 from engenia.stages.base import Stage
+from engenia.stages.integration.stage import _assembly
 from packs.buoy.templates.hull import HullParams, build_hull
 
 
@@ -39,6 +48,27 @@ def default_contract():
     return Contract.model_validate_json((REPO / "packs/buoy/default_contract.json").read_text())
 
 
+def test_rejected_identical_budget_request_is_not_refiled(tmp_path, monkeypatch):
+    requests = [SimpleNamespace(
+        from_stage="mechanical", path="budgets.mechanical.mass_g",
+        requested=325, status="rejected",
+    )]
+    submitted = []
+    board = ModuleType("engenia.core.board")
+    board.load_requests = lambda root, project: [(tmp_path / "CR-001.json", item)
+                                                   for item in requests]
+    board.submit_change_request = lambda *args, **kwargs: submitted.append(kwargs)
+    monkeypatch.setitem(sys.modules, "engenia.core.board", board)
+    ctx = StageContext(root=tmp_path, project="fixture", stage="mechanical")
+    _request_budget(ctx, "budgets.mechanical.mass_g", 325, "325 g exceeds budget")
+    assert submitted == []
+    _request_budget(ctx, "budgets.mechanical.mass_g", 326, "326 g exceeds budget")
+    assert submitted == [{
+        "path": "budgets.mechanical.mass_g", "requested": 326,
+        "reason": "326 g exceeds budget",
+    }]
+
+
 def hashes(ctx):
     return {name: hashlib.sha256((ctx.build_dir / name).read_bytes()).hexdigest()
             for name in (*ARTIFACTS, "interface.json")}
@@ -54,7 +84,27 @@ def test_build_produces_real_artifacts_and_valid_interface(built):
     assert set(interface.facts) == {
         "dry_mass_g", "displaced_volume_cm3", "internal_volume_cm3", "battery_bay_mm",
         "wall_min_mm", "bbox_mm", "centre_of_mass_mm", "contract_version",
+        "battery_bay_centre_mm", "outer_diameter_mm",
     }
+    params = yaml.safe_load((ctx.src_dir / "params.yaml").read_text())
+    assert interface.facts["outer_diameter_mm"] == params["outer_diameter_mm"]
+    assert interface.facts["battery_bay_centre_mm"] == pytest.approx(
+        [0, 0, params["wall_thickness_mm"] + params["battery_bay_mm"][2] / 2]
+    )
+    assembled = _assembly({
+        "mechanical": interface.facts,
+        "electronics": {"mass_g": 60},
+    })
+    expected_z = (
+        interface.facts["dry_mass_g"] * interface.facts["centre_of_mass_mm"][2]
+        + 60 * interface.facts["battery_bay_centre_mm"][2]
+    ) / assembled["total_mass_g"]
+    expected_xy = [
+        (interface.facts["dry_mass_g"] * interface.facts["centre_of_mass_mm"][axis]
+         + 60 * interface.facts["battery_bay_centre_mm"][axis]) / assembled["total_mass_g"]
+        for axis in (0, 1)
+    ]
+    assert assembled["centre_of_mass_mm"] == pytest.approx([*expected_xy, expected_z])
     for name in ("hull", "lid"):
         solid = import_step(ctx.build_dir / f"{name}.step")
         assert solid.is_valid and len(solid.solids()) == 1 and solid.volume > 0
@@ -157,6 +207,21 @@ def test_pack_density_and_infill_are_applied(built):
     ratio = 1.4 / 1.27 * 0.75
     assert stage.interface(custom)["dry_mass_g"] == pytest.approx(
         stage.interface(ctx)["dry_mass_g"] * ratio, abs=1e-6
+    )
+
+
+def test_calibration_scales_mass(built):
+    stage, ctx = built
+    custom = StageContext(root=ctx.root, project="calibrated", stage="mechanical")
+    shutil.copytree(ctx.src_dir, custom.src_dir)
+    custom.project_dir.mkdir(parents=True, exist_ok=True)
+    (custom.project_dir / "calibration.yaml").write_text(
+        yaml.safe_dump({"mass_factor": 1.05, "waterline_offset_mm": 0, "source": "fixture"})
+    )
+    stage.build(custom)
+    assert stage.reads_calibration is True
+    assert stage.interface(custom)["dry_mass_g"] == pytest.approx(
+        stage.interface(ctx)["dry_mass_g"] * 1.05, abs=1e-6
     )
 
 
