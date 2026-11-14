@@ -190,6 +190,8 @@ These are written in step 0 in `engenia/contracts/models.py`. After the step 0 m
 | `verify.limit` | object | Any of `min`, `max`, `equals` |
 | `affects` | list of stage names | At least one |
 | `status` | enum | `draft`, `approved` |
+| `origin` | enum | Optional: `user` (default), `derived` |
+| `reason` | string or null | Optional derivation reason; defaults to `null` |
 
 ### Contract (`projects/<p>/contract/contract.json`)
 
@@ -235,6 +237,10 @@ Status values: `open`, `accepted`, `rejected`.
 `result` is `pass`, `fail` or `error`. `evidence_level` is `calculated`, `simulated` or `measured`.
 
 `message` is an optional human-readable reason, used for `fail` and `error` results. `requirement` is optional: `null` means an internal consistency check not tied to one requirement, such as an integration check or the gate canary.
+
+`margin_pct` is an optional number, defaulting to `null`: distance to the limit as a
+percentage of the limit. It is `null` for errors, checks that did not run, or when
+the percentage is undefined.
 
 ### Stage contract (`engenia/stages/base.py`)
 
