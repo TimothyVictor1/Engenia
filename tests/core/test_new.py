@@ -83,6 +83,7 @@ def test_the_whole_flow_asks_at_both_approvals_and_releases(world):
     assert result.exit_code == 0, result.output
     assert result.output.count("Approve") == 2
     assert "Approve these requirements? [y/N]" in result.output
+    assert "check: mass_budget; value:" in result.output and "limit: max" in result.output
     assert "Approve this check plan? [y/N]" in result.output
     project = world.root / "projects" / PROJECT
     assert [p.name for p in sorted((project / "spec").glob("R-*.yaml"))] == [
