@@ -70,7 +70,13 @@ class FakeStage:
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    from engenia.harness.llm import DESIGN_AGENTS
+
+    for agent in DESIGN_AGENTS:
+        monkeypatch.delenv(f"ENGENIA_MODEL_{agent.upper()}", raising=False)
     for name in (
+        "ENGENIA_VERIFY_MODEL",
+        "ENGENIA_ALLOW_SAME_FAMILY",
         "ENGENIA_LLM_BASE_URL",
         "ENGENIA_LLM_API_KEY",
         "ENGENIA_MAX_ATTEMPTS",

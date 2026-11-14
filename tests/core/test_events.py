@@ -7,7 +7,7 @@ from engenia.core.engine import execute
 
 from .test_repair_loop import Script, gate_result, go, verdict
 
-KEYS = {"ts", "run_id", "project", "stage", "attempt", "kind", "data"}
+KEYS = {"ts", "run_id", "project", "stage", "attempt", "kind", "data", "agent"}
 
 
 def lines(root, run_id=1):

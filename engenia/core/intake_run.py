@@ -8,8 +8,9 @@ from pathlib import Path
 
 from engenia.core.errors import CoreError
 from engenia.core.intake_template import IntakeTemplateError, template_intake
+from engenia.harness.llm import agent_model
 
-MODEL_ENV = ("ENGENIA_LLM_API_KEY", "ENGENIA_LLM_BASE_URL", "ENGENIA_DESIGN_MODEL")
+MODEL_ENV = ("ENGENIA_LLM_API_KEY", "ENGENIA_LLM_BASE_URL")
 
 
 class IntakeFailed(CoreError):
@@ -23,7 +24,9 @@ class IntakeResult:
 
 
 def model_configured() -> bool:
-    return all(os.environ.get(name, "").strip() for name in MODEL_ENV)
+    return bool(agent_model("intake")) and all(
+        os.environ.get(name, "").strip() for name in MODEL_ENV
+    )
 
 
 def run_intake(request: str, project: str, root: Path, *, pack: str = "buoy") -> IntakeResult:

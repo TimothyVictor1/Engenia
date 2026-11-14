@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
+from engenia.core.events import agent_context
 from engenia.harness.limits import Limits
 from engenia.harness.llm import ChatFn, LLMError, chat, message_of
 from engenia.harness.tools import Toolbox, ToolError
@@ -122,6 +123,7 @@ def run_agent(
     chat_fn: ChatFn = chat,
     temperature: float = 0,
     clock: Callable[[], float] = time.monotonic,
+    agent: str | None = None,
 ) -> AgentResult:
     """Run one attempt and save its transcript to transcript_dir/attempt-NN.json.
 
@@ -144,62 +146,65 @@ def run_agent(
         sink.set_attempt(attempt)
     path = transcript_file(transcript_dir, attempt)
 
-    try:
-        while True:
-            if clock() - started >= limits.max_wall_seconds_per_attempt:
-                status = "time_limit"
-                break
-            try:
-                reply = message_of(chat_fn(model, messages, schemas, temperature))
-            except LLMError as exc:
-                status, error = "error", str(exc)
-                break
-            requested = reply.get("tool_calls") or []
-            assistant: dict[str, Any] = {"role": "assistant", "content": reply.get("content")}
-            if requested:
-                assistant["tool_calls"] = requested
-            messages.append(assistant)
-            if sink is not None and reply.get("content"):
-                sink.emit("message", {"role": "assistant", "text": reply["content"]})
-            if not requested:
-                status = "done"
-                break
+    with agent_context(agent or (sink.agent if sink is not None else "unknown"), model):
+        try:
+            while True:
+                if clock() - started >= limits.max_wall_seconds_per_attempt:
+                    status = "time_limit"
+                    break
+                try:
+                    reply = message_of(chat_fn(model, messages, schemas, temperature))
+                except LLMError as exc:
+                    status, error = "error", str(exc)
+                    break
+                requested = reply.get("tool_calls") or []
+                assistant: dict[str, Any] = {"role": "assistant", "content": reply.get("content")}
+                if requested:
+                    assistant["tool_calls"] = requested
+                messages.append(assistant)
+                if sink is not None and reply.get("content"):
+                    sink.emit("message", {"role": "assistant", "text": reply["content"]})
+                if not requested:
+                    status = "done"
+                    break
 
-            stopped: str | None = None
-            for index, call in enumerate(requested):
-                call_id = call.get("id") or f"call_missing_{index}"
-                if stopped is None and tool_calls_used >= limits.max_tool_calls_per_attempt:
-                    stopped = "tool_limit"
-                elif stopped is None and clock() - started >= limits.max_wall_seconds_per_attempt:
-                    stopped = "time_limit"
+                stopped: str | None = None
+                for index, call in enumerate(requested):
+                    call_id = call.get("id") or f"call_missing_{index}"
+                    if stopped is None and tool_calls_used >= limits.max_tool_calls_per_attempt:
+                        stopped = "tool_limit"
+                    elif (stopped is None
+                          and clock() - started >= limits.max_wall_seconds_per_attempt):
+                        stopped = "time_limit"
+                    if stopped is not None:
+                        # Every requested call needs a result or the conversation cannot continue.
+                        reason = stopped.replace("_", " ")
+                        content = json.dumps({"error": f"not executed: {reason}"})
+                    else:
+                        tool_calls_used += 1
+                        if sink is not None:
+                            sink.emit("tool_call", {"id": call_id, **_call_summary(call)})
+                        content = _execute_tool_call(tools, call)
+                        if sink is not None:
+                            sink.emit("tool_result", {"id": call_id, "content": content[:4000]})
+                    messages.append({"role": "tool", "tool_call_id": call_id, "content": content})
                 if stopped is not None:
-                    # Every requested call needs a result or the conversation cannot continue.
-                    content = json.dumps({"error": f"not executed: {stopped.replace('_', ' ')}"})
-                else:
-                    tool_calls_used += 1
-                    if sink is not None:
-                        sink.emit("tool_call", {"id": call_id, **_call_summary(call)})
-                    content = _execute_tool_call(tools, call)
-                    if sink is not None:
-                        sink.emit("tool_result", {"id": call_id, "content": content[:4000]})
-                messages.append({"role": "tool", "tool_call_id": call_id, "content": content})
-            if stopped is not None:
-                status = stopped
-                break
-    finally:
-        _write_transcript(
-            path,
-            attempt=attempt,
-            status=status,
-            error=error,
-            model=model,
-            temperature=temperature,
-            limits=limits,
-            tool_names=[s["function"]["name"] for s in schemas],
-            tool_calls=tool_calls_used,
-            start_index=start_index,
-            messages=messages,
-        )
+                    status = stopped
+                    break
+        finally:
+            _write_transcript(
+                path,
+                attempt=attempt,
+                status=status,
+                error=error,
+                model=model,
+                temperature=temperature,
+                limits=limits,
+                tool_names=[s["function"]["name"] for s in schemas],
+                tool_calls=tool_calls_used,
+                start_index=start_index,
+                messages=messages,
+            )
 
     return AgentResult(
         status=status,  # type: ignore[arg-type]

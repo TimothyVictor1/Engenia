@@ -1,6 +1,6 @@
 """The live design log: one JSON line per event in <root>/.engenia/events/<run_id>.jsonl.
 
-    {"ts", "run_id", "project", "stage", "attempt", "kind", "data"}
+    {"ts", "run_id", "project", "stage", "attempt", "kind", "data", "agent"}
 
 kind is one of message, tool_call, tool_result, code, decision, preview, verdict, repair.
 
@@ -21,11 +21,14 @@ import os
 import re
 import threading
 from collections.abc import Iterator
+from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 KINDS = ("message", "tool_call", "tool_result", "code", "decision", "preview", "verdict", "repair")
+_agent_context: ContextVar[dict[str, str] | None] = ContextVar("event_agent", default=None)
+
 MAX_TEXT = 20_000  # one string in one event; longer text is cut and marked
 
 _lock = threading.Lock()
@@ -134,6 +137,28 @@ def scrub(value: Any, secrets: list[str] | None = None) -> Any:
 # --- writing ----------------------------------------------------------------------------------
 
 
+@contextlib.contextmanager
+def agent_context(agent: str, model: str) -> Iterator[None]:
+    """Attach the actual caller to events, isolated across parallel stages."""
+    from engenia.harness.llm import model_family
+
+    token = _agent_context.set({"name": agent, "model": model, "family": model_family(model)})
+    try:
+        yield
+    finally:
+        _agent_context.reset(token)
+
+
+def _event_agent(stage: str | None) -> dict[str, str] | None:
+    from engenia.harness.llm import agent_models
+
+    actual = _agent_context.get()
+    if actual is not None:
+        return actual
+    configured = agent_models().get(stage or "")
+    return {"name": stage, **configured} if configured is not None else None
+
+
 def emit(
     root: Path,
     stage: str | None,
@@ -163,6 +188,7 @@ def emit(
             "attempt": attempt,
             "kind": kind,
             "data": scrub(data),
+            "agent": scrub(_event_agent(stage)),
         }
         line = json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n"
         path = events_path(root, run)
@@ -177,9 +203,10 @@ def emit(
 class Emitter:
     """`emit` bound to one stage of one root; handed to the agent toolbox and loop."""
 
-    def __init__(self, root: Path, stage: str) -> None:
+    def __init__(self, root: Path, stage: str, *, agent: str | None = None) -> None:
         self.root = Path(root)
         self.stage = stage
+        self.agent = agent or stage
 
     def emit(self, kind: str, data: dict[str, Any]) -> None:
         emit(self.root, self.stage, kind, data)

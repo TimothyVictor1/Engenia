@@ -4,9 +4,9 @@ Configuration comes from the environment at call time:
   ENGENIA_LLM_BASE_URL  e.g. https://api.example.com/v1  (required)
   ENGENIA_LLM_API_KEY   sent as a bearer token when set
 
-Model-family guard: the design model (ENGENIA_DESIGN_MODEL) and the verification model
-(ENGENIA_VERIFY_MODEL) must not be the same model or share a family, so that one model never
-checks its own work. See `check_model_families`.
+Per-agent ENGENIA_MODEL_<AGENT> overrides fall back to ENGENIA_DESIGN_MODEL. Every
+design-side model must differ in family from ENGENIA_VERIFY_MODEL, so that one family never
+checks its own work. See `agent_models` and `check_model_families`.
 """
 
 from __future__ import annotations
@@ -48,33 +48,57 @@ def model_family(model_id: str) -> str:
     return model_id.split("/", 1)[0] if "/" in model_id else model_id
 
 
-def check_model_families(env: Mapping[str, str] | None = None) -> str | None:
-    """Compare ENGENIA_DESIGN_MODEL and ENGENIA_VERIFY_MODEL.
+DESIGN_AGENTS = (
+    "intake", "architect", "mechanical", "electronics", "firmware", "repair", "redteam",
+)
 
-    Returns None when they differ in family, or when either is unset (nothing to compare).
-    When they are equal or share a family: raises ModelFamilyError, unless
-    ENGENIA_ALLOW_SAME_FAMILY=1, in which case the override is returned as a sentence for
-    build/final/audit.md.
+
+def agent_model(agent: str, env: Mapping[str, str] | None = None) -> str:
+    """Resolve an agent override, falling back to the shared design model."""
+    source = os.environ if env is None else env
+    if agent in ("verify_plan", "verification", "final"):
+        return source.get("ENGENIA_VERIFY_MODEL", "").strip()
+    return (source.get(f"ENGENIA_MODEL_{agent.upper()}", "").strip()
+            or source.get("ENGENIA_DESIGN_MODEL", "").strip())
+
+
+def agent_models() -> dict[str, dict[str, str]]:
+    """Effective model and family per agent, evaluated from the current environment."""
+    return {agent: {"model": model, "family": model_family(model)}
+            for agent in (*DESIGN_AGENTS, "verify_plan", "final")
+            for model in (agent_model(agent),)}
+
+
+def check_model_families(
+    env: Mapping[str, str] | None = None, *, model: str | None = None,
+) -> str | None:
+    """Guard every configured design model and an optional actual model against verification.
+
+    ENGENIA_ALLOW_SAME_FAMILY=1 returns an audit note instead of raising.
     """
     source = os.environ if env is None else env
-    design = source.get("ENGENIA_DESIGN_MODEL", "").strip()
     verify = source.get("ENGENIA_VERIFY_MODEL", "").strip()
-    if not design or not verify:
+    if not verify:
         return None
-    if model_family(design) != model_family(verify):
+    candidates = {"ENGENIA_DESIGN_MODEL": source.get("ENGENIA_DESIGN_MODEL", "").strip()}
+    candidates.update({f"ENGENIA_MODEL_{agent.upper()}":
+                       source.get(f"ENGENIA_MODEL_{agent.upper()}", "").strip()
+                       for agent in DESIGN_AGENTS})
+    if model:
+        candidates["actual model"] = model.strip()
+    collisions = [(name, design) for name, design in candidates.items()
+                  if design and model_family(design) == model_family(verify)]
+    if not collisions:
         return None
+    detail = "; ".join(f"design model {design!r} ({name})" for name, design in collisions)
+    detail += (f" and verification model {verify!r} (ENGENIA_VERIFY_MODEL) are the same "
+               f"or share the family {model_family(verify)!r}.")
     if source.get(ALLOW_SAME_FAMILY_ENV, "").strip() == "1":
-        return (
-            f"{ALLOW_SAME_FAMILY_ENV}=1 overrode the model-family guard: design model "
-            f"{design!r} and verification model {verify!r} share the family "
-            f"{model_family(design)!r}."
-        )
+        return f"{ALLOW_SAME_FAMILY_ENV}=1 overrode the model-family guard: {detail}"
     raise ModelFamilyError(
-        f"design model {design!r} (ENGENIA_DESIGN_MODEL) and verification model {verify!r} "
-        f"(ENGENIA_VERIFY_MODEL) are the same or share the family {model_family(design)!r}. "
-        "A model must not check its own family's work. Choose models from different families, "
-        f"or set {ALLOW_SAME_FAMILY_ENV}=1 to override (the override is recorded in "
-        "build/final/audit.md)."
+        f"{detail} A model must not check its own family's work. Choose models from different "
+        f"families, or set {ALLOW_SAME_FAMILY_ENV}=1 to override "
+        "(the override is recorded in build/final/audit.md)."
     )
 
 

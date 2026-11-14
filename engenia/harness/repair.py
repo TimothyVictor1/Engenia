@@ -28,7 +28,7 @@ from engenia.core import events
 from engenia.harness.checks import run_stage_checks
 from engenia.harness.design_loop import CheckRunner, generate_until_pass
 from engenia.harness.limits import Limits
-from engenia.harness.llm import ChatFn, chat, check_model_families
+from engenia.harness.llm import ChatFn, agent_model, chat, check_model_families
 from engenia.stages.base import Stage
 
 RepairStatus = Literal["repaired", "no_model", "exhausted"]
@@ -51,7 +51,7 @@ tool calls.
 
 
 def _model_name(model: str | None) -> str:
-    return (model or os.environ.get("ENGENIA_DESIGN_MODEL", "")).strip()
+    return (model or agent_model("repair")).strip()
 
 
 def _model_available(model: str | None, chat_fn: ChatFn) -> str | None:
@@ -123,32 +123,34 @@ def repair_stage(
     """Try to repair `stage` so the checks behind `failed` pass. See the module docstring."""
     if not failed:
         raise ValueError("repair_stage needs at least one failed verdict")
+    check_model_families(model=model)
     name = _model_available(model, chat_fn)
     if name is None:
         return "no_model"
-    check_model_families()  # a refusal to use this model pair is never swallowed
+    check_model_families(model=name)  # a refusal to use this model pair is never swallowed
 
     limits = limits or Limits.from_env()
     limits = replace(limits, max_attempts=min(limits.max_attempts, MAX_REPAIR_ATTEMPTS))
     task = repair_task(stage, ctx, failed)
-    events.emit(
-        ctx.root, stage.name, "repair", {"phase": "start", "failed": failed_summary(failed)}
-    )
-
-    with tempfile.TemporaryDirectory(prefix="engenia-repair-") as tmp:
-        backup = Path(tmp) / "src"
-        existed = ctx.src_dir.is_dir()
-        if existed:
-            shutil.copytree(ctx.src_dir, backup, symlinks=True)
-        status = generate_until_pass(
-            stage, ctx, model=name, limits=limits,
-            system_prompt=REPAIR_PROMPT.format(stage=stage.name),
-            task=task, chat_fn=chat_fn, run_checks=run_checks,
+    with events.agent_context("repair", name):
+        events.emit(
+            ctx.root, stage.name, "repair", {"phase": "start", "failed": failed_summary(failed)}
         )
-        events.emit(ctx.root, stage.name, "repair", {"phase": "end", "outcome": status})
-        if status == "pass":
-            return "repaired"
-        shutil.rmtree(ctx.src_dir, ignore_errors=True)
-        if existed:
-            shutil.copytree(backup, ctx.src_dir, symlinks=True)
-    return "exhausted"
+
+        with tempfile.TemporaryDirectory(prefix="engenia-repair-") as tmp:
+            backup = Path(tmp) / "src"
+            existed = ctx.src_dir.is_dir()
+            if existed:
+                shutil.copytree(ctx.src_dir, backup, symlinks=True)
+            status = generate_until_pass(
+                stage, ctx, model=name, agent="repair", limits=limits,
+                system_prompt=REPAIR_PROMPT.format(stage=stage.name),
+                task=task, chat_fn=chat_fn, run_checks=run_checks,
+            )
+            events.emit(ctx.root, stage.name, "repair", {"phase": "end", "outcome": status})
+            if status == "pass":
+                return "repaired"
+            shutil.rmtree(ctx.src_dir, ignore_errors=True)
+            if existed:
+                shutil.copytree(backup, ctx.src_dir, symlinks=True)
+        return "exhausted"
