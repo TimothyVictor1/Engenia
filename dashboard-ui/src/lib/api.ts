@@ -2,7 +2,7 @@
 // sample/*.json (served next to the page), with the same shapes.
 
 import type {
-  ContractData, Pipeline, Requirement, ScenariosData, StageDetail,
+  ContractData, FilesList, Pipeline, Requirement, ScenariosData, StageDetail,
 } from "./types";
 import type { AgentsResponse, RunSummary } from "./mission";
 
@@ -24,6 +24,8 @@ const enc = encodeURIComponent;
 export function resolve(path: string, sample: boolean): string {
   if (!sample) return path.replace(/^\//, "");
   const rest = path.replace(/^\/api\//, "").replace(/\?.*$/, "");
+  // A stage's file list; the sample's raw files live under sample/files/<stage>/.
+  if (/^files\/[^/]+$/.test(rest)) return `sample/file-lists/${rest.slice(6)}.json`;
   return rest.startsWith("files/") ? `sample/${rest}` : `sample/${rest}.json`;
 }
 
@@ -101,9 +103,14 @@ export const makeApi = (sample: boolean) => ({
     .then((r) => (Array.isArray(r) ? { run_id: null, events: r } : r)),
   demoFaults: () => json<{ faults: AvailableFault[] }>("/api/demo-fault", sample),
   breakIt: postFault,
+  files: (stage: string) => json<FilesList>(`/api/files/${enc(stage)}`, sample),
+  release: () => json<{ available: boolean; name?: string | null; size?: number | null; modified?: string | null }>("/api/release", sample),
+  /** Zip downloads need a live server; in sample mode there is nothing to download. */
+  zipUrl: (name: string) => (sample ? null : `api/download/${enc(name)}.zip`),
+  releaseUrl: () => (sample ? null : "api/download/release"),
   /** URL of a raw build file. `version` busts the cache after the design changes. */
   fileUrl: (stage: string, file: string, version = 0) => {
-    const base = resolve(`/api/files/${enc(stage)}/${enc(file)}`, sample);
+    const base = resolve(`/api/files/${enc(stage)}/${file.split("/").map(enc).join("/")}`, sample);
     return version && !sample ? `${base}?v=${version}` : base;
   },
 });

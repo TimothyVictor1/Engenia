@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export const VIEWS = ["mission", "pipeline", "requirements", "design", "contract", "scenarios", "studio"] as const;
+export const VIEWS = ["mission", "pipeline", "requirements", "design", "contract", "scenarios", "files", "studio"] as const;
 export type View = (typeof VIEWS)[number];
 
 export function parseHash(hash: string): { view: View; param: string } {
