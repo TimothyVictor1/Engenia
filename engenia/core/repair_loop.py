@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from engenia.contracts.models import StageContext, Verdict, VerdictResult
-from engenia.core import graph, spec
+from engenia.core import events, graph, spec
 from engenia.core.engine import RunReport, StageResult, execute
 from engenia.core.runstate import RunStore
 
@@ -113,7 +113,12 @@ def run_with_repair(
         order = [name for name in graph.topo_order(registry) if name in failures]
         for name in order:
             ctx = StageContext(project=project, stage=name, root=root)  # type: ignore[arg-type]
-            outcome = repair(registry[name], ctx, failures[name])
+            with events.activate(root, run_id, project):
+                outcome = repair(registry[name], ctx, failures[name])
+                events.emit(root, name, "repair", {
+                    "phase": "round", "round": rounds, "outcome": outcome,
+                    "failed": [v.check for v in failures[name]],
+                })
             result.rounds.append({"round": rounds, "stage": name, "outcome": outcome})
             _record(root, lambda s, n=name, o=outcome, r=rounds: s.stage_repair(
                 run_id, n, round_number=r, outcome=o))
@@ -131,7 +136,8 @@ def run_with_repair(
 
     if result.gate is not None and not result.gate.passed:
         failures = failed_verdicts_by_stage(result.gate.report)
-        _propose(project, root, failures, propose, result)
+        with events.activate(root, run_id, project):
+            _propose(project, root, failures, propose, result)
         if not result.reason:
             result.reason = f"the gate still fails after {rounds} repair round(s)"
         _record_failure(root, run_id, failures, result)
@@ -194,6 +200,10 @@ def _propose(
         ctx = StageContext(project=project, stage=stage, root=root)  # type: ignore[arg-type]
         try:
             result.proposals.append(propose(requirement, verdicts, ctx=ctx))
+            events.emit(root, stage, "repair", {
+                "phase": "proposal", "requirement": requirement_id,
+                "file": result.proposals[-1].name,
+            })
         except ValueError as exc:
             result.no_proposal[requirement_id] = str(exc)
 

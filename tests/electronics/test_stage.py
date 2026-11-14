@@ -274,3 +274,20 @@ def test_interface_contains_battery_mounts_and_build_contract_version(tmp_path):
     assert interface["battery_mm"] == list(selected_battery.size_mm)
     assert interface["board_holes_mm"] == [[4, 5], [60, 5], [4, 30], [60, 30]]
     assert interface["contract_version"] == 7
+
+
+def test_deterministic_selection_emits_decisions_citing_requirements(tmp_path):
+    from engenia.core import events
+
+    ctx = make_context(tmp_path, days=7)
+    with events.activate(tmp_path, 3, "test-buoy"):
+        ElectronicsStage().generate(ctx)
+    found = [json.loads(x) for x in events.events_path(tmp_path, 3).read_text().splitlines()]
+    decisions = {e["data"]["title"]: e for e in found if e["kind"] == "decision"}
+    assert {"Radio", "Sensor (audio)", "Battery", "Board size vs bay"} <= set(decisions)
+    assert {e["project"] for e in found} == {"test-buoy"}
+    battery = decisions["Battery"]["data"]
+    assert battery["choice"] == "LP402030" and battery["requirements"] == ["R-003"]
+    assert battery["numbers"]["target_days"] == 7 and battery["numbers"]["endurance_days"] >= 7
+    assert "bay" in decisions["Board size vs bay"]["data"]["reason"]
+    assert decisions["Radio"]["data"]["numbers"]["active_current_ma"] > 0

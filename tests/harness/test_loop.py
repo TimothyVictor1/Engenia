@@ -51,7 +51,7 @@ def test_final_message_stops_the_loop_and_transcript_is_saved(sandbox, tmp_path)
     assert result.tool_calls == 2
     assert (sandbox / "a.txt").read_text() == "hi"
     assert len(llm.calls) == 2
-    assert llm.calls[0].tools is not None and len(llm.calls[0].tools) == 3
+    assert llm.calls[0].tools is not None and len(llm.calls[0].tools) == 4
 
     saved = json.loads(result.transcript_path.read_text(encoding="utf-8"))
     assert result.transcript_path == tmp_path / "transcripts" / "attempt-01.json"

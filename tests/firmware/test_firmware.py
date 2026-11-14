@@ -63,3 +63,33 @@ def test_missing_duty_cycle_is_an_error(tmp_path):
     path.write_text('{"facts": {}}')
     with pytest.raises(KeyError, match='duty_cycle'):
         FirmwareStage().generate(ctx)
+
+
+def test_deterministic_detector_emits_decisions(tmp_path):
+    import yaml
+
+    from engenia.core import events
+
+    ctx = StageContext(root=tmp_path, project="fixture", stage="firmware")
+    ctx.spec_dir.mkdir(parents=True)
+    for number, check in ((1, "detection_rate"), (2, "false_alarm_rate")):
+        (ctx.spec_dir / f"R-00{number}.yaml").write_text(yaml.safe_dump({
+            "id": f"R-00{number}", "statement": "The detector shall work.", "value": 1,
+            "unit": "x", "affects": ["firmware"], "status": "approved",
+            "verify": {"method": "test", "check": check, "limit": {"min": 0}},
+        }))
+    electronics = ctx.stage_interface_path("electronics")
+    electronics.parent.mkdir(parents=True)
+    duty = {"sample": 0.01, "transmit": 0.02, "sleep": 0.97}
+    electronics.write_text(json.dumps({"facts": {"duty_cycle": duty}}))
+    with events.activate(tmp_path, 4, "fixture"):
+        FirmwareStage().generate(ctx)
+    found = [json.loads(x) for x in events.events_path(tmp_path, 4).read_text().splitlines()]
+    decisions = {e["data"]["title"]: e["data"] for e in found if e["kind"] == "decision"}
+    assert set(decisions) == {
+        "Detector type", "Detector frequency", "Detection threshold", "Hold time"}
+    assert decisions["Detector type"]["choice"] == "tone"
+    assert decisions["Detector frequency"]["numbers"]["frequency_hz"] == 200.0
+    assert decisions["Detection threshold"]["requirements"] == ["R-001", "R-002"]
+    assert decisions["Hold time"]["requirements"] == ["R-002"]
+    assert decisions["Hold time"]["numbers"] == {"hold_s": 0.15}

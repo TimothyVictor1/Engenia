@@ -95,6 +95,20 @@ def _execute_tool_call(tools: Toolbox, call: dict[str, Any]) -> str:
         return json.dumps({"error": f"{type(exc).__name__}: {exc}"})
 
 
+def _call_summary(call: dict[str, Any]) -> dict[str, Any]:
+    """Name and arguments of a tool call for the log. File contents live in the code event."""
+    function = call.get("function") if isinstance(call.get("function"), dict) else {}
+    name = function.get("name")
+    raw = function.get("arguments") or "{}"
+    try:
+        arguments = json.loads(raw) if isinstance(raw, str) else raw
+    except json.JSONDecodeError:
+        return {"name": name, "arguments": {"raw": str(raw)[:2000]}}
+    if name == "write_file" and isinstance(arguments, dict):
+        arguments = {"path": arguments.get("path"), "bytes": len(str(arguments.get("content", "")))}
+    return {"name": name, "arguments": arguments}
+
+
 def run_agent(
     system_prompt: str,
     task: str,
@@ -125,6 +139,9 @@ def run_agent(
     status: str = "crashed"  # only visible in the transcript if an unexpected exception escapes
     error: str | None = None
     schemas = tools.schemas()
+    sink = tools.events
+    if sink is not None:
+        sink.set_attempt(attempt)
     path = transcript_file(transcript_dir, attempt)
 
     try:
@@ -142,6 +159,8 @@ def run_agent(
             if requested:
                 assistant["tool_calls"] = requested
             messages.append(assistant)
+            if sink is not None and reply.get("content"):
+                sink.emit("message", {"role": "assistant", "text": reply["content"]})
             if not requested:
                 status = "done"
                 break
@@ -158,7 +177,11 @@ def run_agent(
                     content = json.dumps({"error": f"not executed: {stopped.replace('_', ' ')}"})
                 else:
                     tool_calls_used += 1
+                    if sink is not None:
+                        sink.emit("tool_call", {"id": call_id, **_call_summary(call)})
                     content = _execute_tool_call(tools, call)
+                    if sink is not None:
+                        sink.emit("tool_result", {"id": call_id, "content": content[:4000]})
                 messages.append({"role": "tool", "tool_call_id": call_id, "content": content})
             if stopped is not None:
                 status = stopped

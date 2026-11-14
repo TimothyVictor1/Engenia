@@ -12,6 +12,7 @@ from pathlib import Path
 import yaml
 
 from engenia.contracts.models import Contract, Requirement, StageContext
+from engenia.core import events
 from engenia.core.spec import SpecError, load_requirements
 from engenia.harness.packs import pack_file
 from engenia.harness.proposer import propose_firmware_detector, proposer_fact
@@ -69,6 +70,44 @@ def _requirements(ctx: StageContext) -> list[Requirement]:
         return []
 
 
+def _emit_detector_decisions(ctx: StageContext, detector_type: str, detector: dict) -> None:
+    """Deterministic fallback: the detector family and each setting, with the requirements the
+    detection and false-alarm checks answer."""
+    requirements = _requirements(ctx)
+    detect = events.relevant_requirements(requirements, "firmware", ("detection_rate",))
+    false_alarm = events.relevant_requirements(requirements, "firmware", ("false_alarm_rate",))
+    both = sorted({*detect, *false_alarm})
+    stage = ctx.stage
+    others = [name for name in sorted(DETECTORS) if name != detector_type]
+    events.emit_decision(
+        ctx.root, stage, title="Detector type", choice=detector_type,
+        reason=f"the pack asks for the {detector_type} detector",
+        requirements=both, numbers={},
+        alternatives=[{"option": name, "why_not": "not the detector the pack names"}
+                      for name in others],
+    )
+    if "frequency_hz" in detector:
+        events.emit_decision(
+            ctx.root, stage, title="Detector frequency", choice=f"{detector['frequency_hz']:g} Hz",
+            reason=(f"{detector['frequency_hz']:g} Hz is the tone the {detector_type} template "
+                    "is tuned to; replay data is 2000 Hz mono"),
+            requirements=detect, numbers={"frequency_hz": detector["frequency_hz"],
+                                          "sample_rate_hz": 2000},
+        )
+    events.emit_decision(
+        ctx.root, stage, title="Detection threshold", choice=f"{detector['threshold']:g}",
+        reason=(f"threshold {detector['threshold']:g}: low enough to catch the tone, high "
+                "enough to stay quiet on the quiet recording"),
+        requirements=both, numbers={"threshold": detector["threshold"]},
+    )
+    events.emit_decision(
+        ctx.root, stage, title="Hold time", choice=f"{detector['hold_s']:g} s",
+        reason=(f"hold {detector['hold_s']:g} s merges one tone into a single detection, "
+                "so it counts once"),
+        requirements=false_alarm, numbers={"hold_s": detector["hold_s"]},
+    )
+
+
 def propose_firmware(ctx: StageContext) -> None:
     """Materialize a reviewable source snapshot, including all generation inputs."""
     contract_path = ctx.contract_path
@@ -81,6 +120,8 @@ def propose_firmware(ctx: StageContext) -> None:
     detector = propose_firmware_detector(
         ctx, _requirements(ctx), detector_type, lambda: default_detector(detector_type)
     )
+    if proposer_fact(ctx) == "deterministic":
+        _emit_detector_decisions(ctx, detector_type, detector)
     # Common build system and data generation, then the detector variant's sources.
     shutil.copytree(TEMPLATES / "common", ctx.src_dir, dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
