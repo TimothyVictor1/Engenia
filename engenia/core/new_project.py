@@ -24,14 +24,14 @@ from typing import Any
 
 import yaml
 
-from engenia.core import approval, graph
+from engenia.core import approval, events, graph
+from engenia.core.baseline import reject_derived
 from engenia.core.engine import RunReport, execute
 from engenia.core.errors import CoreError
 from engenia.core.intake_run import (
-    INTENTS_TITLE,
     IntakeFailed,
-    requirement_lines,
     run_intake,
+    summary_lines,
 )
 from engenia.core.lint import Severity, lint_spec_dir
 from engenia.core.release import ReleaseError, release
@@ -82,6 +82,7 @@ def _create(project: str, root: Path, pack: str) -> None:
             f"(use `engenia intake` and `engenia run` on an existing one)"
         )
     (directory / "spec").mkdir(parents=True)
+    (directory / "project.yaml").write_text(yaml.safe_dump({"pack": pack}), encoding="utf-8")
     contract = _pack_contract(root, pack)
     if contract is not None:
         (directory / "contract").mkdir()
@@ -118,11 +119,6 @@ def new_project(
     report = NewReport(project, pack)
     _create(project, root, pack)
     echo(f"1. created projects/{project} ({pack} pack)")
-    if pack != "buoy":
-        report.notes.append(
-            f"the {pack} pack has no stage support yet: the stages still build with the buoy "
-            "templates and parts (see packs/enclosure/README.md)"
-        )
 
     # 2. intake
     try:
@@ -138,13 +134,32 @@ def new_project(
     echo(f"2. intake: {len(drafts)} draft requirement(s) from the {intake.how}")
 
     # 3. approve the requirements
-    shown = [line for p in intake.paths for line in requirement_lines(p)]
-    if intake.intents:
-        shown.append(INTENTS_TITLE)
-        shown.extend(f"  - {i.get('intent')} ({i.get('reason')})" for i in intake.intents)
-    if not confirm("Approve these requirements?", shown):
+    user_paths = [p for p in intake.paths if yaml.safe_load(p.read_text("utf-8")).get(
+        "origin", "user"
+    ) == "user"]
+    derived_paths = [p for p in intake.paths if p not in user_paths]
+    if user_paths and not confirm("Approve these requirements?", summary_lines(
+        user_paths, intake.intents
+    )):
         report.stopped = "the requirements were not approved (drafts are in spec/)"
         return report
+    accepted = list(user_paths)
+    for path in derived_paths:
+        if confirm(
+            f"Approve derived engineering requirement {path.stem}?", summary_lines([path], [])
+        ):
+            accepted.append(path)
+        else:
+            reject_derived(path)
+            with events.attach(root, project):
+                events.emit(root, "intake", "decision", {
+                    "requirement": path.stem, "origin": "derived", "status": "rejected",
+                })
+    intake.paths = accepted
+    if not accepted:
+        report.stopped = "no requirements were approved"
+        return report
+    drafts = [_describe(p) for p in accepted]
     approval.approve_requirements(intake.paths)
     report.requirements = drafts
     echo("3. requirements approved")

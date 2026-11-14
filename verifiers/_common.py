@@ -280,6 +280,23 @@ def comparison_message(measured: float, limit: Limit | Mapping[str, Any] | Any) 
     return f"measured {measured} " + ", ".join(reasons)
 
 
+def margin_pct(measured: float | None, limit: Limit) -> float | None:
+    """Signed distance to the tightest bound, normalized by that bound's magnitude."""
+    if measured is None:
+        return None
+    margins = []
+    for bound, value in (("min", limit.min), ("max", limit.max), ("equals", limit.equals)):
+        if value is None:
+            continue
+        if value == 0:
+            return None
+        distance = measured - value if bound == "min" else value - measured
+        if bound == "equals":
+            distance = -abs(measured - value)
+        margins.append(100 * distance / abs(value))
+    return min(margins) if margins else None
+
+
 def _verdict_with_level(
     ctx: CheckContext,
     measured: float | None,
@@ -298,6 +315,8 @@ def _verdict_with_level(
         result=result,
         evidence_level=evidence_level,
         message=message,
+        margin_pct=margin_pct(measured, limit if limit is not None else ctx.limit)
+        if result != VerdictResult.ERROR else None,
     )
 
 

@@ -22,9 +22,10 @@ from __future__ import annotations
 
 import math
 
-from engenia.contracts.models import CheckContext, Verdict
+from engenia.contracts.models import CheckContext, Verdict, VerdictResult
 from verifiers._common import (
     MissingInput,
+    calculated_verdict,
     checked_verdict,
     fact_from,
     guard,
@@ -74,4 +75,8 @@ def run(ctx: CheckContext) -> Verdict:
     bm_cm = inertia_cm4 / displaced
     kg_cm = _centre_of_mass_z_mm(ctx) / 10.0
     measured_mm = (kb_cm + bm_cm - kg_cm) * 10.0
+    if ctx.params.get("strict_min") and measured_mm <= 0:
+        return calculated_verdict(
+            ctx, measured_mm, VerdictResult.FAIL, message="GM must be strictly positive"
+        )
     return checked_verdict(ctx, measured_mm)

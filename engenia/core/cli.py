@@ -131,7 +131,9 @@ def _run_with_repair(project: str, workers: int, resume: bool, show) -> int:
 def intake(
     request: str = typer.Argument(..., help="The product request, in plain language."),
     project: str = typer.Option(..., "--project", "-p", help="Project to write the spec into."),
-    pack: str = typer.Option("buoy", "--pack", help="Pack whose template is used without a model."),
+    pack: str | None = typer.Option(
+        None, "--pack", help="Product pack; defaults to project.yaml, then buoy."
+    ),
 ) -> None:
     """Turn a plain-language request into draft spec/R-xxx.yaml files that pass lint.
 
@@ -406,6 +408,29 @@ def status(project: str) -> None:
     _project_dir(project)
     for line in status_lines(project, root):
         typer.echo(line)
+
+
+@app.command()
+def reject(project: str, requirement: str) -> None:
+    """Reject a draft derived requirement; keep its reason in spec/rejected/."""
+    import re
+
+    from engenia.core import events
+    from engenia.core.baseline import BaselineError, reject_derived
+
+    directory = _project_dir(project)
+    if not re.fullmatch(r"R-\d{3}", requirement):
+        raise typer.BadParameter("requirement must be R- plus three digits")
+    try:
+        reject_derived(directory / "spec" / f"{requirement}.yaml")
+    except (BaselineError, OSError, ValueError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from None
+    with events.attach(find_root(), project):
+        events.emit(find_root(), "intake", "decision", {
+            "requirement": requirement, "status": "rejected", "origin": "derived",
+        })
+    typer.echo(f"rejected {requirement}; archived in spec/rejected/")
 
 
 @app.command()

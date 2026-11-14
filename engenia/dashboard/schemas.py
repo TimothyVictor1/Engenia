@@ -45,6 +45,8 @@ class RequirementVerdict(ResponseModel):
 
 
 class RequirementItem(ResponseModel):
+    origin: Literal["user", "derived"] = "user"
+    reason: str | None = None
     id: str
     statement: str
     unit: str | None

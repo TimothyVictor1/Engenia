@@ -23,12 +23,23 @@ GRAVITY_M_S2 = 9.80665
 
 
 def _depth(ctx) -> float:
-    requirement = yaml.safe_load((ctx.spec_dir / "R-012.yaml").read_text())
-    statement = requirement["statement"]
-    match = re.search(r"\bat\s+([0-9]+(?:\.[0-9]+)?)\s*m\s+depth\b", statement, re.I)
-    if not match:
-        raise ValueError("R-012 must state a depth in metres")
-    return float(match.group(1))
+    depths = []
+    for path in sorted(ctx.spec_dir.glob("R-*.yaml")):
+        requirement = yaml.safe_load(path.read_text())
+        if requirement.get("status") != "approved" or requirement.get("verify", {}).get(
+            "check"
+        ) != "stress_safety_factor":
+            continue
+        match = re.search(
+            r"\bat\s+([0-9]+(?:\.[0-9]+)?)\s*m\s+(?:submersion\s+)?depth\b",
+            requirement["statement"], re.I,
+        )
+        if not match:
+            raise ValueError(f"{requirement['id']} must state a depth in metres")
+        depths.append(float(match.group(1)))
+    if not depths:
+        raise ValueError("no approved structural requirement states a depth")
+    return max(depths)
 
 
 def _mesh(step: Path) -> MeshTet:

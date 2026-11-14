@@ -32,6 +32,10 @@ def root(tmp_path, monkeypatch) -> Path:
     shutil.copytree(FIXTURE_SPEC, tmp_path / "projects" / EXAMPLE_PROJECT / "spec")
     monkeypatch.setenv("ENGENIA_ROOT", str(tmp_path))
     monkeypatch.setenv("ENGENIA_STORE", str(tmp_path / "store"))
+    for pack in ("buoy", "enclosure"):
+        pack_dir = tmp_path / "packs" / pack
+        pack_dir.mkdir(parents=True)
+        (pack_dir / "pack.yaml").write_text("baseline: []\n")
     return tmp_path
 
 

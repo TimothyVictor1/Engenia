@@ -13,6 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 from engenia.agents.verification.stage import VerifyPlanStage
@@ -35,7 +36,15 @@ PROJECT = "deckbox"
 def world(root, monkeypatch, fake_registry):
     """A scratch root that has the repo's verifiers and packs, and fake stages."""
     for name in ("verifiers", "packs"):
-        shutil.copytree(REPO / name, root / name, ignore=shutil.ignore_patterns("__pycache__"))
+        shutil.copytree(
+            REPO / name, root / name, dirs_exist_ok=True,
+            ignore=shutil.ignore_patterns("__pycache__"),
+        )
+    # This flow fixture has an explicit empty engineering baseline; separate tests add one.
+    for path in (root / "packs").glob("*/pack.yaml"):
+        data = yaml.safe_load(path.read_text())
+        data["baseline"] = []
+        path.write_text(yaml.safe_dump(data))
     for name in ("ENGENIA_LLM_API_KEY", "ENGENIA_LLM_BASE_URL", "ENGENIA_DESIGN_MODEL",
                  "ENGENIA_VERIFY_MODEL"):
         monkeypatch.delenv(name, raising=False)
@@ -170,7 +179,9 @@ def test_the_enclosure_pack_has_its_own_intake_rules(world):
     spec = world.root / "projects" / PROJECT / "spec"
     checks = {p.read_text().split("check: ")[1].split("\n")[0] for p in spec.glob("R-*.yaml")}
     assert checks == {"mass_budget", "wall_thickness_min", "print_bed_fit"}
-    assert "enclosure pack has no stage support yet" in result.output
+    assert yaml.safe_load((world.root / "projects" / PROJECT / "project.yaml").read_text()) == {
+        "pack": "enclosure"
+    }
     assert (world.root / "projects" / PROJECT / "contract" / "contract.json").is_file()
 
 
@@ -250,3 +261,22 @@ def test_a_stage_that_cannot_be_repaired_gets_a_proposal_and_its_dependants_stay
     assert [p.name for p in report.proposals] == ["R-001.yaml"]
     assert recorder.count("build", "integration") == 0
     assert report.release_path is None
+
+
+def test_derived_requirement_can_be_rejected_independently(world):
+    path = world.root / "packs/buoy/pack.yaml"
+    data = yaml.safe_load(path.read_text())
+    data["baseline"] = [{
+        "check": "erc_clean", "value": 0, "unit": "errors", "limit": {"equals": 0},
+        "method": "analysis", "affects": ["electronics"],
+        "statement": "The schematic shall have zero ERC errors.", "reason": "Fixture policy.",
+    }]
+    path.write_text(yaml.safe_dump(data))
+    result = new(input="y\nn\ny\n")
+    assert result.exit_code == 0, result.output
+    assert "derived engineering requirements" in result.output
+    assert "Approve derived engineering requirement R-004?" in result.output
+    directory = world.root / "projects" / PROJECT / "spec"
+    assert (directory / "rejected/R-004.yaml").is_file()
+    assert not (directory / "R-004.yaml").exists()
+    assert "status: approved" in (directory / "R-001.yaml").read_text()
