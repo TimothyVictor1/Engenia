@@ -12,16 +12,11 @@ from pathlib import Path
 
 import yaml
 
-from engenia.agents.electronics.facts import Facts, load_facts
+from engenia.agents.electronics.facts import Facts, load_facts, required_functions
 from engenia.agents.electronics.selection import assembly_size, power_facts, propose_selection
 from engenia.contracts.models import ChangeRequest, Contract, Requirement, StageContext
+from engenia.harness.packs import pack_file, project_pack
 from engenia.harness.proposer import propose_electronics_selection, proposer_fact
-
-
-def _pack_file(ctx: StageContext, name: str) -> Path:
-    local = ctx.root / "packs" / "buoy" / name
-    repo = Path(__file__).resolve().parents[3]
-    return local if local.is_file() else repo / "packs" / "buoy" / name
 
 
 def _write_json(path: Path, value: dict) -> None:
@@ -79,13 +74,13 @@ class ElectronicsStage:
     def generate(self, ctx: StageContext) -> None:
         contract_path = ctx.contract_path
         if not contract_path.is_file():
-            contract_path = _pack_file(ctx, "default_contract.json")
+            contract_path = pack_file(ctx, "default_contract.json")
         contract = Contract.model_validate_json(contract_path.read_text(encoding="utf-8"))
         requirements = [
             Requirement.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
             for path in sorted(ctx.spec_dir.glob("R-*.yaml"))
         ]
-        facts = load_facts(_pack_file(ctx, "parts/facts.toml"))
+        facts = load_facts(pack_file(ctx, "parts/facts.toml"))
         selection = propose_electronics_selection(
             ctx, contract, requirements, facts, propose_selection
         )
@@ -95,12 +90,16 @@ class ElectronicsStage:
         ]
         selection["contract_version"] = contract.version
         # Snapshot catalogue/profile: build never reselects against changed inputs.
-        selection["facts"] = facts.model_dump(mode="json")
+        buoy = project_pack(ctx) == "buoy"
+        selection["facts"] = facts.model_dump(
+            mode="json", exclude={"design": {"active_modes"}} if buoy else None
+        )
         ctx.src_dir.mkdir(parents=True, exist_ok=True)
         (ctx.src_dir / "selection.yaml").write_text(
             yaml.safe_dump(selection, sort_keys=True), encoding="utf-8"
         )
-        shutil.copyfile(Path(__file__).with_name("circuit_template.py"), ctx.src_dir / "circuit.py")
+        circuit = "circuit_buoy.py" if buoy else "circuit_template.py"
+        shutil.copyfile(Path(__file__).with_name(circuit), ctx.src_dir / "circuit.py")
         _request_bay(ctx, selection)
 
     def build(self, ctx: StageContext) -> None:
@@ -111,8 +110,11 @@ class ElectronicsStage:
         facts = Facts.model_validate(selection["facts"])
         by_id = {p.id: p for p in facts.parts}
         parts = {role: by_id[part_id] for role, part_id in selection["parts"].items()}
-        if set(parts) != {"microcontroller", "lora", "audio", "battery", "regulator"}:
-            raise ValueError("selection must contain all five part functions")
+        if set(parts) != set(required_functions(facts)):
+            raise ValueError(
+                "selection must contain exactly the pack's part functions "
+                f"{sorted(required_functions(facts))}"
+            )
         if any(role != part.function for role, part in parts.items()):
             raise ValueError("selected part function mismatch")
         profile = facts.design.model_dump()

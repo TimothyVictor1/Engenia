@@ -1,12 +1,8 @@
 name: transport_vibration
-wave_height_m: 0.0
-wave_period_s: 0.0
 water_temp_c: 20.0
-water_density: 1000.0
-depth_m: 0.0
 extra: {vibration_g_rms: 2.0, road_transport_hours: 8.0}
 rationale: Road transport to the installation site, 2 g rms broadband vibration for a full
   working day. The vibration sensing channel must still separate the reference vibration
-  tone from transport noise at the required detection rate. The wave fields are unused for
-  a deck-mounted box and are kept at zero immersion because the scenario model requires them.
+  tone from transport noise at the required detection rate. Without wave or water fields, a
+  deck-mounted box does not float, so the wave and flow solvers skip this scenario.
 targets: [R-008]

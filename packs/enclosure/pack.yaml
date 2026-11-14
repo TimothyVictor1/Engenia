@@ -1,9 +1,11 @@
-# Deck-sensor product pack. Not yet loaded by the mechanical stage, which still resolves
-# packs/buoy only (see engenia/agents/mechanical/stage.py); shipped ready for a
-# per-project pack hook. Same shape as packs/buoy/pack.yaml.
+# Deck-sensor product pack. A project selects it with `pack: enclosure` in
+# projects/<p>/project.yaml; the architect, electronics and firmware stages then read
+# this pack's contract, template, parts catalogue and detector family.
 materials: {PETG: {density_g_cm3: 1.27}}
 # Infill 1.0 means solid walls.
 printing: {infill_factor: 1.0, bed_mm: [220, 220, 250]}
 templates:
   deck_enclosure:
     checks: [mass_budget, print_bed_fit, wall_thickness_min]
+firmware:
+  detector: threshold  # block-RMS level detector; no tuned frequency to propose.

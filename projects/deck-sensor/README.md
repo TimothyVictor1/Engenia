@@ -2,8 +2,17 @@
 
 A deck-mounted sensor box: temperature, humidity and vibration sensing on a weather deck,
 battery powered with a LoRa uplink, in a 3D-printed PETG enclosure. Second example project
-(task T4-S3): it runs the same pipeline as `harbour-listener` with no changes to
-`engenia/` core.
+(task T4-S3, extended in T4-S4): it runs the same pipeline as `harbour-listener` with no
+changes to `engenia/` core, and builds from its own product pack.
+
+## Pack
+
+`project.yaml` names the pack: `pack: enclosure`. The architect loads
+`packs/enclosure/default_contract.json` and shows that pack to the design model, the
+electronics stage selects parts from `packs/enclosure/parts/facts.toml`, and the firmware
+stage generates the pack's `threshold` detector (a block-RMS level sampler) instead of the
+buoy's tone detector. A project without `project.yaml` (harbour-listener) keeps the buoy
+pack.
 
 ## Spec
 
@@ -21,14 +30,18 @@ Eight approved requirements in `spec/`, all verified by existing verifier script
 | R-008 | firmware detects the reference vibration tone at >= 0.9 | `detection_rate` |
 
 No requirement uses `method: simulation`, so the pipeline needs no wave or structure
-solver; the flow case `simprep` always writes for red-team scenarios is informational only.
+solver. The flow case `simprep` always writes for red-team scenarios is skipped per
+scenario because deck scenarios carry no water conditions; the skip is recorded in the
+flow solver's sanity messages.
 
 ## Red-team scenarios
 
 `scenarios/` holds four deck-relevant stress cases (heat soak, cold snap, washdown,
 transport vibration). The red-team stage prefers `projects/<p>/scenarios/` over its fixed
-buoy scenarios. The `Scenario` model is still buoy-specific (wave fields are required), so
-each file carries neutral zero-immersion values, noted in its rationale.
+buoy scenarios. The wave and water fields of the `Scenario` model are optional: these files
+carry only the ambient temperature and deck-specific `extra` facts, because a deck-mounted
+box does not float. The wave and flow solvers skip such scenarios and record why in their
+sanity messages.
 
 ## Check plan
 
@@ -49,17 +62,7 @@ uv run engenia matrix deck-sensor
 `run` generates `contract/` (from the architect stage) and `src/` (generated stage code,
 left untracked like `harbour-listener`). The gate needs a completed run first.
 
-## Known buoy-specific coupling (not patched here)
+## Remaining buoy-specific coupling
 
-- The mechanical stage resolves `packs/buoy/` by hard-coded path: pack, default contract,
-  parts facts, and the `hull`/`mast_housing` templates. deck-sensor therefore builds the
-  cylindrical buoy hull from the buoy pack; `packs/enclosure/` ships the ready-to-wire
-  deck enclosure template.
-- The architect's model fallback copies `packs/buoy/default_contract.json` into
-  `contract/contract.json`, so deck-sensor inherits the buoy budgets (which happen to
-  satisfy every requirement above).
-- The electronics stage always selects a `lora` and an `audio` part from
-  `packs/buoy/parts/facts.toml`, and requires an approved `battery_capacity` requirement
-  (hence R-003).
-- The firmware stage is a 200 Hz tone detector; R-008 is phrased around what it measures.
-- The red-team `Scenario` model requires wave fields (see above).
+- The verification stage reads bed sizes from `packs/buoy/pack.yaml`; both packs declare
+  the same 220 x 220 x 250 bed, so R-002 is unaffected.

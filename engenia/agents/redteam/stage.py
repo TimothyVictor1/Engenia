@@ -11,7 +11,9 @@ that does not validate is an error, never a silent fallback to the buoy scenario
 Scenario files live at src/redteam/scenarios/<name>.yaml and are validated and copied to
 build/redteam/scenarios/ by build(). Units: wave_height_m is significant wave height in
 metres, wave_period_s in seconds, water_temp_c in degrees Celsius, water_density in kg/m3,
-depth_m is the water depth at the mooring in metres.
+depth_m is the water depth at the mooring in metres. The wave and water fields are optional:
+scenarios for products that do not float (a deck-mounted enclosure) omit them, and the wave
+and flow solvers skip those scenarios, recording why in their sanity messages.
 """
 
 from __future__ import annotations
@@ -29,16 +31,22 @@ SCENARIOS_DIRNAME = "scenarios"
 
 
 class Scenario(BaseModel):
-    """One red-team scenario file (src/redteam/scenarios/<name>.yaml)."""
+    """One red-team scenario file (src/redteam/scenarios/<name>.yaml).
+
+    The wave and water fields are optional: a product that does not float (for
+    example a deck-mounted enclosure) leaves them unset, and the solvers that
+    need them skip such scenarios and say why. `water_temp_c` stays required:
+    every product has an ambient temperature.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    wave_height_m: float
-    wave_period_s: float
+    wave_height_m: float | None = None
+    wave_period_s: float | None = None
     water_temp_c: float
-    water_density: float
-    depth_m: float
+    water_density: float | None = None
+    depth_m: float | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
     rationale: str
     targets: list[str] = Field(min_length=1)

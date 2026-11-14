@@ -47,6 +47,7 @@ def run_case(case: dict, ctx: StageContext) -> dict:
     supplies a mesh and force integration setup for this hull.
     """
     messages: list[str] = []
+    notes: list[str] = []
     drag: dict[str, float] = {}
     evidence: dict[str, str] = {}
     try:
@@ -68,6 +69,11 @@ def run_case(case: dict, ctx: StageContext) -> dict:
     openfoam_installed = shutil.which("simpleFoam") is not None
     for name in sorted(set(wanted) & set(built)):
         scenario = built[name]
+        if scenario.get("water_density") is None:
+            # A product that does not float ships scenarios without water
+            # conditions; current drag on a submerged hull does not apply.
+            notes.append(f"{name}: skipped, no water conditions (water_density missing)")
+            continue
         try:
             speed = _speed(scenario, params)
             scenario_buoy, _ = flooded_buoy(buoy, scenario)
@@ -87,9 +93,12 @@ def run_case(case: dict, ctx: StageContext) -> dict:
             evidence[name] = "calculated"
         except (InputError, ValueError, KeyError) as exc:
             messages.append(f"{name}: {exc}")
-    return {
+    result = {
         "drag_n": drag,
         "evidence": evidence,
         "openfoam_available": openfoam_installed,
         "sanity": {"passed": not messages, "messages": messages},
     }
+    if notes:
+        result["notes"] = notes
+    return result

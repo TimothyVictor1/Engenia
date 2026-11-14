@@ -14,6 +14,7 @@ from pathlib import Path
 import yaml
 
 from engenia.contracts.models import Contract, Requirement, StageContext
+from engenia.harness.packs import pack_file, project_pack
 from engenia.harness.proposer import propose_mechanical_params, proposer_fact
 
 LOG = logging.getLogger(__name__)
@@ -90,8 +91,7 @@ def propose_params(contract: Contract | dict, requirements: list[Requirement]) -
 
 
 def _pack_file(ctx: StageContext, name: str) -> Path:
-    local = ctx.root / "packs" / "buoy" / name
-    return local if local.is_file() else REPO / "packs" / "buoy" / name
+    return pack_file(ctx, name)
 
 
 def _request_budget(ctx: StageContext, path: str, requested, reason: str) -> None:
@@ -118,7 +118,12 @@ class MechanicalStage:
         if not contract_path.is_file():
             contract_path = _pack_file(ctx, "default_contract.json")
         contract_data = json.loads(contract_path.read_text(encoding="utf-8"))
-        template = contract_data.pop("template", "hull")
+        pack_path = _pack_file(ctx, "pack.yaml")
+        pack = yaml.safe_load(pack_path.read_text(encoding="utf-8"))
+        templates = pack.get("templates", {"hull": {"checks": CHECKS}})
+        template = contract_data.pop("template", next(iter(templates), "hull"))
+        if template not in templates:
+            raise ValueError(f"Unknown mechanical template: {template}")
         contract = Contract.model_validate(contract_data)
         requirements = [
             Requirement.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
@@ -131,27 +136,39 @@ class MechanicalStage:
                 ctx, "budgets.mechanical.outer_envelope_mm", exc.required, str(exc),
             )
             raise
-        pack_path = _pack_file(ctx, "pack.yaml")
-        if pack_path.is_file():
-            pack = yaml.safe_load(pack_path.read_text(encoding="utf-8"))
-            templates = pack.get("templates", {"hull": {"checks": CHECKS}})
-            if template not in templates:
-                raise ValueError(f"Unknown mechanical template: {template}")
-            self.checks = list(templates[template]["checks"])
-            params["infill_factor"] = pack.get("printing", {}).get("infill_factor", 1.0)
+        self.checks = list(templates[template]["checks"])
+        params["infill_factor"] = pack.get("printing", {}).get("infill_factor", 1.0)
         ctx.src_dir.mkdir(parents=True, exist_ok=True)
         (ctx.src_dir / "params.yaml").write_text(
             yaml.safe_dump(params, sort_keys=True), encoding="utf-8"
         )
+        if project_pack(ctx) == "enclosure" and template == "deck_enclosure":
+            model = (
+                MODEL.replace(
+                    "from packs.buoy.templates.hull import HullParams, build_hull",
+                    "from packs.enclosure.templates.deck_enclosure "
+                    "import DeckEnclosureParams, build_deck_enclosure",
+                )
+                .replace("HullParams(**", "DeckEnclosureParams(**")
+                .replace(
+                    "hull, lid = build_hull(params)", "body, lid = build_deck_enclosure(params)"
+                )
+            )
+        else:
+            model = (
+                MODEL
+                if template == "hull"
+                else MODEL.replace(
+                    "from packs.buoy.templates.hull import HullParams, build_hull",
+                    "from packs.buoy.templates.mast_housing "
+                    "import MastHousingParams, build_mast_housing",
+                )
+                .replace("HullParams(**", "MastHousingParams(**")
+                .replace("build_hull(params)", "build_mast_housing(params)")
+            )
         (ctx.src_dir / "model.py").write_text(
-            (MODEL if template == "hull" else MODEL.replace(
-                "from packs.buoy.templates.hull import HullParams, build_hull",
-                "from packs.buoy.templates.mast_housing "
-                "import MastHousingParams, build_mast_housing",
-            ).replace("HullParams(**", "MastHousingParams(**").replace(
-                "build_hull(params)", "build_mast_housing(params)"
-            )) + f"\ncontract_version = {contract.version}\n"
-            + f"template = {template!r}\n", encoding="utf-8"
+            model + f"\ncontract_version = {contract.version}\n" + f"template = {template!r}\n",
+            encoding="utf-8",
         )
 
     def build(self, ctx: StageContext) -> None:
@@ -186,8 +203,12 @@ class MechanicalStage:
         )
         subprocess.run(
             [
-                sys.executable, "-m", "engenia.agents.mechanical.builder",
-                str(ctx.src_dir.resolve()), str(ctx.build_dir.resolve()), str(density),
+                sys.executable,
+                "-m",
+                "engenia.agents.mechanical.builder",
+                str(ctx.src_dir.resolve()),
+                str(ctx.build_dir.resolve()),
+                str(density),
             ],
             env=env,
             check=True,

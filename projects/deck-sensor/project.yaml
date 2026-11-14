@@ -1,0 +1,3 @@
+# The product pack this project builds from: the deck-mounted sensor box, not a buoy.
+# Absent (or a missing project.yaml) means the buoy pack.
+pack: enclosure

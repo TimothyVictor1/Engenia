@@ -195,6 +195,15 @@ def run_case(case: dict, ctx: StageContext) -> dict:
     g = params["gravity_m_s2"]
     for name in sorted(set(wanted) & set(built)):
         scenario = built[name]
+        absent = sorted(
+            field for field in ("wave_height_m", "wave_period_s", "water_density", "depth_m")
+            if scenario.get(field) is None
+        )
+        if absent:
+            # A product that does not float ships scenarios without wave or water
+            # conditions; those are out of scope for this solver, not errors.
+            notes.append(f"{name}: skipped, no wave conditions ({', '.join(absent)} missing)")
+            continue
         try:
             scenario_buoy, flooded_mass = flooded_buoy(buoy, scenario)
         except InputError as exc:

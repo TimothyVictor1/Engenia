@@ -9,11 +9,21 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yaml
+
 from engenia.contracts.models import Contract, Requirement, StageContext
 from engenia.core.spec import SpecError, load_requirements
+from engenia.harness.packs import pack_file
 from engenia.harness.proposer import propose_firmware_detector, proposer_fact
 
-DEFAULT_DETECTOR = {"frequency_hz": 200.0, "threshold": 0.15, "hold_s": 0.15}
+TEMPLATES = Path(__file__).with_name("templates")
+# Detector families the templates ship: the tone detector (Goertzel-like bin power) for
+# the buoy, and a plain block-RMS threshold sampler for packs without a tuned frequency.
+DETECTORS = {
+    "tone": {"frequency_hz": 200.0, "threshold": 0.15, "hold_s": 0.15},
+    "threshold": {"threshold": 0.25, "hold_s": 0.15},
+}
+DEFAULT_DETECTOR = DETECTORS["tone"]
 
 
 def _write(path: Path, value: dict) -> None:
@@ -27,8 +37,29 @@ def _run(args: list[str], cwd: Path) -> str:
     return result.stdout
 
 
-def default_detector() -> dict:
-    return dict(DEFAULT_DETECTOR)
+def default_detector(detector_type: str = "tone") -> dict:
+    try:
+        return dict(DETECTORS[detector_type])
+    except KeyError:
+        raise ValueError(
+            f"unknown detector type {detector_type!r}; the pack must name one of "
+            f"{sorted(DETECTORS)}"
+        ) from None
+
+
+def _detector_type(ctx: StageContext) -> str:
+    """The detector family the project's pack asks for, defaulting to the tone detector."""
+    path = pack_file(ctx, "pack.yaml")
+    try:
+        pack = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except OSError:
+        return "tone"
+    detector = (pack.get("firmware") or {}).get("detector", "tone")
+    if detector not in DETECTORS:
+        raise ValueError(
+            f"{path.name}: unknown firmware detector {detector!r}; expected {sorted(DETECTORS)}"
+        )
+    return detector
 
 
 def _requirements(ctx: StageContext) -> list[Requirement]:
@@ -42,17 +73,20 @@ def propose_firmware(ctx: StageContext) -> None:
     """Materialize a reviewable source snapshot, including all generation inputs."""
     contract_path = ctx.contract_path
     if not contract_path.is_file():
-        local = ctx.root / "packs/buoy/default_contract.json"
-        contract_path = local if local.is_file() else (
-            Path(__file__).resolve().parents[3] / "packs/buoy/default_contract.json"
-        )
+        contract_path = pack_file(ctx, "default_contract.json")
     contract = Contract.model_validate_json(contract_path.read_text())
     duty = {"sample": 0.003, "transmit": 0.0005, "sleep": 0.9965}
     electronics = ctx.build_dir.parent / "electronics/interface.json"
     if electronics.is_file():
         duty = json.loads(electronics.read_text())["facts"].get("duty_cycle", duty)
-    detector = propose_firmware_detector(ctx, _requirements(ctx), default_detector)
-    shutil.copytree(Path(__file__).with_name("templates"), ctx.src_dir, dirs_exist_ok=True,
+    detector_type = _detector_type(ctx)
+    detector = propose_firmware_detector(
+        ctx, _requirements(ctx), detector_type, lambda: default_detector(detector_type)
+    )
+    # Common build system and data generation, then the detector variant's sources.
+    shutil.copytree(TEMPLATES / "common", ctx.src_dir, dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    shutil.copytree(TEMPLATES / detector_type, ctx.src_dir, dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     include = ctx.src_dir / "include"
     include.mkdir(exist_ok=True)
@@ -68,10 +102,15 @@ def propose_firmware(ctx: StageContext) -> None:
             f"#define DUTY_{name.upper()} {value:.12g}\n" for name, value in sorted(duty.items())
         ) + "#endif\n"
     )
-    _write(ctx.src_dir / "config.json", {
+    config = {
         "pins_used": pins, "duty_cycle": duty, "contract_version": contract.version,
         "detector": detector,
-    })
+    }
+    # Recorded only when it differs from the long-standing tone default, so existing
+    # project snapshots keep their exact shape.
+    if detector_type != "tone":
+        config["detector_type"] = detector_type
+    _write(ctx.src_dir / "config.json", config)
     _run([sys.executable, "tools/make_data.py"], ctx.src_dir)
 
 
@@ -93,17 +132,16 @@ class FirmwareStage:
             raise RuntimeError(f"Unity tests missing or unsuccessful:\n{output}")
         # PlatformIO test replaces the native executable with the Unity runner.
         _run(["pio", "run", "-e", "native"], ctx.src_dir)
-        detector = json.loads((ctx.src_dir / "config.json").read_text()).get(
-            "detector", DEFAULT_DETECTOR
-        )
+        config = json.loads((ctx.src_dir / "config.json").read_text())
+        detector_type = config.get("detector_type", "tone")
+        detector = config.get("detector") or default_detector(detector_type)
         detections = {}
         for name in ("tone_in_noise", "quiet"):
-            detections[name] = json.loads(_run(
-                [sys.executable, "tools/replay.py", f"data/{name}.wav",
-                 "--frequency", str(detector["frequency_hz"]),
-                 "--threshold", str(detector["threshold"]),
-                 "--hold", str(detector["hold_s"])], ctx.src_dir
-            ))
+            args = [sys.executable, "tools/replay.py", f"data/{name}.wav"]
+            if detector_type == "tone":
+                args += ["--frequency", str(detector["frequency_hz"])]
+            args += ["--threshold", str(detector["threshold"]), "--hold", str(detector["hold_s"])]
+            detections[name] = json.loads(_run(args, ctx.src_dir))
         truth = json.loads((ctx.src_dir / "data/truth.json").read_text())
         hits = sum(any(start <= t < end for t in detections["tone_in_noise"])
                    for start, end in truth)
