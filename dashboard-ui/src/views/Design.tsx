@@ -4,7 +4,8 @@ import { Card, KV } from "@/components/Bits";
 import { Gate, PageHeader } from "@/components/States";
 import { ModelViewer } from "@/components/ModelViewer";
 
-const FILES = ["hull.stl", "lid.stl"];
+// The buoy builds hull + lid, the deck enclosure body + lid; a file a project lacks is skipped.
+const FILES = ["hull.stl", "body.stl", "lid.stl"];
 
 function Facts({ stage, title }: { stage: string; title: string }) {
   const res = useResource("design", (api) => api.stage(stage), stage);
@@ -18,8 +19,8 @@ export function Design() {
   const files = FILES.map((name) => ({ name, url: api.fileUrl("mechanical", name, versions.design) }));
   return (
     <>
-      <PageHeader title="Design" subtitle="The hull and lid from the mechanical stage, with the facts the stages reported." />
-      <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
+      <PageHeader title="Design" subtitle="The hull or body and the lid from the mechanical stage, with the facts the stages reported." />
+      <div className="grid gap-4 lg:grid-cols-[1fr_26rem]">
         <div>
           <div className="mb-2 flex gap-2">
             <button onClick={() => setLid(!lid)} aria-pressed={lid} className="rounded-md border px-3 py-1 text-xs hover:bg-muted aria-pressed:border-primary aria-pressed:bg-accent">Lid</button>

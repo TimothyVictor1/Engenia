@@ -42,12 +42,12 @@ function List({ items, filter, setFilter, open }: { items: Requirement[]; filter
               {["ID", "Requirement", "Limit", "Measured", "Status"].map((h) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}</tr></thead>
             <tbody>{shown.map((r) => (
               <tr key={r.id} id={r.id} className={`border-t align-top ${open === r.id ? "bg-accent/50" : ""}`}>
-                <th scope="row" className="px-3 py-2 text-left font-mono text-xs font-medium">{r.id}</th>
+                <th scope="row" className="whitespace-nowrap px-3 py-2 text-left font-mono text-xs font-medium">{r.id}</th>
                 <td className="px-3 py-2"><div>{r.statement}</div>
                   <div className="mt-1 font-mono text-[10px] text-muted-foreground">{r.method} · affects {r.affects.join(", ")}</div>
                   {r.verdict?.message && <div className="mt-1 text-xs text-muted-foreground">{r.verdict.message}</div>}</td>
-                <td className="px-3 py-2 font-mono text-xs">{fmtLimit(r.limit)}{r.unit ? ` ${r.unit}` : ""}</td>
-                <td className="px-3 py-2 font-mono text-xs">{r.verdict ? <>{r.verdict.measured == null ? "—" : fmtNumber(r.verdict.measured)}<EvidenceTag level={r.verdict.evidence_level} /></> : "—"}</td>
+                <td className="whitespace-nowrap px-3 py-2 font-mono text-xs tabular-nums">{fmtLimit(r.limit)}{r.unit && r.unit !== "fits" ? ` ${r.unit}` : ""}</td>
+                <td className="whitespace-nowrap px-3 py-2 font-mono text-xs tabular-nums">{r.verdict ? <>{r.verdict.measured == null ? "—" : fmtNumber(r.verdict.measured)}{r.verdict.measured != null && r.unit && r.unit !== "fits" ? <span className="ml-1 text-muted-foreground">{r.unit}</span> : null}<EvidenceTag level={r.verdict.evidence_level} /></> : "—"}</td>
                 <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
               </tr>))}</tbody>
           </table>

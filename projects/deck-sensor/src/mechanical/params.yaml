@@ -1,0 +1,22 @@
+battery_bay_mm:
+- 72.0
+- 42.0
+- 22.0
+board_holes_mm:
+- - 3.0
+  - 3.0
+- - 67.0
+  - 3.0
+- - 3.0
+  - 37.0
+- - 67.0
+  - 37.0
+height_mm: 39.0
+infill_factor: 1.0
+lid_thickness_mm: 4.2
+o_ring_groove_depth_mm: 1.2
+o_ring_groove_width_mm: 2.0
+outer_diameter_mm: 114
+screw_hole_diameter_mm: 3.0
+standoff_height_mm: 6.0
+wall_thickness_mm: 3.0

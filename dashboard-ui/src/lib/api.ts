@@ -4,7 +4,7 @@
 import type {
   ContractData, FilesList, Pipeline, Requirement, ScenariosData, StageDetail,
 } from "./types";
-import type { AgentsResponse, RunSummary } from "./mission";
+import { normalizeAgents, type AgentsResponse, type RunSummary } from "./mission";
 
 export class ApiError extends Error {
   status: number | null;
@@ -96,7 +96,7 @@ export const makeApi = (sample: boolean) => ({
     sample ? sampleStage(name) : json<StageDetail>(`/api/stages/${enc(name)}`, false),
   contract: () => json<ContractData>("/api/contract", sample),
   scenarios: () => json<ScenariosData>("/api/scenarios", sample),
-  agents: () => json<AgentsResponse>("/api/agents", sample),
+  agents: () => json<unknown>("/api/agents", sample).then(normalizeAgents) as Promise<AgentsResponse>,
   runSummary: (runId?: number | string | null) =>
     json<RunSummary>(`/api/run/summary${runId != null && !sample ? `?run_id=${enc(String(runId))}` : ""}`, sample),
   eventsHistory: () => json<{ run_id: number | null; events: unknown[] }>("/api/events/history", sample)

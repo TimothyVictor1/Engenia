@@ -1,6 +1,6 @@
 import { useResource } from "@/lib/store";
-import { fmtNumber } from "@/lib/format";
-import { Card, KV } from "@/components/Bits";
+import { fmtNumber, fmtValue, unitOfKey } from "@/lib/format";
+import { Card } from "@/components/Bits";
 import { Empty, Gate, PageHeader } from "@/components/States";
 
 const FIELDS: [keyof import("@/lib/types").Scenario, string, string][] = [
@@ -21,9 +21,13 @@ export function Scenarios() {
             <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-sm">
               {FIELDS.filter(([k]) => s[k] != null).map(([k, label, unit]) => (
                 <div key={k} className="contents"><dt className="text-muted-foreground">{label}</dt>
-                  <dd className="text-right font-mono text-xs">{fmtNumber(s[k])} <span className="text-muted-foreground">{unit}</span></dd></div>))}
+                  <dd className="text-right font-mono text-xs">{fmtNumber(s[k])}&nbsp;<span className="text-muted-foreground">{unit}</span></dd></div>))}
             </dl>
-            {s.extra && Object.keys(s.extra).length > 0 && <div className="border-t pt-2"><KV data={s.extra} /></div>}
+            {s.extra && Object.keys(s.extra).length > 0 && <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 border-t pt-2 text-sm">
+              {Object.entries(s.extra).map(([k, v]) => (
+                <div key={k} className="contents"><dt className="font-mono text-xs text-muted-foreground">{k}</dt>
+                  <dd className="text-right font-mono text-xs">{fmtValue(v)}{typeof v === "number" && unitOfKey(k) ? <span className="text-muted-foreground"> {unitOfKey(k)}</span> : null}</dd></div>))}
+            </dl>}
             {s.rationale && <p className="text-sm text-muted-foreground">{s.rationale}</p>}
             {s.targets && s.targets.length > 0 && <div className="mt-auto flex flex-wrap gap-1">{s.targets.map((id) => (
               <a key={id} href={`#/requirements/${encodeURIComponent(id)}`} className="rounded border px-1.5 font-mono text-xs hover:border-primary hover:text-primary">{id}</a>))}</div>}

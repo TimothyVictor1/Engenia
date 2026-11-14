@@ -117,3 +117,17 @@ describe("merging history and live events", () => {
     expect(latestRun([older, ...run]).every((e) => e.run_id === 7)).toBe(true);
   });
 });
+
+import { normalizeAgents } from "./mission";
+describe("normalizeAgents", () => {
+  it("adapts the real server shape (name, counts, running/waiting)", () => {
+    const r = normalizeAgents({ project: "p", agents: [
+      { name: "mechanical", role: "design", model: "m", family: "a", kind: "llm", status: "running", stage: "mechanical", phase: "generate", counts: { model_calls: 3, tool_calls: 2, repairs: 1 } },
+      { name: "gate", role: "script", model: "", family: "", kind: "script", status: "idle", stage: null, phase: null, counts: {} },
+    ] });
+    expect(r.agents.map((a) => a.id)).toEqual(["mechanical", "gate"]);
+    expect(r.agents[0]).toMatchObject({ status: "active", calls: 3, tool_calls: 2, repairs: 1, side: "design" });
+    expect(r.agents[1]).toMatchObject({ status: "idle", model: null });
+    expect(r.families.independent).toBe(false);
+  });
+});

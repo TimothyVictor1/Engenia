@@ -11,6 +11,7 @@ import { breakSteps, deriveMission, latestRun, mergeEvents, type AgentsResponse,
 import { useReplay } from "@/lib/replay";
 import { usePresentation } from "@/lib/present";
 import { fmtDuration } from "@/lib/format";
+import { ProjectorToggle } from "@/components/ProjectorToggle";
 import { Section } from "@/components/Bits";
 import { Empty, ErrorState, Loading } from "@/components/States";
 import { Graph, type ArcSpec, type NodeStatus, type NodeView } from "@/components/mission/Graph";
@@ -40,10 +41,13 @@ function usePoll<T>(load: () => Promise<T>, ms: number, key: string): Polled<T> 
   return state;
 }
 
-function nodeStatus(state: StageState | undefined, api: string | undefined, fromEvents: boolean): NodeStatus {
+function nodeStatus(state: StageState | undefined, api: string | undefined, fromEvents: boolean, runHasPhases: boolean): NodeStatus {
   if (state?.active) return "running";
   if (state) {
     if (state.cacheHit === true) return "cached";
+    // Live phase events win. Only a run with no phase events at all (an old server that streams
+    // "started"/"done" messages) falls back to the server's stage status.
+    if (!runHasPhases && (api === "done" || api === "failed" || api === "blocked")) return api;
     const failing = state.checks.some((c) => c.result !== "pass");
     const published = state.phases.some((p) => p.phase === "publish" && p.result === "ok");
     if (failing && !published) return "failed";
@@ -130,9 +134,10 @@ export function Mission() {
   }, [pipeline.data, mission.stages]);
   const nodes: NodeView[] = useMemo(() => {
     const api_ = new Map((pipeline.data?.stages ?? []).map((s) => [s.name, s]));
+    const runHasPhases = Object.values(mission.stages).some((s) => s.phases.length > 0);
     return [...names].map((name) => ({
       name, needs: api_.get(name)?.needs ?? [], state: mission.stages[name] ?? null, attempts: api_.get(name)?.attempts ?? null,
-      status: nodeStatus(mission.stages[name], api_.get(name)?.status, replaying || sample === true || events.length > 0),
+      status: nodeStatus(mission.stages[name], api_.get(name)?.status, replaying || sample === true || events.length > 0, runHasPhases),
     }));
   }, [names, pipeline.data, mission.stages, replaying, sample, events.length]);
   // The summary describes the end of the run. While replaying it must not leak that end state
@@ -188,6 +193,7 @@ export function Mission() {
             <button onClick={replay.live} className="rounded-md border px-3 py-1 hover:bg-muted">Back to live</button>
           ) : (
             <button onClick={replay.start} className="flex items-center gap-1.5 rounded-md border px-3 py-1 hover:bg-muted"><RotateCcw className="h-3.5 w-3.5" /> Replay this run</button>))}
+          {present && <ProjectorToggle />}
           <button onClick={() => setPresent(!present)} aria-pressed={present} className="flex items-center gap-1.5 rounded-md border px-3 py-1 hover:bg-muted">
             {present ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}{present ? "Exit presentation" : "Presentation mode"}</button>
         </div>

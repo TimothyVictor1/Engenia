@@ -1,0 +1,14 @@
+depth_m: 5.0
+extra:
+  air_temp_c: -10.0
+name: baltic_winter
+rationale: 'Cold brackish water with short winter chop: the power budget and the metacentric
+  height must hold at low temperature and density.'
+targets:
+- R-006
+- R-007
+- R-011
+water_density: 1003.0
+water_temp_c: 2.0
+wave_height_m: 0.5
+wave_period_s: 4.5

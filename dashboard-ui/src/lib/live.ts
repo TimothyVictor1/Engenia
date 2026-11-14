@@ -56,7 +56,7 @@ export interface Studio {
   spans: Span[];
   decisions: DecisionCard[];
   code: CodeFile | null;
-  preview: { stage: string; files: string[]; ts: string } | null;
+  preview: { stage: string; files: string[]; url: string | null; ts: string } | null;
   feed: LiveEvent[];
   start: number;
   end: number;
@@ -133,7 +133,7 @@ export function deriveStudio(events: LiveEvent[]): Studio {
       code = { path, language: str(e.data.language) || "python", code: text, diff, ts: e.ts };
     } else if (e.kind === "preview") {
       const list = strings(e.data.files).concat(e.data.file ? [str(e.data.file)] : []);
-      preview = { stage: str(e.data.stage) || e.stage, files: list.filter((f) => f.endsWith(".stl")), ts: e.ts };
+      preview = { stage: str(e.data.stage) || e.stage, files: list.filter((f) => f.endsWith(".stl")), url: typeof e.data.stl === "string" && e.data.stl.startsWith("/api/") ? e.data.stl : null, ts: e.ts };
     }
   }
   return {

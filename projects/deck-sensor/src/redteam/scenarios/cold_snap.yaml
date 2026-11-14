@@ -1,0 +1,14 @@
+depth_m: null
+extra:
+  air_temp_c: -20.0
+name: cold_snap
+rationale: Winter night on an exposed deck at -20 C. Lithium-polymer capacity drops
+  sharply at low temperature, so the endurance minimum must still hold, and the printed
+  enclosure must not crack. Without wave or water fields, a deck-mounted box does
+  not float, so the wave and flow solvers skip this scenario.
+targets:
+- R-003
+water_density: null
+water_temp_c: -20.0
+wave_height_m: null
+wave_period_s: null

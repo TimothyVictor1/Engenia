@@ -1,0 +1,14 @@
+depth_m: 6.0
+extra:
+  wind_speed_ms: 20.0
+name: storm
+rationale: 'Design storm in open water: the worst case for tilt limits and hull stress
+  at depth.'
+targets:
+- R-006
+- R-011
+- R-012
+water_density: 1005.0
+water_temp_c: 12.0
+wave_height_m: 2.0
+wave_period_s: 8.0

@@ -1,6 +1,6 @@
 import { useResource } from "@/lib/store";
 import type { ContractData } from "@/lib/types";
-import { flatten, fmtValue } from "@/lib/format";
+import { flatten, fmtNumber, fmtValue } from "@/lib/format";
 import { Card, KV, Section } from "@/components/Bits";
 import { Empty, Gate, PageHeader } from "@/components/States";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -35,7 +35,7 @@ function findFact(facts: Record<string, unknown> | undefined, budgetKey: string)
 }
 
 const Quantity = ({ value, unit }: { value: unknown; unit: string }) => (
-  <span className="font-mono text-xs">{Array.isArray(value) && value.every((x) => typeof x === "number") ? value.join(" × ") : fmtValue(value)}
+  <span className="font-mono text-xs">{Array.isArray(value) && value.every((x) => typeof x === "number") ? value.map(fmtNumber).join(" × ") : fmtValue(value)}
     {unit && <span className="ml-1 text-muted-foreground">{unit}</span>}</span>
 );
 

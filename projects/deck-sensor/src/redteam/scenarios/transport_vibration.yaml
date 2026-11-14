@@ -1,0 +1,16 @@
+depth_m: null
+extra:
+  road_transport_hours: 8.0
+  vibration_g_rms: 2.0
+name: transport_vibration
+rationale: Road transport to the installation site, 2 g rms broadband vibration for
+  a full working day. The vibration sensing channel must still separate the reference
+  vibration tone from transport noise at the required detection rate. Without wave
+  or water fields, a deck-mounted box does not float, so the wave and flow solvers
+  skip this scenario.
+targets:
+- R-008
+water_density: null
+water_temp_c: 20.0
+wave_height_m: null
+wave_period_s: null

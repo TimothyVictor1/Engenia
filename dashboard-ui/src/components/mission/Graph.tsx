@@ -63,8 +63,8 @@ function Node({ n, x, y, k, selected, onSelect }: { n: NodeView; x: number; y: n
       className={`absolute rounded-lg border bg-card p-2.5 text-left shadow-sm transition-shadow ${selected ? "ring-2 ring-primary" : ""} ${n.status === "running" ? "border-info shadow-info/30 shadow-md" : ""} ${n.status === "failed" ? "border-destructive/60" : ""} ${n.status === "blocked" || n.status === "pending" ? "border-dashed opacity-80" : ""}`}>
       <button onClick={onSelect} aria-pressed={selected} aria-label={`${n.name}: ${n.status}`} className="absolute inset-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-primary" />
       <div className="pointer-events-none relative flex items-center justify-between gap-1">
-        <span className="truncate font-mono text-[13px] font-semibold">{n.name}</span>
-        <span className={`font-mono text-[10px] font-medium ${STATUS_CLASS[n.status] ?? ""}`}>{n.status === "running" && s?.active ? s.active : n.status.replace("_", " ")}</span>
+        <span className="truncate font-mono text-[15px] font-semibold">{n.name}</span>
+        <span className={`font-mono text-[11px] font-medium ${STATUS_CLASS[n.status] ?? ""}`}>{n.status === "running" && s?.active ? s.active : n.status.replace("_", " ")}</span>
       </div>
       <div className="pointer-events-none relative mt-0.5 flex flex-wrap items-center gap-1 text-[10px] text-muted-foreground">
         {s?.cacheHit === true && <span className="rounded-full border border-success/50 px-1.5 text-success">cache hit</span>}
@@ -170,7 +170,7 @@ export function Graph({ nodes, mission, arcs, selected, onSelect, fill }: {
         onPointerDown={(e) => { if ((e.target as HTMLElement).closest("button")) return; drag.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y }; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); }}
         onPointerMove={(e) => { const d = drag.current; if (d) { setTouched(true); setView((v) => ({ ...v, x: d.vx + e.clientX - d.x, y: d.vy + e.clientY - d.y })); } }}
         onPointerUp={() => { drag.current = null; }}
-        className={`engineering-grid relative overflow-hidden rounded-lg border bg-surface outline-none focus-visible:ring-2 focus-visible:ring-primary ${fill ? "h-[calc(100vh-24rem)] min-h-96" : "h-[34rem]"} cursor-grab active:cursor-grabbing`}>
+        className={`engineering-grid relative overflow-hidden rounded-lg border bg-surface outline-none focus-visible:ring-2 focus-visible:ring-primary ${fill ? "h-[calc(100vh-24rem)] min-h-96" : "h-[max(34rem,min(56rem,calc(100vh-13rem)))]"} cursor-grab active:cursor-grabbing`}>
         <div style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.k})`, transformOrigin: "0 0", width: place.width, height: place.height }} className="absolute left-0 top-0">
           {BANDS.map((b) => { const box = bandBox(b.cols); return (
             <div key={b.id} data-band={b.id} style={{ left: box.left, width: box.width, top: 6, height: place.nodesHeight - 12 }} className={`absolute rounded-xl border border-dashed ${BAND_TINT[b.id]}`}>
@@ -179,7 +179,7 @@ export function Graph({ nodes, mission, arcs, selected, onSelect, fill }: {
           {lanes.length > 1 && (() => { const p = place.pos.get(lanes[0].name)!; return (
             <div style={{ left: p.x - 8, top: p.y - 12, width: 4, height: lanes.length * (H + GY) - GY + 24 }} className="absolute rounded bg-primary/30" aria-hidden="true" />); })()}
           {lanes.length > 1 && (() => { const p = place.pos.get(lanes[0].name)!; return (
-            <div style={{ left: p.x, top: p.y - 14 }} className="absolute font-mono text-[10px] text-primary" data-testid="lanes">{lanes.length} parallel lanes · {activeLanes} active</div>); })()}
+            <div style={{ left: p.x, top: p.y - 24 }} className="absolute font-mono text-[10px] text-primary" data-testid="lanes">{lanes.length} parallel lanes · {activeLanes} active</div>); })()}
           <svg width={place.width} height={place.height} className="pointer-events-none absolute left-0 top-0" aria-hidden="true">
             <defs>{(["ok", "bad", "warn", "info"] as const).map((t) => (
               <marker key={t} id={`arrow-${t}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" className={TONE_FILL[t]} /></marker>))}
@@ -215,7 +215,7 @@ export function Graph({ nodes, mission, arcs, selected, onSelect, fill }: {
           {nodes.map((n) => { const p = place.pos.get(n.name)!; return <Node key={n.name} n={n} x={p.x} y={p.y} k={view.k} selected={selected === n.name} onSelect={() => onSelect(selected === n.name ? null : n.name)} />; })}
         </div>
       </div>
-      <div className="absolute right-2 top-2 flex flex-col gap-1">
+      <div className="absolute bottom-2 right-2 flex flex-col gap-1">
         <Tip text="Scroll or pinch to zoom; drag to pan. Zoom in to read each stage's phase timings." align="right">
           <button onClick={() => zoomAt(1.25)} aria-label="Zoom in" className="rounded-md border bg-card p-1.5 hover:bg-muted"><Plus className="h-4 w-4" /></button></Tip>
         <button onClick={() => zoomAt(1 / 1.25)} aria-label="Zoom out" className="rounded-md border bg-card p-1.5 hover:bg-muted"><Minus className="h-4 w-4" /></button>

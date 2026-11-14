@@ -12,6 +12,7 @@ import { Requirements } from "./views/Requirements";
 import { Contract } from "./views/Contract";
 import { Scenarios } from "./views/Scenarios";
 import { Files } from "./views/Files";
+import { ProjectorToggle } from "./components/ProjectorToggle";
 
 // three.js is large and only two views need it: load it when one of them opens.
 const Design = lazy(() => import("./views/Design").then((m) => ({ default: m.Design })));
@@ -39,13 +40,14 @@ function Header() {
         {pipeline.data?.project ?? (sample ? "harbour-listener" : "—")}
       </span>
       <div className="ml-auto flex items-center gap-4 text-xs">
+        <ProjectorToggle />
         <span className="flex items-center gap-1.5 text-muted-foreground" role="status">
           <span className={`h-2 w-2 rounded-full ${dot}`} /> {label}
         </span>
         <label className="flex cursor-pointer items-center gap-2 font-medium">
           <input type="checkbox" className="h-4 w-4 accent-[var(--primary)]" checked={sample === true}
             disabled={sample === null} onChange={(e) => setSample(e.target.checked)} />
-          Sample data
+          Use sample data
         </label>
       </div>
     </header>
@@ -68,7 +70,7 @@ function Shell() {
     );
   }
   return (
-    <div className="flex min-h-screen w-full flex-col md:flex-row">
+    <div className="flex min-h-screen w-full flex-col overflow-x-clip md:flex-row">
       <aside className="shrink-0 border-b bg-surface md:w-56 md:border-b-0 md:border-r">
         <a href="#/pipeline" className="flex h-14 items-center gap-2.5 border-b px-4">
           <img src={brand} alt="" width={28} height={28} className="h-7 w-7" />
