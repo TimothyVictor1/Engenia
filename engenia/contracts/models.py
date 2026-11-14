@@ -106,6 +106,8 @@ class Requirement(_Model):
     verify: VerifySpec
     affects: list[StageName] = Field(min_length=1)
     status: RequirementStatus
+    origin: Literal["user", "derived"] = "user"
+    reason: str | None = None
 
     @model_validator(mode="after")
     def _check_rules(self) -> Requirement:
@@ -198,6 +200,7 @@ class Verdict(_Model):
     evidence_level: EvidenceLevel
     artifact: str | None = Field(default=None, pattern=SHA256_PATTERN)
     message: str | None = None
+    margin_pct: float | None = None
 
 
 class CheckPlanItem(_Model):
