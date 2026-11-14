@@ -140,3 +140,20 @@ def test_every_stage_that_reads_another_stages_output_lists_it_in_needs():
             if other not in stage.needs:
                 missing.append(f"{name} reads {other} but needs {stage.needs}")
     assert not missing, "\n".join(missing)
+
+
+def test_a_library_that_installs_a_signal_handler_can_run_in_a_worker(root, fake_registry):
+    """gmsh calls signal.signal when it starts; in a worker thread that raises ValueError."""
+    import signal
+
+    registry = fake_registry()
+    original = registry["firmware"].build
+
+    def build(ctx):
+        signal.signal(signal.SIGUSR2, signal.SIG_DFL)  # raises in a plain worker thread
+        original(ctx)
+
+    registry["firmware"].build = build
+    assert execute(PROJECT, root, registry=registry, workers=3).ok
+    assert signal.signal.__name__ == "signal"  # the real function is back afterwards
+    assert signal.signal(signal.SIGUSR2, signal.SIG_DFL) == signal.SIG_DFL  # main thread works
