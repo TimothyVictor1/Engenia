@@ -1,0 +1,10 @@
+{
+  "budgets.electronics.bay_mm": "pack default",
+  "budgets.electronics.energy_mwh_per_day": "pack default",
+  "budgets.electronics.mass_g": "R-003",
+  "budgets.firmware.flash_kb": "pack default",
+  "budgets.firmware.ram_kb": "pack default",
+  "budgets.mechanical.mass_g": "R-003",
+  "budgets.mechanical.outer_envelope_mm": "pack default",
+  "totals.mass_g_max": "R-003"
+}

@@ -1,0 +1,10 @@
+id: R-003
+statement: The total mass of the duct shall not exceed 150 g.
+value: 150
+unit: g
+verify:
+  method: analysis
+  check: mass_budget
+  limit: {max: 150}
+affects: [mechanical]
+status: approved

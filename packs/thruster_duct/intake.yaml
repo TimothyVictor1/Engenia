@@ -1,0 +1,59 @@
+# Deterministic intake for the thruster_duct pack (used when no design model is configured).
+# Same shape as packs/buoy/intake.yaml. Rule keys beyond it:
+#   value_group: which number the pattern found is the requirement's value (default 1);
+#   bounds: {min: 2, max: 3}: a band limit, each bound the number of that pattern group;
+#   {n1}, {n2}...: in a statement, the numbers the pattern's groups found, in order.
+# The clearance and thrust requirements carry the propeller, the flange bolts and the thrust in
+# their statements, which the pack's proposer and the verifiers read (engenia.sim.duct).
+requirements:
+  - name: tip_clearance
+    pattern: '(\d+(?:\.\d+)?)\s*mm\s+prop\w*\D{0,30}?(\d+(?:\.\d+)?)\s*(?:-|to|–)\s*(\d+(?:\.\d+)?)\s*mm\s+(?:tip\s+)?clearance'
+    statement: The duct shall fit a {n1} mm propeller with a tip clearance of {n2} to {n3} mm.
+    unit: mm
+    method: analysis
+    check: prop_clearance
+    bounds: {min: 2, max: 3}
+    affects: [mechanical]
+  - name: flange_thrust_bolts
+    pattern: '(\d+)\s*[x×]\s*M(\d+(?:\.\d+)?)\D{0,40}?(\d+(?:\.\d+)?)\s*N\b\D{0,20}?thrust\D{0,30}?safety factor\D{0,10}?(\d+(?:\.\d+)?)'
+    statement: The {n1} x M{n2} flange shall carry {n3} N of thrust with a bending safety factor of at least {value}.
+    unit: ratio
+    method: analysis
+    check: bending_stress
+    bound: min
+    value_group: 4
+    affects: [mechanical]
+  - name: flange_thrust
+    pattern: '^(?!.*\d+\s*[x×]\s*M\d).*?(\d+(?:\.\d+)?)\s*N\b\D{0,20}?thrust\D{0,30}?safety factor\D{0,10}?(\d+(?:\.\d+)?)'
+    statement: The flange shall carry {n1} N of thrust with a bending safety factor of at least {value}.
+    unit: ratio
+    method: analysis
+    check: bending_stress
+    bound: min
+    value_group: 2
+    affects: [mechanical]
+  - name: mass
+    pattern: '(?:mass|weigh\w*|under|below|less than|lighter than)\D{0,40}?(\d+(?:\.\d+)?)\s*(?:g|grams?)\b'
+    statement: The total mass of the duct shall not exceed {value} g.
+    unit: g
+    method: analysis
+    check: mass_budget
+    bound: max
+    affects: [mechanical]
+  - name: wall_thickness
+    pattern: 'wall\D{0,60}?(\d+(?:\.\d+)?)\s*mm\b'
+    statement: The duct shall have a minimum wall thickness of at least {value} mm.
+    unit: mm
+    method: analysis
+    check: wall_thickness_min
+    bound: min
+    affects: [mechanical]
+  - name: print_bed_fit
+    pattern: '(?:print\w*|3d)\W+(?:bed|printer)|fit\w*\W+(?:on|in|within)\W+(?:the\W+|a\W+)?(?:print\w*|3d)'
+    statement: The duct shall fit within the print bed.
+    unit: ratio
+    method: analysis
+    check: print_bed_fit
+    bound: equals
+    value: 1
+    affects: [mechanical]

@@ -1,0 +1,10 @@
+id: R-004
+statement: The duct shall have a minimum wall thickness of at least 1.5 mm.
+value: 1.5
+unit: mm
+verify:
+  method: analysis
+  check: wall_thickness_min
+  limit: {min: 1.5}
+affects: [mechanical]
+status: approved

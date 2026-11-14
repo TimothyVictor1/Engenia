@@ -1,0 +1,10 @@
+name: thrust_surge
+water_temp_c: 12.0
+extra:
+  load_factor: 2.0
+  note: full-throttle reversal
+rationale: A full-throttle reversal or a propeller stall can send up to twice the steady thrust
+  through the flange for an instant (an allowance, not a hydrodynamic calculation). The flange
+  must hold its bending safety factor at twice the thrust. The pack sizes the flange for it and
+  the bending_stress verifier applies the same factor.
+target_checks: [bending_stress]

@@ -101,3 +101,18 @@ def test_the_allowable_comes_from_the_packs_structure_block(setup, tmp_path):
     verdict = load("bending_stress")(setup(STATEMENT, pack="stiff"))
     assert verdict.measured == pytest.approx(expected(0.5 * G, 150, 0, 5, 20, allowable=35.0))
     assert not math.isnan(verdict.measured)
+
+
+def test_a_force_with_no_distance_takes_its_lever_from_the_facts(setup, write_interface):
+    ctx = setup("The 4 x M4 flange shall carry 15 N of thrust with a bending safety factor of 3.",
+                pack="buoy", params={})
+    write_interface("mechanical", {"bending_root_section_mm": [274.0, 3.2],
+                                   "bending_root_offset_mm": 0.0, "bending_lever_mm": 6.8})
+    assert load("bending_stress")(ctx).measured == pytest.approx(
+        expected(15.0, 6.8, 0.0, 274.0, 3.2))
+
+
+def test_a_thrust_with_no_lever_fact_is_an_error(setup):
+    ctx = setup("The flange shall carry 15 N of thrust.", pack="buoy")
+    verdict = load("bending_stress")(ctx)
+    assert verdict.result == "error" and "bending_lever_mm" in verdict.message

@@ -1,0 +1,6 @@
+- id: SIM-FLOW
+  requirement: null
+  scenarios:
+  - debris_and_swell
+  - thrust_surge
+  solver: flow

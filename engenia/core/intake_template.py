@@ -47,7 +47,8 @@ def match_rules(
 
     `numbers` are the numbers the pattern's groups found, in order (empty when it has none).
     `value` is what the requirement carries: the rule's fixed `value`, else its `limit`, else
-    the number of group `value_group` (1 is the first, the default)."""
+    the first bound of a band, else the number of group `value_group` (1 is the first, the
+    default). A rule with `bounds: {min: 2, max: 3}` makes a band limit from those groups."""
     clauses = [c.strip() for c in _CLAUSES.split(text) if c.strip()]
     found = []
     for rule in rules:
@@ -59,6 +60,8 @@ def match_rules(
                 given = [g for g in match.groups() if g is not None]
                 numbers = [_number(g) for g in given]
                 fixed = rule.get("value", rule.get("limit"))
+                if fixed is None and "bounds" in rule:  # a band: the value is its first bound
+                    fixed = numbers[int(next(iter(rule["bounds"].values()))) - 1]
                 if fixed is None:
                     fixed = numbers[int(rule.get("value_group", 1)) - 1]
                 found.append((rule, fixed, numbers))
@@ -98,7 +101,10 @@ def template_intake(text: str, project: str, root: Path, *, pack: str = "buoy") 
             "verify": {
                 "method": rule["method"],
                 "check": rule["check"],
-                "limit": {rule["bound"]: value},
+                "limit": (
+                    {name: numbers[int(group) - 1] for name, group in rule["bounds"].items()}
+                    if "bounds" in rule else {rule["bound"]: value}
+                ),
             },
             "affects": list(rule["affects"]),
             "status": "draft",

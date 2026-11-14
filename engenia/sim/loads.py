@@ -44,12 +44,20 @@ def parse_load(statement: str) -> PointLoad | None:
     return PointLoad(newtons, float(lever.group(1)), diameter)
 
 
-def scenario_load_factor(pack_dir: Path, check: str) -> float:
-    """The largest `extra.load_factor` among the pack's red-team scenarios that target `check`
-    (1 when none does). A gust or an ice load multiplies the load the requirement states."""
-    factor = 1.0
+def scenario_extra_max(pack_dir: Path, check: str, key: str, default: float) -> float:
+    """The largest `extra[key]` among the pack's red-team scenarios that target `check`
+    (`default` when none carries it). Scenarios are static pack files, so a verifier and a
+    proposer that read them cannot disagree and need not wait for a stage."""
+    value = default
     for path in sorted((Path(pack_dir) / "scenarios").glob("*.yaml")):
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-        if check in (data.get("target_checks") or []):
-            factor = max(factor, float((data.get("extra") or {}).get("load_factor", 1.0)))
-    return factor
+        extra = data.get("extra") or {}
+        if check in (data.get("target_checks") or []) and key in extra:
+            value = max(value, float(extra[key]))
+    return value
+
+
+def scenario_load_factor(pack_dir: Path, check: str) -> float:
+    """The largest `extra.load_factor` of the scenarios that target `check` (1 when none does).
+    A gust or a thrust surge multiplies the load the requirement states."""
+    return scenario_extra_max(pack_dir, check, "load_factor", 1.0)
