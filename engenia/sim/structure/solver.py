@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import math
 import re
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -28,42 +32,30 @@ def _depth(ctx) -> float:
 
 
 def _mesh(step: Path) -> MeshTet:
-    try:
-        import gmsh
-    except ImportError as exc:
+    # gmsh runs in a fresh interpreter: its bundled OpenCASCADE crashes the process
+    # if it shares one with build123d's OCP. This module must never import gmsh.
+    with tempfile.TemporaryDirectory() as work:
+        request, result = Path(work) / "request.json", Path(work) / "mesh.json"
+        request.write_text(json.dumps({"step": str(step), "mesh_size_mm": MESH_SIZE_MM}))
+        proc = subprocess.run(
+            [sys.executable, "-m", "engenia.sim.structure._mesh_worker",
+             str(request), str(result)],
+            capture_output=True, text=True, check=False,
+        )
+        if proc.returncode != 0 or not result.exists():
+            raise RuntimeError(
+                f"gmsh meshing process failed (exit {proc.returncode}): "
+                f"{proc.stderr.strip()[-500:]}"
+            )
+        data = json.loads(result.read_text())
+    if data.get("error") == "import":
         raise RuntimeError(
             "structural simulation not_run: gmsh needs its system libraries, including GLU"
-        ) from exc
-    gmsh.initialize(interruptible=False)  # no signal handler: off the main thread is safe
-    try:
-        gmsh.option.setNumber("General.Terminal", 0)
-        gmsh.option.setNumber("Mesh.RandomSeed", 0)
-        gmsh.option.setNumber("Mesh.CharacteristicLengthMin", MESH_SIZE_MM)
-        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", MESH_SIZE_MM)
-        gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
-        gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
-        gmsh.option.setNumber("Mesh.Algorithm3D", 1)
-        gmsh.model.add("hull")
-        gmsh.model.occ.importShapes(str(step))
-        gmsh.model.occ.synchronize()
-        gmsh.model.mesh.generate(3)
-        node_tags, coordinates, _ = gmsh.model.mesh.getNodes()
-        lookup = {int(tag): i for i, tag in enumerate(node_tags)}
-        tetrahedra = []
-        for element_type, _, node_blocks in zip(*gmsh.model.mesh.getElements(3), strict=True):
-            if gmsh.model.mesh.getElementProperties(element_type)[0].startswith("Tetrahedron"):
-                nodes_per = gmsh.model.mesh.getElementProperties(element_type)[3]
-                if nodes_per != 4:
-                    continue
-                tetrahedra.extend(
-                    [lookup[int(tag)] for tag in cell]
-                    for cell in node_blocks.reshape(-1, 4)
-                )
-        if not tetrahedra:
-            raise ValueError("STEP meshing produced no linear tetrahedra")
-        return MeshTet(coordinates.reshape(-1, 3).T, np.asarray(tetrahedra).T)
-    finally:
-        gmsh.finalize()
+        )
+    if not data["tetrahedra"]:
+        raise ValueError("STEP meshing produced no linear tetrahedra")
+    coordinates = np.asarray(data["coordinates"], dtype=float)
+    return MeshTet(coordinates.reshape(-1, 3).T, np.asarray(data["tetrahedra"]).T)
 
 
 def _tetra_volumes(mesh: MeshTet) -> np.ndarray:
@@ -82,8 +74,6 @@ def _material(ctx) -> dict:
 def _geometry(ctx, mesh: MeshTet) -> tuple[float, float]:
     path = ctx.stage_build_dir("mechanical") / "interface.json"
     if path.exists():
-        import json
-
         facts = json.loads(path.read_text())["facts"]
         return facts["bbox_mm"][0] / 2, facts["wall_min_mm"]
     # Fixture projects can provide the same dimensions through mechanical params.
