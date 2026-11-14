@@ -4,8 +4,10 @@ import { Card, KV } from "@/components/Bits";
 import { Gate, PageHeader } from "@/components/States";
 import { ModelViewer } from "@/components/ModelViewer";
 
-// The buoy builds hull + lid, the deck enclosure body + lid; a file a project lacks is skipped.
-const FILES = ["hull.stl", "body.stl", "lid.stl"];
+// The buoy builds hull + lid, the deck enclosure body + lid, the sensor pod a tube and two caps,
+// the bracket and the thruster duct one part each; a file a project lacks is skipped.
+const FILES = ["hull.stl", "body.stl", "lid.stl", "tube.stl", "cap_rear.stl", "cap_front.stl",
+  "bracket.stl", "duct.stl"];
 
 function Facts({ stage, title }: { stage: string; title: string }) {
   const res = useResource("design", (api) => api.stage(stage), stage);
@@ -19,7 +21,7 @@ export function Design() {
   const files = FILES.map((name) => ({ name, url: api.fileUrl("mechanical", name, versions.design) }));
   return (
     <>
-      <PageHeader title="Design" subtitle="The hull or body and the lid from the mechanical stage, with the facts the stages reported." />
+      <PageHeader title="Design" subtitle="The printed parts from the mechanical stage (hull, body, tube, caps, bracket or duct), with the facts the stages reported." />
       <div className="grid gap-4 lg:grid-cols-[1fr_26rem]">
         <div>
           <div className="mb-2 flex gap-2">

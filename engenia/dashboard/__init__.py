@@ -1,5 +1,5 @@
 """Read-only live dashboard API. Start with python -m engenia.dashboard."""
 
-from engenia.dashboard.app import create_app
+from engenia.dashboard.app import create_app, create_multi_app
 
-__all__ = ["create_app"]
+__all__ = ["create_app", "create_multi_app"]

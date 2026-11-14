@@ -115,7 +115,7 @@ Counts on `main`:
 - 8 agent folders. 6 of them can call a model: `intake`, `verify_plan`, `architect`, `mechanical`, `electronics`, `firmware`. 2 are deterministic (`redteam`, `testplan`).
 - 5 stages are scripts: `integration`, `simprep`, `simulation`, `final`, `report`. `final` has one optional model call, the advisory audit note.
 - 2 more model call sites that are not agents: the repair loop (`engenia/harness/repair.py`, design model) and the audit note (verification model).
-- Deciding code: 16 verifier scripts in `verifiers/` (13 design checks and 3 `measured_*` checks) and the gate in `engenia/gate/`. No model is ever called there.
+- Deciding code: 18 verifier scripts in `verifiers/` (15 design checks and 3 `measured_*` checks) and the gate in `engenia/gate/`. No model is ever called there.
 
 ## 5. Verification in three layers
 
@@ -174,7 +174,7 @@ The planted-defect suite (`evals/faults/`, ten faults F01 to F10) checks the che
 
 ## 7. Example projects
 
-Both projects live in `projects/`. The numbers below come from running the commands on `main` at commit `4758b43` on an Apple-silicon Mac (Python 3.12.5), in deterministic mode: no model was configured, so every `proposer` fact in the interfaces reads `deterministic`. A run with models configured can pick different design parameters. The check plans are the same, so the limits do not change.
+The first two projects, 7.1 and 7.2, live in `projects/`. The numbers below come from running the commands on `main` at commit `4758b43` on an Apple-silicon Mac (Python 3.12.5), in deterministic mode: no model was configured, so every `proposer` fact in the interfaces reads `deterministic`. A run with models configured can pick different design parameters. The check plans are the same, so the limits do not change.
 
 ```bash
 uv run engenia run harbour-listener      # 12 stages ran, 44 s; a second run restored 11 of 12 from the cache
@@ -283,6 +283,20 @@ No requirement limits drag; it is reported in the simulation facts.
 
 *Enclosure body (blue) and lid (orange), lid raised 50 mm for the picture.*
 
+### 7.3 Product packs and their example projects
+
+Five product packs exist in `packs/`. A project picks one with `pack: <name>` in `projects/<p>/project.yaml`, and every pack ships an example project that passes `engenia run` and `engenia gate` with no model (the deterministic fallback). The three newest packs build from a pack-owned Python module (`module:` in `pack.yaml`) that sizes every dimension from the contract and the requirements and logs a decision for each choice.
+
+| Pack | Product | Example project | In one line |
+|---|---|---|---|
+| `buoy` | Floating hydrophone buoy | `harbour-listener` | Hull, lid, mast housing; tone detector; waves, structure and flow solvers |
+| `enclosure` | Deck-mounted sensor box | `deck-sensor` | Gasketed rectangular box; block-RMS threshold detector |
+| `pressure_housing` | Watertight cylindrical sensor pod | `sensor-pod` | Tube and two plug end caps on O-rings from a standard table, optional cable-gland boss; stress safety factor at depth from the structure solver, with max-depth and cold-water scenarios |
+| `bracket` | Mast clamp or L-bracket | `antenna-bracket` | Clamp diameter, mounting holes and fillets; the new `bending_stress` check (cantilever root stress against the printed PETG allowable); no electronics, so those stages are skipped |
+| `thruster_duct` | Kort-nozzle-like duct around a small thruster propeller | `thruster-duct` | Mounting flange with bolt holes; the new `prop_clearance` check (tip clearance inside a band); the flange is checked with `bending_stress` |
+
+`engenia new` writes `project.yaml` for `pressure_housing`, `bracket` and `thruster_duct`; `enclosure` projects add it by hand. A pack's `skip_stages: [electronics, firmware]` makes those stages publish `not_applicable` and drops the checks that need them. Details: `packs/<pack>/README.md` and `projects/<project>/README.md`.
+
 ## 8. Quick start
 
 ### Codespaces
@@ -335,7 +349,7 @@ All commands are `uv run engenia <command>`. Run `engenia <command> --help` for 
 |---|---|---|---|
 | `lint <project>` | | Validates and lints the spec. Exits 1 on any error. | `engenia lint harbour-listener` |
 | `intake <request>` | `-p/--project` (required), `--pack` (default `buoy`) | Turns a plain-language request into draft `spec/R-xxx.yaml` files that pass lint. Uses the design model if configured, else the pack template. Files are always drafts. | `engenia intake "A buoy that hears a 200 Hz tone" -p my-buoy` |
-| `new <request>` | `-p/--project` (required), `--pack` (`buoy` or `enclosure`), `-y/--yes`, `-j/--workers` | Creates a project and goes from request to release: intake, approve requirements, run, approve check plan, gate with repair loop, release. Asks at each approval unless `--yes`. Never applies a change proposal. | `engenia new "A deck sensor box" -p my-box --pack enclosure` |
+| `new <request>` | `-p/--project` (required), `--pack` (`buoy`, `enclosure`, `pressure_housing`, `bracket` or `thruster_duct`), `-y/--yes`, `-j/--workers` | Creates a project and goes from request to release: intake, approve requirements, run, approve check plan, gate with repair loop, release. Asks at each approval unless `--yes`. Never applies a change proposal. | `engenia new "A deck sensor box" -p my-box --pack enclosure` |
 | `run <project>` | `-j/--workers` (default 4), `--resume`, `--repair` | Runs every stage in dependency order, independent stages in parallel, rerunning only what changed. `--resume` continues the last unfinished run. `--repair` runs the gate, asks the design model to repair failing stages (3 rounds), then writes requirement change proposals. | `engenia run harbour-listener -j 2 --repair` |
 | `approve <project>` | `--proposal <R-xxx>`, `-y/--yes` | Shows what changed, then copies `checks/checks.sha256` to `checks/APPROVED`. With `--proposal`, accepts `spec/proposals/R-xxx.yaml` into `spec/` as approved. | `engenia approve my-buoy` |
 | `gate <project>` | | Runs the approval check, G1 to G5 and the coverage lists. Exit 0 only on pass. Writes `build/gate/report.json`. | `engenia gate harbour-listener` |
@@ -356,7 +370,7 @@ uv run python -m engenia.dashboard --project harbour-listener            # http:
 uv run python -m engenia.dashboard --project harbour-listener --host 0.0.0.0 --port 8080
 ```
 
-Flags: `--project` (required), `--port` (default 8080), `--host` (default 127.0.0.1). The React source is in `dashboard-ui/`; the built files are committed in `engenia/dashboard/static/`. A **Sample data** toggle (or `?sample=1`) shows bundled sample data when no project has been built.
+Flags: `--project` (required unless `--all`), `--all`, `--port` (default 8080), `--host` (default 127.0.0.1). With `--all` (`uv run python -m engenia.dashboard --all`) one server shows every project with requirements at `/p/<name>/`, `--project` picks the one opened first, and a **project switcher** in the header moves between them (harbour-listener, deck-sensor, sensor-pod, antenna-bracket, thruster-duct). `GET /api/projects` lists them. The React source is in `dashboard-ui/`; the built files are committed in `engenia/dashboard/static/`. A **Sample data** toggle (or `?sample=1`) shows bundled sample data when no project has been built.
 
 | View | Shows |
 |---|---|
@@ -415,9 +429,9 @@ engenia/                  Python package (the `engenia` command)
   gate/                   The gate (G1 to G5), canary fixtures, the final stage
   evidence/               Trace matrix, `engenia measure`, `engenia doctor`
   dashboard/              FastAPI app and the committed build of the UI
-verifiers/                16 check scripts: each reads files and returns one verdict
-packs/                    Product packs: buoy and enclosure (templates, parts facts, default contract, intake template, sim settings)
-projects/                 Example projects: harbour-listener, deck-sensor (spec, checks, scenarios)
+verifiers/                18 check scripts: each reads files and returns one verdict
+packs/                    Product packs: buoy, enclosure, pressure_housing, bracket, thruster_duct (templates, parts facts, default contract, intake template, scenarios, sim settings)
+projects/                 Example projects: harbour-listener, deck-sensor, sensor-pod, antenna-bracket, thruster-duct (spec, checks, scenarios)
 evals/faults/             The planted-defect suite F01 to F10
 dashboard-ui/             React source of the dashboard
 docs/images/              Renders used in this README and the script that made them
@@ -492,10 +506,10 @@ The loop from a verified design to a measured one:
 - No `export-print` command.
 - A container runner is not on `main`; there is no `containers/` directory, so stages run in the local environment. Reproducibility across machines is tested within one kernel and platform version only (see `engenia/agents/mechanical/README.md`).
 - Requirement-to-check mapping for `verify_plan` is validated by script, but whether a check is a good test of the requirement's wording is a human judgement at the approval step. The audit note is advisory.
-- The structure solver reads the depth from the statement of R-012, so that requirement must state it in the form "at N m depth".
+- The structure solver reads the depth from the statement of the requirement whose check is `stress_safety_factor` (R-012 when none is marked), so that requirement must state it in the form "at N m depth".
 - The wave and structure caches key on the stage classes, not on solver parameters; after editing solver settings, clear `build/simulation/` to force a rerun.
 - The dashboard UI tests are not part of CI.
-- Only the buoy and enclosure packs exist.
+- Five packs exist (buoy, enclosure, pressure_housing, bracket, thruster_duct). The three newer ones are checked by analytic models: the pod's collapse margin is sized in its proposer and the FE check is linear stress only, `bending_stress` is a closed-form beam formula on the cantilever root, and `prop_clearance` is geometric. Their red-team load factors and the swelling shift are assumptions. See each pack's README.
 
 ## 16. In progress, roadmap, team and license
 

@@ -1,4 +1,4 @@
-import { Suspense, lazy, type ComponentType } from "react";
+import { Suspense, lazy, useEffect, useState, type ComponentType } from "react";
 import { Box, FileSignature, FlaskConical, FolderOpen, Gauge, ListChecks, Radio, Workflow, type LucideIcon } from "lucide-react";
 import brand from "./assets/engenia-mark.png";
 import { DashboardProvider, useDash, useResource } from "./lib/store";
@@ -13,6 +13,7 @@ import { Contract } from "./views/Contract";
 import { Scenarios } from "./views/Scenarios";
 import { Files } from "./views/Files";
 import { ProjectorToggle } from "./components/ProjectorToggle";
+import type { ProjectList } from "./lib/types";
 
 // three.js is large and only two views need it: load it when one of them opens.
 const Design = lazy(() => import("./views/Design").then((m) => ({ default: m.Design })));
@@ -29,6 +30,30 @@ const NAV: Record<View, { title: string; icon: LucideIcon }> = {
   studio: { title: "Live studio", icon: Radio },
 };
 
+/** The project name; with several projects on one server (/p/<name>/), a dropdown that moves to
+ * another project's address. A single-project server shows the plain name. */
+function ProjectName({ name }: { name: string }) {
+  const { api, sample } = useDash();
+  const [list, setList] = useState<ProjectList | null>(null);
+  useEffect(() => {
+    if (sample !== false) return;
+    let cancelled = false;
+    api.projects().then((l) => { if (!cancelled) setList(l); }).catch(() => { /* no list: plain name */ });
+    return () => { cancelled = true; };
+  }, [api, sample]);
+  const pill = "rounded-md bg-muted px-2.5 py-1 font-mono text-xs font-medium";
+  if (!list?.switchable || list.projects.length < 2) return <span className={pill}>{name}</span>;
+  return (
+    <label className="flex items-center gap-2">
+      <span className="sr-only">Project</span>
+      <select className={`${pill} cursor-pointer border-0`} value={name}
+        onChange={(e) => location.assign(`../${encodeURIComponent(e.target.value)}/${location.hash}`)}>
+        {list.projects.map((p) => <option key={p.name} value={p.name}>{p.name} ({p.pack})</option>)}
+      </select>
+    </label>
+  );
+}
+
 function Header() {
   const { sample, setSample, connection } = useDash();
   const pipeline = useResource("pipeline", (api) => api.pipeline());
@@ -36,9 +61,7 @@ function Header() {
   const label = connection === "live" ? "Live" : connection === "sample" ? "Sample data" : "Offline";
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-card/90 px-4 backdrop-blur">
-      <span className="rounded-md bg-muted px-2.5 py-1 font-mono text-xs font-medium">
-        {pipeline.data?.project ?? (sample ? "harbour-listener" : "—")}
-      </span>
+      <ProjectName name={pipeline.data?.project ?? (sample ? "harbour-listener" : "—")} />
       <div className="ml-auto flex items-center gap-4 text-xs">
         <ProjectorToggle />
         <span className="flex items-center gap-1.5 text-muted-foreground" role="status">
