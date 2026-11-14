@@ -197,3 +197,50 @@ def test_always_bad_selection_falls_back_and_is_recorded(root):
 
     assert select(ctx, llm) == expected
     assert proposer_fact(ctx) == "deterministic"
+
+
+# --- budgets in the prompts --------------------------------------------------------------------
+
+
+def test_the_mechanical_prompt_has_the_budgets_density_and_the_mass_formula(root):
+    ctx = ctx_for(root, "mechanical")
+    llm = FakeLLM(writes(propose_params(CONTRACT, [WALL])))
+    hull(ctx, llm)
+    task = user_texts(llm, 0)[0]
+    assert "at most 300 g" in task  # mass budget
+    assert "[160.0, 160.0, 220.0] mm" in task and "5632 cm3" in task  # volume
+    assert "[70.0, 40.0, 22.0] mm" in task and "61.6 cm3" in task  # bay
+    assert "PETG" in task and "density 1.27 g/cm3" in task and "infill factor" in task
+    assert "mass_g = (hull_solid_volume_mm3 + lid_solid_volume_mm3) / 1000" in task
+    assert "ESTIMATE THE MASS BEFORE YOU WRITE proposal.json" in task
+
+
+def test_a_hull_whose_estimated_mass_is_over_budget_goes_back_to_the_model(root):
+    ctx = ctx_for(root, "mechanical")
+    good = propose_params(CONTRACT, [WALL])
+    heavy = {**good, "wall_thickness_mm": 12.0, "lid_thickness_mm": 20.0}
+    llm = FakeLLM(writes(heavy) + writes(good))
+
+    assert hull(ctx, llm) == good
+    feedback = user_texts(llm, 2)[-1]
+    assert "hull_mass_estimate_g" in feedback and "300" in feedback
+    assert "estimated printed mass" in feedback
+
+
+def test_the_estimate_is_below_the_budget_for_the_default_hull():
+    from engenia.harness.proposer import estimate_hull_mass_g
+
+    params = propose_params(CONTRACT, [WALL])
+    grams = estimate_hull_mass_g(params, 1.27, 1.0)
+    assert 50 < grams < 300
+
+
+def test_the_electronics_prompt_has_the_mass_and_power_budgets(root):
+    ctx = ctx_for(root, "electronics")
+    expected = propose_selection(CONTRACT, [ENDURANCE], FACTS)
+    llm = FakeLLM(writes({"parts": expected["parts"]}))
+    select(ctx, llm)
+    task = user_texts(llm, 0)[0]
+    assert "at most\n  60 g" in task
+    assert "180 mWh per day" in task and "7.5 mW" in task
+    assert "ESTIMATE BEFORE YOU CHOOSE" in task

@@ -22,6 +22,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
 
+import yaml
+
 from engenia.contracts.models import (
     Contract,
     EvidenceLevel,
@@ -220,6 +222,31 @@ is taller than the wall); wall_thickness_mm must meet every wall minimum below; 
 must be at least the contract bay; outer_diameter_mm must fit the envelope's x and y; and
 height_mm + lid_thickness_mm must fit the envelope's z.
 
+Budgets you must meet (the stage's own mass_budget check fails the build otherwise):
+- mass: the printed hull plus lid must weigh at most {mass_budget:g} g.
+- volume: the hull fits the envelope {envelope} mm, a box of {envelope_cm3:g} cm3.
+- bay: the electronics bay is {bay} mm ({bay_cm3:g} cm3); the hull must hold it.
+
+Printed mass: material {material}, density {density:g} g/cm3 (calibration included), infill factor
+{infill:g} (the pack sets it; your infill_factor is replaced by it). The scripts compute
+
+    mass_g = (hull_solid_volume_mm3 + lid_solid_volume_mm3) / 1000 * {density:g} * {infill:g}
+
+where, to a good approximation (r = outer_diameter_mm / 2, w = wall_thickness_mm,
+h = height_mm, t = lid_thickness_mm, rim = 2 * w + o_ring_groove_width_mm):
+
+    floor      = pi * r^2 * w
+    side wall  = pi * (r^2 - (r - w)^2) * (h - w)
+    seal rim   = pi * ((r^2 - (r - rim)^2) - (r^2 - (r - w)^2)) * w
+    bay walls  = ((x + 2w) * (y + 2w) - x * y) * (z + w)      with the bay x, y, z
+    lid        = pi * r^2 * t - the groove volume
+    (screw bosses and tabs add about 5 percent)
+
+ESTIMATE THE MASS BEFORE YOU WRITE proposal.json: do this sum for your numbers, compare it with
+the {mass_budget:g} g budget, and shrink the diameter, height or wall until it fits (the wall may
+not go below the minimum). Say the estimate in record_decision. A script repeats the estimate:
+{estimate_note}
+
 {requirements}
 
 Contract:
@@ -227,9 +254,61 @@ Contract:
 """
 
 
-def mechanical_validator(contract: Contract, wall_minimum: float | None) -> Validator:
+def printing_facts(ctx: StageContext) -> dict[str, Any]:
+    """Material, density (calibration applied) and infill the mechanical build will use."""
+    from engenia.harness.packs import pack_file
+
+    density, infill, material = 1.27, 1.0, "PETG"
+    try:
+        pack = yaml.safe_load(pack_file(ctx, "pack.yaml").read_text("utf-8")) or {}
+        density = float(pack["materials"][material]["density_g_cm3"])
+        infill = float(pack.get("printing", {}).get("infill_factor", infill))
+    except (OSError, KeyError, TypeError, ValueError, yaml.YAMLError):
+        pass
+    try:
+        calibration = yaml.safe_load((ctx.project_dir / "calibration.yaml").read_text("utf-8"))
+        factor = float(calibration["mass_factor"])
+        if math.isfinite(factor) and factor > 0:
+            density *= factor
+    except (OSError, KeyError, TypeError, ValueError, yaml.YAMLError):
+        pass
+    return {"material": material, "density_g_cm3": density, "infill_factor": infill}
+
+
+BOSS_ALLOWANCE = 1.05  # screw bosses and tabs are left out of the closed-form estimate
+
+
+def estimate_hull_mass_g(params: dict[str, Any], density: float, infill: float) -> float:
+    """Closed-form printed mass of the hull and lid, with the 5 percent boss allowance."""
+    r = float(params["outer_diameter_mm"]) / 2
+    w, h = float(params["wall_thickness_mm"]), float(params["height_mm"])
+    t, groove = float(params["lid_thickness_mm"]), float(params["o_ring_groove_width_mm"])
+    depth = float(params["o_ring_groove_depth_mm"])
+    x, y, z = (float(v) for v in params["battery_bay_mm"])
+    rim = 2 * w + groove
+
+    def ring(outer: float, inner: float) -> float:
+        return math.pi * (outer**2 - max(inner, 0.0) ** 2)
+
+    volume = (
+        math.pi * r**2 * w
+        + ring(r, r - w) * (h - w)
+        + (ring(r, r - rim) - ring(r, r - w)) * w
+        + ((x + 2 * w) * (y + 2 * w) - x * y) * (z + w)
+        + math.pi * r**2 * t
+        - ring(r - w, r - w - groove) * depth
+    )
+    return volume * BOSS_ALLOWANCE / 1000 * density * infill
+
+
+def mechanical_validator(
+    contract: Contract,
+    wall_minimum: float | None,
+    printing: dict[str, Any] | None = None,
+) -> Validator:
     ex, ey, ez = contract.budgets.mechanical.outer_envelope_mm
     bay = contract.budgets.electronics.bay_mm
+    mass_budget = contract.budgets.mechanical.mass_g
 
     def validate(params: dict[str, Any]) -> list[Verdict]:
         verdicts: list[Verdict] = []
@@ -268,6 +347,23 @@ def mechanical_validator(contract: Contract, wall_minimum: float | None) -> Vali
                 f"hull plus lid {height} mm exceeds the {ez} mm limit",
             )
         )
+        if printing is not None:
+            try:
+                mass = estimate_hull_mass_g(
+                    params, printing["density_g_cm3"], printing["infill_factor"]
+                )
+            except (KeyError, TypeError, ValueError):
+                mass = None
+            if mass is not None:
+                verdicts.append(
+                    _number(
+                        "hull_mass_estimate_g",
+                        mass,
+                        Limit(max=mass_budget),
+                        f"estimated printed mass {mass:.0f} g exceeds the {mass_budget:g} g "
+                        "mechanical budget; reduce the diameter, height or wall",
+                    )
+                )
         slack = min(p - b for p, b in zip(proposed_bay, bay, strict=True))
         verdicts.append(
             _number(
@@ -319,12 +415,25 @@ def propose_mechanical_params(
         and r.verify.limit is not None
         and r.verify.limit.min is not None
     ]
+    printing = printing_facts(ctx)
+    ex, ey, ez = c.budgets.mechanical.outer_envelope_mm
+    bx, by, bz = c.budgets.electronics.bay_mm
     return propose(
         ctx,
         task=MECHANICAL_TASK.format(
-            requirements=_requirement_lines(requirements), contract=c.model_dump_json(indent=2)
+            mass_budget=c.budgets.mechanical.mass_g,
+            envelope=list(c.budgets.mechanical.outer_envelope_mm),
+            envelope_cm3=ex * ey * ez / 1000,
+            bay=list(c.budgets.electronics.bay_mm),
+            bay_cm3=bx * by * bz / 1000,
+            material=printing["material"],
+            density=printing["density_g_cm3"],
+            infill=printing["infill_factor"],
+            estimate_note="hull_mass_estimate_g must not exceed the mass budget.",
+            requirements=_requirement_lines(requirements),
+            contract=c.model_dump_json(indent=2),
         ),
-        validate=mechanical_validator(c, max(walls, default=None)),
+        validate=mechanical_validator(c, max(walls, default=None), printing),
         fallback=lambda: fallback(contract, requirements),
         **kwargs,
     )
@@ -338,6 +447,18 @@ Stage: electronics. Choose one part for each function. Write a JSON object
 using ids from the catalogue below. Scripts compute power and size from your choice and check
 that the battery voltage suits the regulator, that the design lasts {target_text}, and
 that the assembly fits the bay {bay} mm.
+
+Budgets from the contract:
+- mass: the chosen parts plus {support_mass_g:g} g of support hardware must weigh at most
+  {mass_budget:g} g.
+- power: the energy budget is {energy_budget:g} mWh per day, so the average battery-side power must
+  stay at or under {power_budget:g} mW (energy per day / 24 h).
+
+ESTIMATE BEFORE YOU CHOOSE: mass = sum of the part masses in the catalogue + {support_mass_g:g} g;
+average power = the duty-cycle mix of each part's active and sleep current at the regulated
+voltage, divided by the regulator efficiency {efficiency:g}, plus the regulator's own quiescent
+draw. Compare both with the budgets above and pick lighter or lower-power parts until they fit.
+Say the estimates in record_decision. Scripts repeat both calculations and send you the numbers.
 
 {requirements}
 
@@ -404,6 +525,9 @@ def _selection_from_parts(contract: Contract, facts: Any, target: float, parts_i
 
 
 def electronics_validator(contract: Contract, facts: Any, target: float | None) -> Validator:
+    mass_budget = contract.budgets.electronics.mass_g
+    power_budget = contract.budgets.electronics.energy_mwh_per_day / 24
+
     def validate(proposal: dict[str, Any]) -> list[Verdict]:
         try:
             chosen = _selection_from_parts(contract, facts, target, proposal.get("parts"))
@@ -427,6 +551,23 @@ def electronics_validator(contract: Contract, facts: Any, target: float | None) 
                 slack,
                 Limit(min=0),
                 f"assembly {chosen['assembly_mm']} mm does not fit the bay {list(bay)} mm",
+            )
+        )
+        verdicts.append(
+            _number(
+                "electronics_mass_g",
+                chosen["mass_g"],
+                Limit(max=mass_budget),
+                f"mass {chosen['mass_g']:g} g exceeds the {mass_budget:g} g electronics budget",
+            )
+        )
+        verdicts.append(
+            _number(
+                "avg_power_mw",
+                chosen["avg_power_mw"],
+                Limit(max=power_budget),
+                f"average power {chosen['avg_power_mw']:.2f} mW exceeds the "
+                f"{power_budget:.2f} mW the energy budget allows",
             )
         )
         return verdicts
@@ -462,6 +603,11 @@ def propose_electronics_selection(
                 f"at least {target:g} days" if target is not None else "as long as possible"
             ),
             bay=list(contract.budgets.electronics.bay_mm),
+            mass_budget=contract.budgets.electronics.mass_g,
+            support_mass_g=facts.design.support_mass_g,
+            energy_budget=contract.budgets.electronics.energy_mwh_per_day,
+            power_budget=contract.budgets.electronics.energy_mwh_per_day / 24,
+            efficiency=facts.design.regulator_efficiency,
             requirements=_requirement_lines(requirements),
             catalogue=catalogue,
         ),
