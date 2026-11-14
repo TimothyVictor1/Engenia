@@ -49,7 +49,9 @@ def match_rules(text: str, rules: list[dict]) -> list[tuple[dict, float | int]]:
         for clause in clauses:
             match = pattern.search(clause)
             if match:
-                found.append((rule, _number(next(g for g in match.groups() if g is not None))))
+                # A rule with a fixed `value` (a yes/no property) needs no number in the request.
+                given = [g for g in match.groups() if g is not None]
+                found.append((rule, rule["value"] if "value" in rule else _number(given[0])))
                 break
     return found
 
@@ -65,7 +67,8 @@ def template_intake(text: str, project: str, root: Path, *, pack: str = "buoy") 
         ) from exc
 
     spec_dir = Path(root) / "projects" / project / "spec"
-    existing = spec.load_requirements(spec_dir) if spec_dir.is_dir() else []
+    has_files = spec_dir.is_dir() and any(spec_dir.glob("R-*.yaml"))
+    existing = spec.load_requirements(spec_dir) if has_files else []
     have = {r.verify.check for r in existing}
     next_number = max((int(r.id[2:]) for r in existing), default=0) + 1
 

@@ -1,0 +1,29 @@
+# Deterministic intake for the enclosure pack (used when no design model is configured).
+# Same shape as packs/buoy/intake.yaml. A rule with a fixed `value` is a yes/no property: the
+# request only has to mention it.
+requirements:
+  - name: mass
+    pattern: '(?:mass|weigh\w*)\D{0,60}?(\d+(?:\.\d+)?)\s*(?:g|grams?)\b'
+    statement: The total mass of the enclosure shall not exceed {value} g.
+    unit: g
+    method: analysis
+    check: mass_budget
+    bound: max
+    affects: [mechanical]
+  - name: wall_thickness
+    pattern: 'wall\D{0,60}?(\d+(?:\.\d+)?)\s*mm\b'
+    statement: The enclosure shall have a minimum wall thickness of at least {value} mm.
+    unit: mm
+    method: analysis
+    check: wall_thickness_min
+    bound: min
+    affects: [mechanical]
+  - name: print_bed_fit
+    pattern: '(?:print\w*|3d)\W+(?:bed|printer)|fit\w*\W+(?:on|in|within)\W+(?:the\W+|a\W+)?(?:print\w*|3d)'
+    statement: The enclosure shall fit within the print bed.
+    unit: fits
+    method: analysis
+    check: print_bed_fit
+    bound: equals
+    value: 1
+    affects: [mechanical]

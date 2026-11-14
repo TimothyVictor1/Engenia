@@ -5,7 +5,6 @@ lint, run, gate and matrix work; plan and status print "not implemented".
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import typer
@@ -127,11 +126,6 @@ def _run_with_repair(project: str, workers: int, resume: bool, show) -> int:
     return 1
 
 
-def _model_configured() -> bool:
-    names = ("ENGENIA_LLM_API_KEY", "ENGENIA_LLM_BASE_URL", "ENGENIA_DESIGN_MODEL")
-    return all(os.environ.get(name, "").strip() for name in names)
-
-
 @app.command()
 def intake(
     request: str = typer.Argument(..., help="The product request, in plain language."),
@@ -143,29 +137,15 @@ def intake(
     Uses the design model when ENGENIA_LLM_API_KEY, ENGENIA_LLM_BASE_URL and ENGENIA_DESIGN_MODEL
     are set; otherwise a deterministic template from the pack. Files are always drafts.
     """
-    from engenia.core.intake_template import IntakeTemplateError, template_intake
+    from engenia.core.intake_run import IntakeFailed, run_intake
 
     root = find_root()
     try:
-        if _model_configured():
-            from engenia.agents.intake import IntakeError
-            from engenia.agents.intake import intake as model_intake
-
-            try:
-                written = [
-                    root / "projects" / project / "spec" / f"{r.id}.yaml"
-                    for r in model_intake(request, project)
-                ]
-            except IntakeError as exc:
-                typer.echo(f"error: {exc}", err=True)
-                raise typer.Exit(1) from None
-            how = "model"
-        else:
-            written = template_intake(request, project, root, pack=pack)
-            how = f"template ({pack} pack, no model configured)"
-    except IntakeTemplateError as exc:
+        result = run_intake(request, project, root, pack=pack)
+    except IntakeFailed as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from None
+    written, how = result.paths, result.how
     for path in written:
         typer.echo(f"wrote {path.relative_to(root)}")
     typer.echo(f"intake: {len(written)} draft requirement(s) from the {how}")
@@ -176,6 +156,50 @@ def intake(
             typer.echo(line, err=True)
         raise typer.Exit(1)
     typer.echo(f"lint {project}: ok. Review the drafts, then set status: approved.")
+
+
+@app.command()
+def new(
+    request: str = typer.Argument(..., help="The product request, in plain language."),
+    project: str = typer.Option(..., "--project", "-p", help="Name of the new project."),
+    pack: str = typer.Option("buoy", "--pack", help="Product pack: buoy or enclosure."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Approve every step without asking."),
+    workers: int = typer.Option(default_workers(), "--workers", "-j", min=1),
+) -> None:
+    """Create a project and take it from the request to a release, asking at each approval.
+
+    Creates the project, runs intake, asks you to approve the drafted requirements, runs the
+    stages (which plans the checks), asks you to approve the check plan, runs the gate with the
+    repair loop, and on a pass writes the release zip. Ends with a short summary. Without --yes
+    every approval is a question to you; a change proposal is never applied.
+    """
+    from engenia.core.new_project import NewProjectError, new_project, summary
+
+    def confirm(question: str, lines: list[str]) -> bool:
+        for line in lines:
+            typer.echo(f"  {line}")
+        return True if yes else typer.confirm(question, default=False)
+
+    try:
+        report = new_project(
+            request, project, find_root(), pack=pack, confirm=confirm, echo=typer.echo,
+            workers=workers,
+        )
+    except NewProjectError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from None
+    except SpecError as exc:
+        for problem in exc.problems:
+            typer.echo(f"error: {problem}", err=True)
+        raise typer.Exit(1) from None
+    except CoreError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from None
+    typer.echo("")
+    for line in summary(report):
+        typer.echo(line)
+    if not report.ok:
+        raise typer.Exit(1)
 
 
 @app.command()

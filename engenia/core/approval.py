@@ -156,3 +156,15 @@ def apply_proposal(project: str, root: Path, requirement: str) -> Preview:
     target.write_text(_approved_text(proposal.read_text("utf-8")), encoding="utf-8")
     proposal.unlink()
     return preview
+
+
+# --- drafted requirements ----------------------------------------------------------------------
+
+
+def approve_requirements(paths: list[Path]) -> list[str]:
+    """Mark drafted requirement files approved (status: approved). Returns their ids."""
+    ids = []
+    for path in paths:
+        path.write_text(_approved_text(path.read_text("utf-8")), encoding="utf-8")
+        ids.append(path.stem)
+    return ids
