@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -22,6 +23,36 @@ from engenia.harness.proposer import propose_electronics_selection, proposer_fac
 
 def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+# SKiDL appends the Python call chain ("@ [file:line=>file:line]") to log lines. Those frames
+# hold install, checkout and temp paths, so they differ between machines and directories.
+_LOCATION = re.compile(r"\s+@\s+\[[^\]\n]*\]")
+# Any absolute path that survives the labelled replacements (POSIX or Windows drive).
+_ABS_PATH = re.compile(r"(?<![\w.>])(?:[A-Za-z]:)?[\\/](?:[\w.\-+~@]+[\\/])+[\w.\-+~@]*")
+
+
+def normalize_log(log: str, labels: list[tuple[Path, str]]) -> str:
+    """Make a SKiDL log identical across directories, machines and tool installs."""
+    for path, label in labels:
+        for variant in {str(path), str(path.resolve())}:
+            log = log.replace(variant, label)
+    log = _LOCATION.sub("", log)
+    log = _ABS_PATH.sub(lambda m: "<path>/" + re.split(r"[\\/]", m.group(0))[-1], log)
+    return log.replace("\r\n", "\n")
+
+
+def _clean_env() -> dict[str, str]:
+    """Environment for the SKiDL subprocess without machine-specific KiCad/SKiDL settings."""
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if not k.upper().startswith(("KICAD", "SKIDL"))
+    }
+    env.update(
+        {"PYTHONHASHSEED": "0", "PYTHONIOENCODING": "utf-8", "LC_ALL": "C.UTF-8", "TZ": "UTC"}
+    )
+    return env
 
 
 def _request_bay(ctx: StageContext, selection: dict) -> None:
@@ -190,21 +221,18 @@ class ElectronicsStage:
                 str(ctx.build_dir.resolve()),
             ],
             cwd=ctx.build_dir,
-            env={**os.environ, "PYTHONHASHSEED": "0"},
+            env=_clean_env(),
             capture_output=True,
             text=True,
             encoding="utf-8",
             timeout=120,
             check=False,
         )
-        log = result.stdout + result.stderr
         # Replace nested paths before the root so their specific labels survive.
-        for path, label in (
-            (ctx.build_dir, "<build>"),
-            (ctx.src_dir, "<src>"),
-            (ctx.root, "<root>"),
-        ):
-            log = log.replace(str(path.resolve()), label)
+        log = normalize_log(
+            result.stdout + result.stderr,
+            [(ctx.build_dir, "<build>"), (ctx.src_dir, "<src>"), (ctx.root, "<root>")],
+        )
         (ctx.build_dir / "build.log").write_text(log, encoding="utf-8")
         if result.returncode:
             raise RuntimeError(

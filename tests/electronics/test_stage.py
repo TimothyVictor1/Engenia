@@ -291,3 +291,40 @@ def test_deterministic_selection_emits_decisions_citing_requirements(tmp_path):
     assert battery["numbers"]["target_days"] == 7 and battery["numbers"]["endurance_days"] >= 7
     assert "bay" in decisions["Board size vs bay"]["data"]["reason"]
     assert decisions["Radio"]["data"]["numbers"]["active_current_ma"] > 0
+
+def _build_in(root, monkeypatch=None):
+    from engenia.core.hashing import tree_hash
+
+    ctx = make_context(root)
+    stage = ElectronicsStage()
+    stage.generate(ctx)
+    stage.build(ctx)
+    key = tree_hash(ctx.build_dir, exclude=("interface.json", "verdict.json", "transcripts"))
+    interface = {"stage": "electronics", "key": key, "facts": stage.interface(ctx)}
+    text = json.dumps(interface, sort_keys=True, indent=2) + "\n"
+    return ctx.build_dir, text
+
+
+def test_build_is_byte_identical_across_directories(tmp_path, monkeypatch):
+    first, first_interface = _build_in(tmp_path / "a")
+    # A deeper, differently named directory, plus machine-specific KiCad settings.
+    monkeypatch.setenv("KICAD8_SYMBOL_DIR", str(tmp_path / "somewhere" / "symbols"))
+    second, second_interface = _build_in(tmp_path / "much" / "deeper" / "other-dir")
+    assert (first / "build.log").read_bytes() == (second / "build.log").read_bytes()
+    assert first_interface == second_interface
+    for name in ("bom.csv", "build_facts.json", "circuit.net", "erc.json", "erc.txt"):
+        assert (first / name).read_bytes() == (second / name).read_bytes(), name
+    log = (first / "build.log").read_text(encoding="utf-8")
+    assert str(tmp_path) not in log
+    assert " @ [" not in log
+
+
+def test_normalize_log_strips_locations_and_paths(tmp_path):
+    from engenia.agents.electronics.stage import normalize_log
+
+    raw = (
+        f"WARNING: x @ [{tmp_path}/b/lib/site-packages/skidl/a.py:9=>/usr/lib/py/b.py:3]\n"
+        f"see {tmp_path}/b/circuit.py and /home/user/.venv/lib/x.py\n"
+    )
+    out = normalize_log(raw, [(tmp_path / "b", "<build>")])
+    assert out == "WARNING: x\nsee <build>/circuit.py and <path>/x.py\n"
