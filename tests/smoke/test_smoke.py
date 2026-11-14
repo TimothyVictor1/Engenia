@@ -127,11 +127,15 @@ def test_lint_rejects_id_not_matching_file_name(workdir):
     assert runner.invoke(app, ["lint", "harbour-listener"]).exit_code == 1
 
 
-@pytest.mark.parametrize("command", ["plan", "status"])
-def test_unimplemented_commands_exit_zero(command, workdir):
-    result = runner.invoke(app, [command, "harbour-listener"])
+def test_plan_is_not_a_command(workdir):
+    assert runner.invoke(app, ["plan", "harbour-listener"]).exit_code != 0
+
+
+def test_status_with_no_runs(workdir):
+    result = runner.invoke(app, ["status", "harbour-listener"])
     assert result.exit_code == 0
-    assert "not implemented" in result.output
+    assert "no runs yet" in result.output
+    assert "not implemented" not in result.output
 
 
 def test_requirement_rejects_unknown_fields():

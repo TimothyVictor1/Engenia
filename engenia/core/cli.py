@@ -1,6 +1,6 @@
 """The engenia command line (PROJECT.md section 6, CLI commands).
 
-lint, run, gate, matrix, measure and doctor work; plan and status print "not implemented".
+Every command is implemented. `status` reads the latest run from .engenia/run.db.
 """
 
 from __future__ import annotations
@@ -259,12 +259,6 @@ def release(project: str) -> None:
 
 
 @app.command()
-def plan(project: str) -> None:
-    """Show which stages will run and why."""
-    typer.echo("not implemented")
-
-
-@app.command()
 def gate(project: str) -> None:
     """Run all checks, reproduction and coverage."""
     from engenia.gate.gate import format_report, run_gate
@@ -356,6 +350,14 @@ def measure(
         f" offset {result.calibration.waterline_offset_mm:.6g} mm"
     )
     typer.echo(f"calibration -> {show(result.calibration_path)} ({result.calibration.source})")
+    for test in result.planned:
+        limit = test["limit"]
+        typer.echo(
+            f"{test['id']} ({test['requirement']}) {test['quantity']}: {test['result']}"
+            f" (measured {test['measured']:.6g}, limit {limit}; from the physical test plan)"
+        )
+    for note in result.plan_notes:
+        typer.echo(f"note: {note}")
     for requirement_id, reason in sorted(result.skipped.items()):
         typer.echo(f"skipped {requirement_id}: {reason}")
     for verdict in result.verdicts:
@@ -375,8 +377,14 @@ def measure(
 
 @app.command()
 def status(project: str) -> None:
-    """Show run state and open change requests."""
-    typer.echo("not implemented")
+    """Show the latest run (stage, status, attempts, duration), the last gate result and open
+    change requests."""
+    from engenia.core.status import status_lines
+
+    root = find_root()
+    _project_dir(project)
+    for line in status_lines(project, root):
+        typer.echo(line)
 
 
 @app.command()

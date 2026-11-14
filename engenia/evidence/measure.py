@@ -90,6 +90,11 @@ class MeasureResult:
     proposals: dict[str, Path] = field(default_factory=dict)  # requirement id -> proposal
     proposal_errors: dict[str, str] = field(default_factory=dict)  # requirement id -> reason
     skipped: dict[str, str] = field(default_factory=dict)  # requirement id -> why not checked
+    # Tests of build/testplan/physical-tests.json that this measurement answers: dicts with
+    # id, requirement, quantity, measured, limit, result ("pass" or "fail"). Informational: the
+    # verdicts, not these lines, decide the exit code.
+    planned: list[dict[str, Any]] = field(default_factory=list)
+    plan_notes: list[str] = field(default_factory=list)  # why there are no planned tests
 
     @property
     def exit_code(self) -> int:
@@ -248,6 +253,39 @@ def _check_requirements(project: str, root: Path, result: MeasureResult) -> None
             _propose(project, requirement, result, root)
 
 
+def _planned_tests(root: Path, project: str, measurements: dict[str, Any], result) -> None:
+    """Match the numbers just measured to the tests of the testplan stage, by test id."""
+    from engenia.gate.gate import recompute_result
+
+    path = root / "projects" / project / "build" / "testplan" / "physical-tests.json"
+    if not path.is_file():
+        result.plan_notes.append(
+            "no physical test plan: run `engenia run` to build the testplan stage"
+        )
+        return
+    try:
+        tests = json.loads(path.read_text(encoding="utf-8"))["tests"]
+        for test in tests:
+            key = test.get("measurement_key")
+            if key not in measurements:
+                continue
+            limit = Limit.model_validate(test["limit"])
+            value = float(measurements[key])
+            outcome = recompute_result(value, limit)
+            result.planned.append(
+                {
+                    "id": test["id"],
+                    "requirement": test["requirement"],
+                    "quantity": test["quantity"],
+                    "measured": value,
+                    "limit": limit.model_dump(exclude_none=True),
+                    "result": outcome.value if outcome else "error",
+                }
+            )
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        result.plan_notes.append(f"physical-tests.json is unreadable: {exc}")
+
+
 # --- the command --------------------------------------------------------------------------------
 
 
@@ -321,4 +359,5 @@ def measure(
         calibration_path=calibration_path,
     )
     _check_requirements(project, root, result)
+    _planned_tests(root, project, measurements, result)
     return result
