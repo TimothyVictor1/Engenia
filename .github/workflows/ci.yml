@@ -31,4 +31,17 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libglu1-mesa libgl1 libxrender1 libxext6 libxcursor1 libxft2 libxinerama1
       - run: uv sync
       - run: uv run pytest -q -m slow
-      - run: uv run engenia run harbour-listener
+      - name: Run harbour-listener pipeline
+        run: |
+          if uv run engenia run harbour-listener; then
+            exit 0
+          else
+            pipeline_status=$?
+          fi
+          gate_report=projects/harbour-listener/build/gate/report.json
+          if [ -f "$gate_report" ]; then
+            cat "$gate_report"
+          else
+            printf '%s\n' "No gate report was produced: $gate_report"
+          fi
+          exit "$pipeline_status"
