@@ -50,13 +50,15 @@ def drop_unverifiable(project_dir, set_plan):
 
 
 def test_fails_when_a_requirement_has_no_verdict_though_every_verdict_passes(
-    root, registry, project_dir
+    root, registry, project_dir, add_requirement, set_plan
 ):
-    # R-003 names a verifier that does not exist: the gate calls it "unverified" and still passes.
+    # R-003 names a verifier that does not exist: the gate (G4) fails it as unverified.
+    add_requirement(3, "flow_drag", {"min": 0.9})
+    set_plan()
     build = run_final(root, registry)
 
     by_check = {v["check"]: v for v in verdicts_of(build)}
-    assert by_check["final_gate"]["result"] == "pass"
+    assert by_check["final_gate"]["result"] == "fail"
     assert by_check["error_verdicts"]["result"] == "pass"
     assert by_check["requirements_without_verdict"]["result"] == "fail"
     assert "R-003" in by_check["requirements_without_verdict"]["message"]

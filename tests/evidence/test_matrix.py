@@ -88,9 +88,9 @@ def test_verdicts_reach_the_rows(
 
     payload = build_matrix("demo", scratch_root)
     assert row_of(payload, "R-001")["result"] == "pass"
-    assert row_of(payload, "R-001")["measured"] == 50.0
-    # mass_budget for the electronics stage checks the stage budget from the contract
-    assert row_of(payload, "R-001")["limit"] == {"max": 60.0}
+    # requirement-level mass_budget runs at integration: total mass against the requirement limit
+    assert row_of(payload, "R-001")["measured"] == 330.0
+    assert row_of(payload, "R-001")["limit"] == {"max": 400.0}
     assert row_of(payload, "R-002")["result"] == "fail"
     assert row_of(payload, "R-002")["measured"] == 2.0
     assert row_of(payload, "R-002")["limit"] == {"min": 3.0}

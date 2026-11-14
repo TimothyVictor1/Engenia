@@ -33,17 +33,28 @@ def failed(result):
     return sorted(n for n, g in result.report["gates"].items() if not g["passed"])
 
 
-def test_clean_project_passes_and_unverified_is_reported(root, registry, project_dir):
+def test_clean_project_passes(root, registry, project_dir):
     result = gate(root, registry)
     assert result.passed, result.report["gates"]
     assert result.exit_code == 0
+    assert result.report["unverified"] == []
+    assert {v["requirement"] for v in result.report["verdicts"]} == {"R-001", "R-002"}
+    saved = json.loads((project_dir / "build" / "gate" / "report.json").read_text())
+    assert saved == result.report
+
+
+def test_approved_requirement_without_a_verifier_fails_g4(root, registry, add_requirement,
+                                                          set_plan):
+    add_requirement(3, "flow_drag", {"min": 0.9})
+    set_plan()
+    result = gate(root, registry)
+    assert not result.passed
     assert result.report["unverified"] == [
         {"requirement": "R-003", "check": "flow_drag", "status": "unverified",
          "reason": "no verifier verifiers/flow_drag.py yet"}
     ]
-    assert {v["requirement"] for v in result.report["verdicts"]} == {"R-001", "R-002"}
-    saved = json.loads((project_dir / "build" / "gate" / "report.json").read_text())
-    assert saved == result.report
+    assert "R-003: no runnable verifier verifiers/flow_drag.py" in problems(result, "G4")
+    assert "G1" in failed(result)
 
 
 def test_report_is_identical_between_runs(root, registry, project_dir):
@@ -131,6 +142,47 @@ def test_g2_accepts_a_consistent_stored_verdict(root, registry, project_dir):
     path = project_dir / "build" / "mechanical" / "verdict.json"
     path.write_text(json.dumps(stored_verdict("pass", 280.0, {"max": 400.0})))
     assert gate(root, registry).passed
+
+
+def test_g2_rejects_a_consistent_stored_fail(root, registry, project_dir):
+    path = project_dir / "build" / "mechanical" / "verdict.json"
+    path.write_text(json.dumps([{
+        "check": "int_mounts_match", "requirement": None, "measured": 0.0,
+        "limit": {"equals": 1}, "result": "fail", "evidence_level": "calculated",
+        "artifact": None, "message": "int_mounts_match: mismatch"}]))
+    result = gate(root, registry)
+    assert not result.passed
+    assert any("stored result is fail" in p for p in problems(result, "G2"))
+
+
+def test_requirement_level_mass_check_runs_at_integration(root):
+    from engenia.contracts.models import CheckContext, CheckPlanItem, Limit
+    from engenia.gate.gate import producing_stage
+    from verifiers.mass_budget import run
+
+    class Stage:
+        def __init__(self, checks):
+            self.checks = checks
+
+    reg = {"mechanical": Stage(["mass_budget"]), "electronics": Stage(["mass_budget"]),
+           "integration": Stage([])}
+    order = ["mechanical", "electronics", "integration"]
+    item = CheckPlanItem(id="C-001", requirement="R-001", check="mass_budget",
+                         params={}, limit=Limit(max=400))
+    assert producing_stage(item, None, reg, order) == "integration"
+
+    build = root / "projects" / "tot" / "build"
+    facts_by_stage = {"mechanical": {"dry_mass_g": 250.0}, "electronics": {"mass_g": 100.0}}
+    for stage, facts in facts_by_stage.items():
+        (build / stage).mkdir(parents=True)
+        (build / stage / "interface.json").write_text(
+            json.dumps({"stage": stage, "key": "sha256:" + "0" * 64, "facts": facts}))
+    def verdict(limit):
+        return run(CheckContext(project="tot", stage="integration", root=root,
+                                check="mass_budget", requirement="R-001", params={},
+                                limit=Limit(max=limit)))
+    assert verdict(400).result == "pass"
+    assert verdict(1).result == "fail"
 
 
 def test_g2_flags_an_unreadable_stored_verdict(root, registry, project_dir):
