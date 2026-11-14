@@ -5,7 +5,10 @@ pipeline runs end to end. The harness may replace propose_scenarios() later; gen
 resolves it through the module namespace, so a monkeypatch takes effect.
 
 A project can also own its scenarios: when projects/<p>/scenarios/ holds *.yaml files,
-generate() uses those instead of the fixed proposal (project_scenarios). A project file
+generate() uses those instead of the fixed proposal (project_scenarios).
+The fixed proposal targets requirements by check name and is resolved to the project's own
+R-ids (resolve_targets); scenarios no requirement matches are skipped and recorded in
+skipped_scenarios.yaml. The red-team model may add scenarios in the same format. A project file
 that does not validate is an error, never a silent fallback to the buoy scenarios.
 
 Scenario files live at src/redteam/scenarios/<name>.yaml and are validated and copied to
@@ -23,15 +26,21 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from engenia.contracts.models import StageContext
 
 SCENARIOS_DIRNAME = "scenarios"
+SKIPPED_FILENAME = "skipped_scenarios.yaml"
 
 
 class Scenario(BaseModel):
     """One red-team scenario file (src/redteam/scenarios/<name>.yaml).
+
+    A scenario names what it stresses either by requirement id (`targets`) or by verifier
+    check name (`target_checks`, for example wave_tilt). Pack scenarios use checks, so they
+    work for any project; resolve_targets() turns checks into the project's own R-ids at
+    generate time, so files in src/ and build/ only ever carry R-ids.
 
     The wave and water fields are optional: a product that does not float (for
     example a deck-mounted enclosure) leaves them unset, and the solvers that
@@ -49,7 +58,14 @@ class Scenario(BaseModel):
     depth_m: float | None = None
     extra: dict[str, Any] = Field(default_factory=dict)
     rationale: str
-    targets: list[str] = Field(min_length=1)
+    targets: list[str] = Field(default_factory=list)
+    target_checks: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _names_a_target(self) -> Scenario:
+        if not self.targets and not self.target_checks:
+            raise ValueError("a scenario needs at least one target or target_check")
+        return self
 
 
 def propose_scenarios() -> list[Scenario]:
@@ -67,7 +83,7 @@ def propose_scenarios() -> list[Scenario]:
                 "Baseline sheltered-harbour conditions: upright floating and the tilt "
                 "limit must hold in light chop."
             ),
-            targets=["R-006", "R-011"],
+            target_checks=["metacentric_height", "wave_tilt"],
         ),
         Scenario(
             name="baltic_winter",
@@ -81,7 +97,7 @@ def propose_scenarios() -> list[Scenario]:
                 "Cold brackish water with short winter chop: the power budget and the "
                 "metacentric height must hold at low temperature and density."
             ),
-            targets=["R-006", "R-007", "R-011"],
+            target_checks=["metacentric_height", "power_budget", "wave_tilt"],
         ),
         Scenario(
             name="storm",
@@ -95,7 +111,7 @@ def propose_scenarios() -> list[Scenario]:
                 "Design storm in open water: the worst case for tilt limits and hull "
                 "stress at depth."
             ),
-            targets=["R-006", "R-011", "R-012"],
+            target_checks=["metacentric_height", "wave_tilt", "stress_safety_factor"],
         ),
         Scenario(
             name="flooded_bay",
@@ -109,9 +125,51 @@ def propose_scenarios() -> list[Scenario]:
                 "Hull partially flooded after a seal failure in a rain-swollen bay of "
                 "fresh water: buoyancy margin, upright floating and hull stress degrade."
             ),
-            targets=["R-005", "R-006", "R-012"],
+            target_checks=["buoyancy_margin", "metacentric_height", "stress_safety_factor"],
         ),
     ]
+
+
+def _spec_checks(spec_dir: Path) -> dict[str, list[str]]:
+    """Map verify.check name to the sorted requirement ids that use it."""
+    by_check: dict[str, list[str]] = {}
+    for path in sorted(spec_dir.glob("R-*.yaml")):
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        check = (data.get("verify") or {}).get("check")
+        if check:
+            by_check.setdefault(check, []).append(path.stem)
+    return by_check
+
+
+def resolve_targets(
+    scenarios: list[Scenario], spec_dir: Path
+) -> tuple[list[Scenario], list[dict[str, Any]]]:
+    """Resolve target_checks to this project's requirement ids.
+
+    Returns (kept scenarios with only R-id targets, skipped records). A scenario whose
+    checks match no requirement and that names no explicit R-id is skipped, with the
+    reason recorded. Checks that match nothing in a kept scenario are simply dropped.
+    """
+    by_check = _spec_checks(spec_dir)
+    kept: list[Scenario] = []
+    skipped: list[dict[str, Any]] = []
+    for scenario in scenarios:
+        targets = list(scenario.targets)
+        for check in scenario.target_checks:
+            for req_id in by_check.get(check, []):
+                if req_id not in targets:
+                    targets.append(req_id)
+        if not targets:
+            skipped.append(
+                {
+                    "name": scenario.name,
+                    "reason": "no requirement in this project uses any of the checks "
+                    + ", ".join(scenario.target_checks),
+                }
+            )
+            continue
+        kept.append(scenario.model_copy(update={"targets": targets, "target_checks": []}))
+    return kept, skipped
 
 
 def project_scenarios(ctx: StageContext) -> list[Scenario]:
@@ -160,8 +218,15 @@ class RedteamStage:
         if scenarios_dir.is_dir():
             shutil.rmtree(scenarios_dir)
         scenarios_dir.mkdir(parents=True, exist_ok=True)
-        for scenario in project_scenarios(ctx) or propose_scenarios():
-            payload = scenario.model_dump(mode="json")
+        proposed = project_scenarios(ctx) or propose_scenarios()
+        scenarios, skipped = resolve_targets(proposed, ctx.spec_dir)
+        skipped_path = ctx.src_dir / SKIPPED_FILENAME
+        if skipped:
+            skipped_path.write_text(yaml.safe_dump(skipped, sort_keys=True), encoding="utf-8")
+        elif skipped_path.exists():
+            skipped_path.unlink()
+        for scenario in scenarios:
+            payload = scenario.model_dump(mode="json", exclude={"target_checks"})
             _scenario_path(ctx.src_dir, scenario.name).write_text(
                 yaml.safe_dump(payload, sort_keys=True, default_flow_style=False),
                 encoding="utf-8",
@@ -171,6 +236,7 @@ class RedteamStage:
         """Validate the scenario files and copy them to build/redteam/scenarios/."""
         scenarios = self._load_scenarios(ctx)
         self._check_targets(ctx, scenarios)
+        skipped_src = ctx.src_dir / SKIPPED_FILENAME
         if ctx.build_dir.exists():
             shutil.rmtree(ctx.build_dir)
         out_dir = ctx.build_dir / SCENARIOS_DIRNAME
@@ -178,12 +244,18 @@ class RedteamStage:
         for scenario in scenarios:
             source = _scenario_path(ctx.src_dir, scenario.name)
             shutil.copy2(source, out_dir / source.name)
+        if skipped_src.is_file():
+            shutil.copy2(skipped_src, ctx.build_dir / SKIPPED_FILENAME)
 
     def interface(self, ctx: StageContext) -> dict:
         """Facts for later stages: the names of the built scenarios."""
         out_dir = ctx.build_dir / SCENARIOS_DIRNAME
         names = sorted(path.stem for path in out_dir.glob("*.yaml")) if out_dir.is_dir() else []
-        return {"scenarios": names}
+        facts: dict[str, Any] = {"scenarios": names}
+        skipped_path = ctx.build_dir / SKIPPED_FILENAME
+        if skipped_path.is_file():
+            facts["skipped"] = yaml.safe_load(skipped_path.read_text(encoding="utf-8"))
+        return facts
 
     def _load_scenarios(self, ctx: StageContext) -> list[Scenario]:
         scenarios_dir = ctx.src_dir / SCENARIOS_DIRNAME

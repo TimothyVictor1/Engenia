@@ -108,11 +108,102 @@ def test_propose_scenarios_are_the_four_fixed_ones():
     assert [s.model_dump() for s in scenarios] == [s.model_dump() for s in again]
 
 
-def test_proposed_targets_are_real_requirement_ids():
-    real_ids = {path.stem for path in SPEC_DIR.glob("R-*.yaml")}
+def test_proposed_scenarios_target_checks_not_requirement_ids():
     for scenario in redteam_module.propose_scenarios():
-        assert scenario.targets, f"{scenario.name} names no requirement"
-        assert set(scenario.targets) <= real_ids
+        assert scenario.target_checks, f"{scenario.name} names no check"
+        assert not scenario.targets
+
+
+def test_harbour_listener_resolved_targets_are_unchanged(workdir):
+    """Resolution must reproduce the previously hardcoded R-ids exactly."""
+    ctx = make_ctx(workdir)
+    RedteamStage().generate(ctx)
+    got = {
+        path.stem: yaml.safe_load(path.read_text(encoding="utf-8"))["targets"]
+        for path in scenario_files(ctx.src_dir / SCENARIOS_DIRNAME)
+    }
+    assert got == {
+        "calm_harbour": ["R-006", "R-011"],
+        "baltic_winter": ["R-006", "R-007", "R-011"],
+        "storm": ["R-006", "R-011", "R-012"],
+        "flooded_bay": ["R-005", "R-006", "R-012"],
+    }
+    for path in scenario_files(ctx.src_dir / SCENARIOS_DIRNAME):
+        assert "target_checks" not in yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert not (ctx.src_dir / "skipped_scenarios.yaml").exists()
+
+
+def _write_spec(directory: Path, req_id: str, check: str) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / f"{req_id}.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "id": req_id,
+                "statement": "The thing shall behave.",
+                "value": 1,
+                "unit": "m",
+                "verify": {"method": "simulation", "check": check, "limit": {"max": 1}},
+                "affects": ["redteam"],
+                "status": "approved",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_new_project_with_different_ids_resolves_and_skips(tmp_path, monkeypatch):
+    spec = tmp_path / "projects" / "other" / "spec"
+    _write_spec(spec, "R-001", "wave_tilt")
+    _write_spec(spec, "R-002", "stress_safety_factor")
+    _write_spec(spec, "R-003", "wave_tilt")
+    monkeypatch.setenv("ENGENIA_ROOT", str(tmp_path))
+    stage = RedteamStage()
+    ctx = StageContext(project="other", stage="redteam", root=tmp_path)
+    stage.generate(ctx)
+    stage.build(ctx)
+    got = {
+        path.stem: yaml.safe_load(path.read_text(encoding="utf-8"))["targets"]
+        for path in scenario_files(ctx.build_dir / SCENARIOS_DIRNAME)
+    }
+    # No requirement uses buoyancy_margin/power_budget, so only scenarios with a match stay.
+    assert got == {
+        "calm_harbour": ["R-001", "R-003"],
+        "baltic_winter": ["R-001", "R-003"],
+        "storm": ["R-001", "R-003", "R-002"],
+        "flooded_bay": ["R-002"],
+    }
+    assert "skipped" not in stage.interface(ctx)
+
+
+def test_scenario_with_no_matching_check_is_skipped_with_reason(tmp_path, monkeypatch):
+    spec = tmp_path / "projects" / "other" / "spec"
+    _write_spec(spec, "R-001", "wave_tilt")
+    monkeypatch.setenv("ENGENIA_ROOT", str(tmp_path))
+    stage = RedteamStage()
+    ctx = StageContext(project="other", stage="redteam", root=tmp_path)
+    stage.generate(ctx)
+    stage.build(ctx)
+    names = [p.stem for p in scenario_files(ctx.build_dir / SCENARIOS_DIRNAME)]
+    assert names == ["baltic_winter", "calm_harbour", "storm"]
+    facts = stage.interface(ctx)
+    assert [item["name"] for item in facts["skipped"]] == ["flooded_bay"]
+    assert "buoyancy_margin" in facts["skipped"][0]["reason"]
+
+
+def test_model_scenario_in_same_format_may_use_checks(workdir, monkeypatch):
+    custom = Scenario(
+        name="custom",
+        water_temp_c=10.0,
+        rationale="model-proposed",
+        target_checks=["wave_tilt"],
+    )
+    monkeypatch.setattr(redteam_module, "propose_scenarios", lambda: [custom])
+    ctx = make_ctx(workdir)
+    RedteamStage().generate(ctx)
+    written = yaml.safe_load(
+        (ctx.src_dir / SCENARIOS_DIRNAME / "custom.yaml").read_text(encoding="utf-8")
+    )
+    assert written["targets"] == ["R-011"]
 
 
 def test_generate_writes_valid_scenario_files(workdir):
@@ -278,6 +369,7 @@ def test_scenario_model_rejects_unknown_fields():
 def test_scenario_model_requires_at_least_one_target():
     data = redteam_module.propose_scenarios()[0].model_dump()
     data["targets"] = []
+    data["target_checks"] = []
     with pytest.raises(ValidationError):
         Scenario.model_validate(data)
 
