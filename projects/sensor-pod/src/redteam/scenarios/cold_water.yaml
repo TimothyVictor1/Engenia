@@ -1,0 +1,16 @@
+depth_m: null
+extra:
+  air_temp_c: -5.0
+name: cold_water
+rationale: Near-freezing sea water is the densest the pod sees. Pressure at depth
+  and the displaced weight both rise, so the stress safety factor falls and the pod
+  floats higher, and the margin that lets it be near-neutral has to hold in both directions.
+  Printed PETG strength at this temperature is not modelled; the stiffer, more brittle
+  behaviour is a test-plan item.
+targets:
+- R-002
+- R-004
+water_density: 1028.0
+water_temp_c: 2.0
+wave_height_m: null
+wave_period_s: null

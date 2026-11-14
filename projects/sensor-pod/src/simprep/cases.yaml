@@ -1,0 +1,12 @@
+- id: SIM-002
+  requirement: R-002
+  scenarios:
+  - cold_water
+  - max_depth_plus_20pct
+  solver: structure
+- id: SIM-FLOW
+  requirement: null
+  scenarios:
+  - cold_water
+  - max_depth_plus_20pct
+  solver: flow

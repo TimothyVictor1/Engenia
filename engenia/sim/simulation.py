@@ -6,6 +6,7 @@ dict. A solver module that does not exist gives the case status "not_run". The d
     wave_tilt        {scenario: {"wave_height_m": float, "max_tilt_deg": float}}
     drag_n           {scenario: float}
     safety_factor, max_von_mises_mpa, structure_depth_m     float
+    safety_factor_by_scenario   {scenario: float}, only when scenarios change the load
     sanity           {"passed": bool, "messages": [str]}
 
 A case whose sanity did not pass contributes only its sanity entry to the interface facts.
@@ -114,4 +115,8 @@ class SimulationStage:
             for key in SCALARS:
                 if result.get(key) is not None:
                     facts[key] = result[key]
+            if result.get("safety_factor_by_scenario"):  # only a pack that has such scenarios
+                facts.setdefault("safety_factor_by_scenario", {}).update(
+                    result["safety_factor_by_scenario"]
+                )
         return facts

@@ -1,0 +1,10 @@
+id: R-001
+statement: The total mass of the pod shall not exceed 250 g.
+value: 250
+unit: g
+verify:
+  method: analysis
+  check: mass_budget
+  limit: {max: 250}
+affects: [mechanical, electronics]
+status: approved

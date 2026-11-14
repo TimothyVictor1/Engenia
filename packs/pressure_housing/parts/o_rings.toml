@@ -1,0 +1,23 @@
+# Standard O-ring table for the pressure_housing pack.
+#
+# Metric catalogue sizes written as inside diameter x cross-section (ID x CS, mm), the
+# nominal series stocked as NBR 70 assortments and described by ISO 3601-1 (dimensions)
+# and Parker O-Ring Handbook (static radial seal design: squeeze 15-30 %, stretch <= 5 %).
+# The proposer picks from this table; it never invents a ring size. Verify a size against
+# the chosen supplier's catalogue before buying: these are nominal sizes, not a quote.
+[table]
+material = "NBR 70 Shore A"
+density_g_cm3 = 1.25  # typical NBR compound; used only to estimate the ring mass.
+cs_mm = [2.0, 2.5, 3.0]
+
+[[rings]]
+cs_mm = 2.0
+id_mm = [30.0, 32.0, 34.0, 35.0, 36.0, 38.0, 40.0, 42.0, 44.0, 45.0, 46.0, 48.0, 50.0, 52.0, 54.0, 55.0, 56.0, 58.0, 60.0, 62.0, 65.0, 68.0, 70.0]
+
+[[rings]]
+cs_mm = 2.5
+id_mm = [30.0, 32.0, 34.0, 35.0, 36.0, 38.0, 40.0, 42.0, 44.0, 45.0, 46.0, 48.0, 50.0, 52.0, 54.0, 55.0, 56.0, 58.0, 60.0, 62.0, 65.0, 68.0, 70.0]
+
+[[rings]]
+cs_mm = 3.0
+id_mm = [40.0, 42.0, 44.0, 45.0, 46.0, 48.0, 50.0, 52.0, 54.0, 55.0, 56.0, 58.0, 60.0, 62.0, 65.0, 68.0, 70.0, 72.0, 75.0, 78.0, 80.0]

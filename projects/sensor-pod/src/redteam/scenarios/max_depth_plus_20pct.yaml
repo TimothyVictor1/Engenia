@@ -1,0 +1,16 @@
+depth_m: null
+extra:
+  depth_factor: 1.2
+name: max_depth_plus_20pct
+rationale: The pod is lowered 20 % deeper than its rated depth, through a mis-set
+  winch counter or a drifting mooring. The hull must still hold its stress safety
+  factor and the walls must stay at their minimum, because a seal fails when the tube
+  or cap yields. The structure solver scales the design-depth stress by the pressure
+  ratio and the pod sizing uses the same depth.
+targets:
+- R-002
+- R-003
+water_density: 1025.0
+water_temp_c: 10.0
+wave_height_m: null
+wave_period_s: null

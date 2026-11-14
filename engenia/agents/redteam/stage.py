@@ -29,6 +29,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from engenia.contracts.models import StageContext
+from engenia.harness.packs import pack_file
 
 SCENARIOS_DIRNAME = "scenarios"
 SKIPPED_FILENAME = "skipped_scenarios.yaml"
@@ -179,7 +180,16 @@ def project_scenarios(ctx: StageContext) -> list[Scenario]:
     A file that does not validate raises: a broken project scenario must not quietly
     become a buoy scenario.
     """
-    directory = ctx.project_dir / SCENARIOS_DIRNAME
+    return _load_directory(ctx.project_dir / SCENARIOS_DIRNAME)
+
+
+def pack_scenarios(ctx: StageContext) -> list[Scenario]:
+    """Scenarios the project's pack ships: packs/<pack>/scenarios/*.yaml. They name checks
+    (`target_checks`), not requirement ids, so they fit any project built from the pack."""
+    return _load_directory(pack_file(ctx, "pack.yaml").parent / SCENARIOS_DIRNAME)
+
+
+def _load_directory(directory: Path) -> list[Scenario]:
     paths = sorted(directory.glob("*.yaml")) if directory.is_dir() else []
     scenarios: list[Scenario] = []
     for path in paths:
@@ -211,14 +221,14 @@ class RedteamStage:
     def generate(self, ctx: StageContext) -> None:
         """Write the proposed scenarios to src/redteam/scenarios/*.yaml.
 
-        The project's own scenarios (projects/<p>/scenarios/) win when present; the fixed
-        proposal is the fallback.
+        The project's own scenarios (projects/<p>/scenarios/) win when present, then the
+        pack's (packs/<pack>/scenarios/); the fixed proposal is the last fallback.
         """
         scenarios_dir = ctx.src_dir / SCENARIOS_DIRNAME
         if scenarios_dir.is_dir():
             shutil.rmtree(scenarios_dir)
         scenarios_dir.mkdir(parents=True, exist_ok=True)
-        proposed = project_scenarios(ctx) or propose_scenarios()
+        proposed = project_scenarios(ctx) or pack_scenarios(ctx) or propose_scenarios()
         scenarios, skipped = resolve_targets(proposed, ctx.spec_dir)
         skipped_path = ctx.src_dir / SKIPPED_FILENAME
         if skipped:
