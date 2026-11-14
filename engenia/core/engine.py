@@ -46,6 +46,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from engenia.contracts.models import Interface, StageContext
+from engenia.core import agents as agent_registry
 from engenia.core import board, events, graph, spec
 from engenia.core.cache import Cache, default_store
 from engenia.core.errors import CoreError
@@ -64,6 +65,13 @@ VERDICT_FILE = "verdict.json"
 # every run and say nothing about the design.
 TRANSCRIPTS_DIR = "transcripts"
 _NOT_OUTPUTS = (INTERFACE_FILE, VERDICT_FILE, TRANSCRIPTS_DIR)
+
+KEY_PREFIX_CHARS = 16  # cache events carry a short key prefix, not the full hash
+
+
+def key_prefix(key: str) -> str:
+    """A short, human-comparable form of a cache key: sha256: plus the first hex digits."""
+    return "sha256:" + key.removeprefix("sha256:")[:KEY_PREFIX_CHARS]
 
 
 class PipelineError(CoreError):
@@ -159,6 +167,7 @@ def _run_stage(stage: Stage, ctx: StageContext, cache: Cache) -> StageResult:
 
 
 def _run_keyed(stage: Stage, ctx: StageContext, cache: Cache, keys: StageKeys) -> StageResult:
+    root, name = ctx.root, ctx.stage
 
     generated = False
     state = _src_state(ctx, keys.input_key)
@@ -168,27 +177,35 @@ def _run_keyed(stage: Stage, ctx: StageContext, cache: Cache, keys: StageKeys) -
         state is _Src.EMPTY and cache.has(keys.stage_key)
     )
     if needs_code:
-        _call(stage, "generate", lambda: stage.generate(ctx))
-        _record_generation(ctx, keys.input_key)
+        with events.phase(root, name, "generate"):
+            _call(stage, "generate", lambda: stage.generate(ctx))
+            _record_generation(ctx, keys.input_key)
         generated = True
         keys = compute_keys(stage, ctx)  # the code is part of the full key
 
     built = False
-    restored = cache.get(keys.stage_key, ctx.build_dir) and (
-        ctx.stage_interface_path(ctx.stage).is_file()
-    )
+    with events.phase(root, name, "cache"):
+        restored = cache.get(keys.stage_key, ctx.build_dir) and (
+            ctx.stage_interface_path(ctx.stage).is_file()
+        )
+        events.emit(root, name, "cache", {"key": key_prefix(keys.stage_key), "hit": restored})
     if not restored:
         if ctx.build_dir.exists():
             shutil.rmtree(ctx.build_dir)  # no stale outputs from an earlier run
         ctx.build_dir.parent.mkdir(parents=True, exist_ok=True)
-        _call(stage, "build", lambda: stage.build(ctx))
-        _write_build_files(stage, ctx)
-        _call(stage, "checks", lambda: verify_stage(stage, ctx))
-        cache.put(keys.stage_key, ctx.build_dir)
+        with events.phase(root, name, "build"):
+            _call(stage, "build", lambda: stage.build(ctx))
+        with events.phase(root, name, "publish"):
+            _write_build_files(stage, ctx)
+        with events.phase(root, name, "check"):
+            _call(stage, "checks", lambda: verify_stage(stage, ctx))
+        with events.phase(root, name, "cache"):
+            cache.put(keys.stage_key, ctx.build_dir)
         built = True
 
     if restored:
-        _call(stage, "checks", lambda: verify_stage(stage, ctx, restored=True))
+        with events.phase(root, name, "check"):
+            _call(stage, "checks", lambda: verify_stage(stage, ctx, restored=True))
     status = Status.RAN if generated or built else Status.CACHED
     return StageResult(stage.name, status, generated, built, keys.stage_key)
 
@@ -249,7 +266,6 @@ def execute(
     order = graph.topo_order(reg)
     spec.load_spec(root / "projects" / project / "spec")  # fail early on a broken spec
     cache = Cache(store if store is not None else default_store(root))
-    decisions = board.process_change_requests(root, project)  # before anything reads the contract
 
     state = RunStore(root)
     try:
@@ -261,6 +277,7 @@ def execute(
             kept = state.reopen_run(run_id, order)
         else:
             run_id = state.start_run(project, order)
+        decisions = board.process_change_requests(root, project)  # before anything reads it
         failed: dict[str, str] = {}
         skipped: set[str] = set()  # added by worker threads; set.add is atomic
 
@@ -272,12 +289,18 @@ def execute(
                 except CoreError:
                     key = None  # the normal path reports what is wrong
                 if key == kept[name]["key"] and ctx.stage_interface_path(name).is_file():
-                    _call(reg[name], "checks", lambda: verify_stage(reg[name], ctx, restored=True))
+                    with events.phase(root, name, "check"):
+                        _call(reg[name], "checks", lambda: verify_stage(reg[name], ctx,
+                                                                        restored=True))
                     skipped.add(name)
                     return StageResult(name, Status.CACHED, False, False, key, resumed=True)
             return _run_stage(reg[name], ctx, cache)
 
         def started(name: str) -> None:
+            try:
+                events.set_agent(root, name, agent_registry.for_stage(name).as_log())
+            except KeyError:
+                pass  # a registry outside the frozen stage list has no agent identity
             events.emit(root, name, "message", {"text": f"stage {name} started"})
             if name not in kept:
                 state.stage_started(run_id, name)
@@ -313,14 +336,15 @@ def execute(
             done=done, failed=fail, blocked=block,
         )
         with events.activate(root, run_id, project):
+            decisions += board.process_change_requests(root, project)
             outcome = schedule(
                 order, reg, work, workers=workers or default_workers(), hooks=hooks
             )
+            decisions += board.process_change_requests(root, project)  # what the stages asked for
         state.finish_run(run_id, "failed" if failed else "done")
     finally:
         state.close()
 
-    decisions += board.process_change_requests(root, project)  # what the stages asked for
     mismatches = write_mismatches(
         root / "projects" / project / "build", board.load_contract(root, project)
     )

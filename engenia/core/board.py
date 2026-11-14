@@ -38,6 +38,7 @@ from engenia.contracts.models import (
     Contract,
     StageContext,
 )
+from engenia.core import events
 from engenia.core.errors import CoreError
 
 REQUESTS_DIR = "change_requests"
@@ -105,6 +106,10 @@ def submit_change_request(
                 stream.write(request.model_dump_json(indent=2) + "\n")
         except FileExistsError:
             continue  # another stage took this number first
+        events.emit(ctx.root, ctx.stage, "change_request", {
+            "status": "filed", "id": request.id, "path": path,
+            "requested": request.requested, "reason": reason,
+        })
         return request
     raise BoardError("change request id space exhausted")
 
@@ -200,7 +205,10 @@ def _write_json(path: Path, value: Any) -> None:
 
 
 def process_change_requests(root: Path, project: str) -> list[Decision]:
-    """Decide every open request. Returns the decisions made now, in id order."""
+    """Decide every open request. Returns the decisions made now, in id order.
+
+    The decisions are also logged as change_request events: to the active run when there is
+    one, else to the project's newest run log (`events.attach`)."""
     open_requests = [
         (p, r) for p, r in load_requests(root, project) if r.status is ChangeRequestStatus.OPEN
     ]
@@ -210,25 +218,30 @@ def process_change_requests(root: Path, project: str) -> list[Decision]:
     contract = load_contract(root, project)
     decisions: list[Decision] = []
     changed = False
-    for path, request in open_requests:
-        updated, reason = evaluate(contract, request)
-        if updated is not None:
-            status = ChangeRequestStatus.ACCEPTED
-            if updated != contract:
-                updated = updated.model_copy(update={"version": contract.version + 1})
-                contract, changed = updated, True
-        else:
-            status = ChangeRequestStatus.REJECTED
-        decisions.append(Decision(
-            request.id, status, reason, request.from_stage, request.path, contract.version
-        ))
-        path.write_text(
-            request.model_copy(update={"status": status}).model_dump_json(indent=2) + "\n",
-            encoding="utf-8",
-        )
-    if changed:
-        _write_json(directory / "contract.json", contract.model_dump(mode="json"))
-    _record_decisions(directory / DECISIONS_FILE, decisions)
+    with events.attach(root, project):
+        for path, request in open_requests:
+            updated, reason = evaluate(contract, request)
+            if updated is not None:
+                status = ChangeRequestStatus.ACCEPTED
+                if updated != contract:
+                    updated = updated.model_copy(update={"version": contract.version + 1})
+                    contract, changed = updated, True
+            else:
+                status = ChangeRequestStatus.REJECTED
+            decisions.append(Decision(
+                request.id, status, reason, request.from_stage, request.path, contract.version
+            ))
+            events.emit(root, request.from_stage, "change_request", {
+                "status": status.value, "id": request.id, "path": request.path,
+                "reason": reason, "contract_version": contract.version,
+            })
+            path.write_text(
+                request.model_copy(update={"status": status}).model_dump_json(indent=2) + "\n",
+                encoding="utf-8",
+            )
+        if changed:
+            _write_json(directory / "contract.json", contract.model_dump(mode="json"))
+        _record_decisions(directory / DECISIONS_FILE, decisions)
     return decisions
 
 

@@ -162,8 +162,13 @@ def run_agent(
                 if requested:
                     assistant["tool_calls"] = requested
                 messages.append(assistant)
-                if sink is not None and reply.get("content"):
-                    sink.emit("message", {"role": "assistant", "text": reply["content"]})
+                if sink is not None:
+                    # One event per model turn, tool-call turns included, so the log can count
+                    # model calls per agent.
+                    sink.emit("message", {
+                        "role": "assistant", "text": reply.get("content") or "",
+                        "tool_calls": len(requested),
+                    })
                 if not requested:
                     status = "done"
                     break

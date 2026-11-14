@@ -23,6 +23,7 @@ from pathlib import Path
 import yaml
 
 from engenia.contracts.models import Requirement
+from engenia.core import events
 from engenia.core.errors import CoreError
 from engenia.core.hashing import file_hash
 from engenia.core.lint import Severity, lint_data
@@ -102,6 +103,10 @@ def apply_plan(project: str, root: Path) -> str:
         snapshot = _snapshot(root, project)
         snapshot.parent.mkdir(parents=True, exist_ok=True)
         snapshot.write_text((checks / PLAN).read_text("utf-8"), encoding="utf-8")
+    with events.attach(root, project):
+        events.emit(root, None, "approval", {
+            "what": "plan", "status": "given", "hash": content.strip(),
+        })
     return content.strip()
 
 
@@ -155,6 +160,11 @@ def apply_proposal(project: str, root: Path, requirement: str) -> Preview:
     proposal, target = _proposal_paths(project, root, requirement)
     target.write_text(_approved_text(proposal.read_text("utf-8")), encoding="utf-8")
     proposal.unlink()
+    with events.attach(root, project):
+        events.emit(root, None, "approval", {
+            "what": "proposal", "status": "given", "requirement": requirement,
+            "hash": file_hash(target),
+        })
     return preview
 
 

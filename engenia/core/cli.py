@@ -271,6 +271,25 @@ def gate(project: str) -> None:
     raise typer.Exit(result.exit_code)
 
 
+@app.command("demo-fault")
+def demo_fault(project: str, fault: str) -> None:
+    """Plant a fault from evals/faults in a scratch copy and run it there, so the dashboard
+    can show the gate catching it and the repair loop reacting. The real project is never
+    touched: only new run logs appear under .engenia/events/."""
+    from engenia.core.demo_fault import DemoError, run_demo_fault
+
+    _project_dir(project)
+    try:
+        result = run_demo_fault(project, fault, find_root())
+    except DemoError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from None
+    typer.echo(f"demo-fault {result.fault_id} on {project}: "
+               f"{'caught' if result.caught else 'NOT caught'}")
+    typer.echo(result.detail)
+    raise typer.Exit(0 if result.caught else 1)
+
+
 @app.command()
 def matrix(project: str) -> None:
     """Write the trace matrix (build/report/trace_matrix.md and .json) and print it."""
