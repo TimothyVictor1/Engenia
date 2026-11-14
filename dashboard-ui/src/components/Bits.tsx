@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { flatten, fmtValue } from "@/lib/format";
+import { flatten, fmtFact } from "@/lib/format";
 
 export function KV({ data, empty = "Nothing reported." }: { data: Record<string, unknown> | undefined; empty?: string }) {
   const rows = flatten(data);
@@ -9,8 +9,8 @@ export function KV({ data, empty = "Nothing reported." }: { data: Record<string,
       <tbody>
         {rows.map(([k, v]) => (
           <tr key={k} className="border-b last:border-0">
-            <th scope="row" className="py-1.5 pr-4 text-left align-top font-mono text-xs font-normal text-muted-foreground">{k}</th>
-            <td className="py-1.5 font-mono text-xs">{fmtValue(v)}</td>
+            <th scope="row" className="py-1.5 pr-4 text-left align-top font-mono text-xs font-normal text-muted-foreground">{k.replace(/([_.])/g, "$1\u200b")}</th>
+            <td className="py-1.5 text-right align-top font-mono text-xs tabular-nums">{fmtFact(k, v)}</td>
           </tr>
         ))}
       </tbody>

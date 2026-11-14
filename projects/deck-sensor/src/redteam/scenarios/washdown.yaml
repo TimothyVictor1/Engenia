@@ -1,0 +1,16 @@
+depth_m: null
+extra:
+  air_temp_c: 5.0
+  rain_rate_mm_h: 150.0
+  salt spray: true
+name: washdown
+rationale: Driving rain and a salt-water deck washdown at 150 mm/h against the gasketed
+  lid. The 3 mm minimum wall and the seal are the only barrier between the spray and
+  the electronics, so the enclosure minimums must hold. Without wave or water fields,
+  a deck-mounted box does not float, so the wave and flow solvers skip this scenario.
+targets:
+- R-004
+water_density: null
+water_temp_c: 5.0
+wave_height_m: null
+wave_period_s: null

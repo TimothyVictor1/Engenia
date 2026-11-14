@@ -1,0 +1,280 @@
+assembly_mm:
+- 70.0
+- 40.0
+- 14.3
+avg_power_mw: 2.977679023529412
+battery_wh: 0.666
+bay_mm:
+- 72.0
+- 42.0
+- 22.0
+board_holes_mm:
+- - 3.0
+  - 3.0
+- - 67.0
+  - 3.0
+- - 3.0
+  - 37.0
+- - 67.0
+  - 37.0
+board_mm:
+- 70.0
+- 40.0
+- 8.0
+contract_version: 2
+duty_cycle:
+  sample: 0.003
+  sleep: 0.9965
+  transmit: 0.0005
+endurance_days: 7.455471131904128
+facts:
+  design:
+    assembly_clearance_mm: 2.0
+    board_mm:
+    - 70.0
+    - 40.0
+    - 8.0
+    duty_cycle:
+      sample: 0.003
+      sleep: 0.9965
+      transmit: 0.0005
+    regulator_efficiency: 0.85
+    source: 'Engenia buoy electronics design assumptions, README.md p. 1: duty fractions,
+      board envelope, support mass/current, clearance, efficiency and usable-capacity
+      derating; these are design allowances, not vendor specifications.'
+    support_current_ma: 0.2
+    support_mass_g: 12.0
+    usable_capacity_fraction: 0.8
+  parts:
+  - active_current_ma: 68.0
+    approved: true
+    capacity_mah: null
+    function: microcontroller
+    id: ESP32-WROVER-B
+    mass_g: 2.4
+    nominal_voltage_v: null
+    output_voltage_v: null
+    size_mm:
+    - 31.5
+    - 18.0
+    - 3.3
+    sleep_current_ma: 0.15
+    source: Espressif ESP32-WROVER-B Datasheet v2.4 pp. 27-29, 38; ESP32 Series Datasheet
+      v5.3 p. 30; Adafruit 3979 Technical Details (mass/dimensions). See README.md.
+    sources:
+      active_current_ma: 'ESP32 Series Datasheet v5.3 p. 30, Table 4-2: dual core
+        240 MHz modem-sleep upper value 68 mA, RF disabled. Module-memory overhead
+        covered by README.md p. 1 modelling limitation.'
+      mass_g: 'Adafruit ESP32-WROVER-B 3979, Technical Details: product weight 2.4
+        g (https://www.adafruit.com/product/3979).'
+      size_mm: 'Adafruit 3979 Technical Details: 31.5 x 18.0 x 3.3 mm; ESP32-WROVER-B
+        Datasheet v2.4 p. 38 module drawing.'
+      sleep_current_ma: 'ESP32 Series Datasheet v5.3 p. 30, Table 4-2: deep sleep
+        with ULP powered, 150 uA / 1000 = 0.15 mA. Memory power-down assumed; see
+        README.md p. 1.'
+      supply_voltage_v: ESP32-WROVER-B Datasheet v2.4 p. 27, Table 14 recommended
+        supply.
+    supply_voltage_v:
+    - 3.0
+    - 3.6
+  - active_current_ma: 120.0
+    approved: true
+    capacity_mah: null
+    function: lora
+    id: RFM95W-868S2
+    mass_g: 2.0
+    nominal_voltage_v: null
+    output_voltage_v: null
+    size_mm:
+    - 16.0
+    - 16.0
+    - 2.4
+    sleep_current_ma: 0.0002
+    source: HopeRF RFM95W/96W/98W Datasheet V2.0 pp. 10-13, 122 (electrical/mechanical);
+      Seeed RFM95 LoRa Module Technical Details (2 g gross mass). See README.md.
+    sources:
+      active_current_ma: HopeRF RFM95W/96W/98W Datasheet V2.0 p. 13 electrical specification,
+        +20 dBm TX 120 mA.
+      mass_g: Seeed RFM95 LoRa Module Technical Details, gross weight 2 g; used as
+        conservative assembled-module mass (README.md source URL).
+      size_mm: HopeRF RFM95W/96W/98W Datasheet V2.0 p. 122 mechanical drawing; 16
+        x 16 x 2.4 mm envelope (README.md source URL).
+      sleep_current_ma: HopeRF RFM95W/96W/98W Datasheet V2.0 p. 13 electrical specification,
+        sleep register retention 0.2 uA / 1000.
+      supply_voltage_v: HopeRF RFM95W product datasheet, Main Datasheet VDD 2.4-3.7
+        V (https://www.hoperf.com/modules/lora/RFM95W.html).
+    supply_voltage_v:
+    - 2.4
+    - 3.7
+  - active_current_ma: 0.024
+    approved: true
+    capacity_mah: null
+    function: audio
+    id: MAX4466EUK
+    mass_g: 0.1
+    nominal_voltage_v: null
+    output_voltage_v: null
+    size_mm:
+    - 3.0
+    - 3.0
+    - 1.45
+    sleep_current_ma: 0.024
+    source: Analog Devices MAX4465-MAX4469 Datasheet Rev. 2 pp. 1-2, 11; SOT23-5 outline
+      21-0057 p. 1; Engenia README.md p. 1 mass allowance (not a manufacturer mass).
+    sources:
+      active_current_ma: 'MAX4465-MAX4469 Datasheet Rev. 2 p. 2: typical supply current
+        24 uA / 1000.'
+      mass_g: 'Engenia README.md p. 1: 0.1 g conservative procurement allowance for
+        the SOT23-5 device; provisional engineering assumption, not measured or vendor
+        specified.'
+      size_mm: 'Analog Devices SOT23-5 package outline 21-0057 p. 1: 3.0 x 3.0 x 1.45
+        mm maximum envelope (https://mds.analog.com/api/public/content/sot-23_21-0057.pdf).'
+      sleep_current_ma: 'MAX4465-MAX4469 Datasheet Rev. 2 pp. 1-2: MAX4466 has no
+        shutdown; remains at typical 24 uA in system sleep.'
+      supply_voltage_v: MAX4465-MAX4469 Datasheet Rev. 2 p. 2, electrical characteristics
+        supply voltage range.
+    supply_voltage_v:
+    - 2.4
+    - 5.5
+  - active_current_ma: 0.1
+    approved: true
+    capacity_mah: null
+    function: regulator
+    id: S7V8F3
+    mass_g: 0.6
+    nominal_voltage_v: null
+    output_voltage_v: 3.3
+    size_mm:
+    - 16.51
+    - 11.43
+    - 2.54
+    sleep_current_ma: 0.1
+    source: Pololu S7V8F3 product datasheet, Specifications web page (single page),
+      Dimensions and General specifications; README.md p. 1.
+    sources:
+      active_current_ma: 'Pololu S7V8F3 Specifications: maximum enabled no-load quiescent
+        current 0.1 mA. Conversion loss accounted separately.'
+      mass_g: 'Pololu S7V8F3 Specifications, Dimensions: 0.6 g without optional headers
+        (https://www.pololu.com/product/2122/specs).'
+      output_voltage_v: 'Pololu S7V8F3 Specifications, General specifications: fixed
+        output 3.3 V.'
+      size_mm: 'Pololu S7V8F3 Specifications, Dimensions: 0.65 x 0.45 x 0.1 inches,
+        multiplied by exact 25.4 mm/in.'
+      sleep_current_ma: 'Pololu S7V8F3 Specifications: same 0.1 mA enabled quiescent
+        current; regulator remains enabled during system sleep.'
+      supply_voltage_v: 'Pololu S7V8F3 Specifications, General specifications: minimum
+        2.7 V, maximum 11.8 V.'
+    supply_voltage_v:
+    - 2.7
+    - 11.8
+  - active_current_ma: 0.0
+    approved: true
+    capacity_mah: 180.0
+    function: battery
+    id: LP402030
+    mass_g: 3.8
+    nominal_voltage_v: 3.7
+    output_voltage_v: null
+    size_mm:
+    - 31.0
+    - 20.5
+    - 4.3
+    sleep_current_ma: 0.0
+    source: EEMB LP402030 Specification ZJQM-RD-SPC-H2213 (2022-08-09), pp. 3-4; passive-cell
+      current convention in README.md p. 1.
+    sources:
+      active_current_ma: 'EEMB LP402030 Specification p. 3 bare cell; README.md p.
+        1: zero parasitic load, externally drawn load computed from consumers.'
+      capacity_mah: 'EEMB LP402030 Specification p. 3 section 2.2: minimum capacity
+        180 mAh, not typical 190 mAh.'
+      mass_g: 'EEMB LP402030 Specification p. 3 section 2.4: approximate mass 3.8
+        g.'
+      nominal_voltage_v: 'EEMB LP402030 Specification p. 3 section 2.3: 3.7 V.'
+      size_mm: 'EEMB LP402030 Specification pp. 3-4 sections 2.6 and 3: maximum body
+        dimensions (tabs covered by assembly clearance).'
+      sleep_current_ma: 'EEMB LP402030 Specification p. 5 retention; README.md p.
+        1: zero electronic parasitic load; retention covered by capacity derating.'
+      supply_voltage_v: 'EEMB LP402030 Specification p. 3 sections 2.7-2.8: nominal
+        charge limit and discharge cut-off.'
+    supply_voltage_v:
+    - 2.75
+    - 4.2
+  - active_current_ma: 0.0
+    approved: true
+    capacity_mah: 900.0
+    function: battery
+    id: LP503450
+    mass_g: 19.0
+    nominal_voltage_v: 3.7
+    output_voltage_v: null
+    size_mm:
+    - 52.0
+    - 34.5
+    - 5.3
+    sleep_current_ma: 0.0
+    source: EEMB LP503450 Specification ZJQM-RD-SPC-H0750 (2021-07-01), pp. 3-4; passive-cell
+      current convention in README.md p. 1.
+    sources:
+      active_current_ma: 'EEMB LP503450 Specification p. 3 bare cell; README.md p.
+        1: zero parasitic electronic load.'
+      capacity_mah: 'EEMB LP503450 Specification p. 3 section 2.2: minimum capacity
+        900 mAh.'
+      mass_g: 'EEMB LP503450 Specification p. 3 section 2.4: approximate mass 19 g.'
+      nominal_voltage_v: 'EEMB LP503450 Specification p. 3 section 2.3: 3.7 V.'
+      size_mm: 'EEMB LP503450 Specification pp. 3-4 sections 2.6 and 3: maximum body
+        dimensions.'
+      sleep_current_ma: 'EEMB LP503450 Specification p. 5 retention; README.md p.
+        1: zero parasitic electronic load; retention covered by derating.'
+      supply_voltage_v: 'EEMB LP503450 Specification p. 3 sections 2.7-2.8: nominal
+        charge limit and discharge cut-off.'
+    supply_voltage_v:
+    - 2.75
+    - 4.2
+  - active_current_ma: 0.0
+    approved: true
+    capacity_mah: 1700.0
+    function: battery
+    id: LP505464
+    mass_g: 36.0
+    nominal_voltage_v: 3.7
+    output_voltage_v: null
+    size_mm:
+    - 65.0
+    - 54.5
+    - 5.3
+    sleep_current_ma: 0.0
+    source: EEMB LP505464 Specification ZJQM-RD-SPC-H2072 (2022-02-12), pp. 3-4; passive-cell
+      current convention in README.md p. 1.
+    sources:
+      active_current_ma: 'EEMB LP505464 Specification p. 3 bare cell; README.md p.
+        1: zero parasitic electronic load.'
+      capacity_mah: 'EEMB LP505464 Specification p. 3 section 2.2: minimum capacity
+        1700 mAh.'
+      mass_g: 'EEMB LP505464 Specification p. 3 section 2.4: approximate mass 36 g.'
+      nominal_voltage_v: 'EEMB LP505464 Specification p. 3 section 2.3: 3.7 V.'
+      size_mm: 'EEMB LP505464 Specification pp. 3-4 sections 2.6 and 3: maximum body
+        dimensions.'
+      sleep_current_ma: 'EEMB LP505464 Specification p. 5 retention; README.md p.
+        1: zero parasitic electronic load; retention covered by derating.'
+      supply_voltage_v: 'EEMB LP505464 Specification p. 3 sections 2.7-2.8: nominal
+        charge limit and discharge cut-off.'
+    supply_voltage_v:
+    - 2.75
+    - 4.2
+mass_g: 20.9
+mode_power_mw:
+  sample: 265.2404235294118
+  sleep: 1.8227764705882352
+  transmit: 731.122
+parts:
+  audio: MAX4466EUK
+  battery: LP402030
+  lora: RFM95W-868S2
+  microcontroller: ESP32-WROVER-B
+  regulator: S7V8F3
+pins_used:
+  HYDROPHONE_ADC: GPIO34
+  LORA_CS: GPIO5
+requested_bay_mm: null
+target_endurance_days: 7.0
+usable_battery_wh: 0.5328

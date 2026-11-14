@@ -3,6 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
+  --breakpoint-3xl: 112.5rem;
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-success: var(--success);
@@ -93,7 +94,42 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+  --surface: oklch(0.17 0.04 265);
+  --success: oklch(0.72 0.17 152);
+  --info: oklch(0.72 0.14 245);
+  --warning: oklch(0.8 0.15 80);
 }
+
+/* Projector: white page, near-black text, strong borders, bigger type. Contrast of body text on
+   the background is above 15:1 and muted text above 7:1, so it reads from the back of a room. */
+.projector {
+  font-size: 118%;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.14 0.01 255);
+  --surface: oklch(0.97 0.003 250);
+  --card: oklch(1 0 0);
+  --muted: oklch(0.94 0.004 250);
+  --muted-foreground: oklch(0.34 0.02 255);
+  --accent: oklch(0.92 0.04 235);
+  --primary: oklch(0.38 0.15 245);
+  --primary-foreground: oklch(1 0 0);
+  --border: oklch(0.55 0.015 255);
+  --input: oklch(0.55 0.015 255);
+  --ring: oklch(0.38 0.15 245);
+  --success: oklch(0.42 0.13 152);
+  --info: oklch(0.42 0.16 250);
+  --warning: oklch(0.5 0.13 65);
+  --destructive: oklch(0.5 0.2 27);
+}
+.projector .text-\[7px\], .projector .text-\[8px\], .projector .text-\[10px\] { font-size: 0.75rem; }
+.projector .text-\[11px\] { font-size: 0.8rem; }
+.projector .text-xs { font-size: 0.85rem; }
+.projector .border { border-width: 1.5px; }
+
+@keyframes fade-in-late { from { opacity: 0; } to { opacity: 1; } }
+/* Spinners that appear after a delay, so a fast load never flashes one. */
+.fade-in-late { animation: fade-in-late 150ms 250ms both; }
+html, body { overflow-x: clip; }
 
 @layer base {
   * { border-color: var(--color-border); }

@@ -1,0 +1,24 @@
+- id: SIM-011
+  requirement: R-011
+  scenarios:
+  - baltic_winter
+  - calm_harbour
+  - flooded_bay
+  - storm
+  solver: waves
+- id: SIM-012
+  requirement: R-012
+  scenarios:
+  - baltic_winter
+  - calm_harbour
+  - flooded_bay
+  - storm
+  solver: structure
+- id: SIM-FLOW
+  requirement: null
+  scenarios:
+  - baltic_winter
+  - calm_harbour
+  - flooded_bay
+  - storm
+  solver: flow

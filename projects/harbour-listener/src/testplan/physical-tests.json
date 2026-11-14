@@ -1,0 +1,198 @@
+{
+  "not_covered": [
+    {
+      "check": "wall_thickness_min",
+      "reason": "needs a cut section of the print; measure it from a sacrificial part",
+      "requirement": "R-004"
+    },
+    {
+      "check": "power_budget",
+      "reason": "covered indirectly by the battery endurance test (average power is logged)",
+      "requirement": "R-007"
+    },
+    {
+      "check": "erc_clean",
+      "reason": "an electrical rule check of the netlist, not a physical measurement",
+      "requirement": "R-008"
+    },
+    {
+      "check": "detection_rate",
+      "reason": "software behaviour, shown by replaying audio, not at the bench",
+      "requirement": "R-009"
+    },
+    {
+      "check": "false_alarm_rate",
+      "reason": "software behaviour, shown by replaying audio, not at the bench",
+      "requirement": "R-010"
+    },
+    {
+      "check": "stress_safety_factor",
+      "reason": "needs a pressure rig and a destructive test, not a bench measurement",
+      "requirement": "R-012"
+    }
+  ],
+  "project": "harbour-listener",
+  "tests": [
+    {
+      "check": "mass_budget",
+      "expected": {
+        "text": "<= 400 g",
+        "unit": "g",
+        "value": 400.0
+      },
+      "id": "T-001",
+      "instrument": "Digital scale, 0.1 g resolution or better, calibrated with a known mass",
+      "limit": {
+        "max": 400.0
+      },
+      "measure_option": "--mass-g",
+      "measurement_key": "mass_g",
+      "pass_rule": "Pass when the measured value is <= 400 g.",
+      "procedure": [
+        "Assemble the prototype as it will be deployed: hull, lid, electronics, battery, seals.",
+        "Zero the scale. Place the assembled prototype on it and wait for a stable reading.",
+        "Record the mass in grams. Repeat three times, removing the prototype each time.",
+        "Use the mean of the three readings as the measured mass.",
+        "Record it with `engenia measure <project> --mass-g <value> --waterline-mm <value>`."
+      ],
+      "quantity": "mass",
+      "requirement": "R-001",
+      "statement": "The total mass of the buoy shall not exceed 400 g.",
+      "title": "Mass of the assembled prototype"
+    },
+    {
+      "check": "print_bed_fit",
+      "expected": {
+        "text": "= 1 fits",
+        "unit": "fits",
+        "value": 1.0
+      },
+      "id": "T-002",
+      "instrument": "Calipers or steel ruler, 0.1 mm resolution; the printer's stated bed size",
+      "limit": {
+        "equals": 1.0
+      },
+      "measure_option": null,
+      "measurement_key": null,
+      "pass_rule": "Pass when the measured value is = 1 fits.",
+      "procedure": [
+        "Measure the printed hull's three bounding dimensions in millimetres. Do this on the printed part, not on the CAD file.",
+        "Sort the three dimensions and the three bed dimensions in ascending order.",
+        "The part fits if each sorted dimension is no larger than the matching bed dimension.",
+        "Record the result as 1 (fits) or 0 (does not fit), with the dimensions."
+      ],
+      "quantity": "fit",
+      "requirement": "R-002",
+      "statement": "The hull shall fit within the 220 x 220 x 250 mm print bed.",
+      "title": "Printed hull fits the print bed"
+    },
+    {
+      "check": "battery_capacity",
+      "expected": {
+        "text": ">= 7 day",
+        "unit": "day",
+        "value": 7.0
+      },
+      "id": "T-003",
+      "instrument": "Inline power meter or source meter (current to 0.01 mA, logging), the real battery (rated capacity from its datasheet), a thermometer",
+      "limit": {
+        "min": 7.0
+      },
+      "measure_option": null,
+      "measurement_key": null,
+      "pass_rule": "Pass when the measured value is >= 7 day.",
+      "procedure": [
+        "Fully charge the battery. Put the power meter in series with the battery.",
+        "Run the firmware in its normal duty cycle at about 20 C for at least 24 hours, logging current and voltage.",
+        "Compute the average power in mW over the whole log, including every sleep and transmit period.",
+        "Endurance in days = battery Wh x 1000 / average power mW / 24 x 0.8, where 0.8 is the derating the design checks use.",
+        "For a final proof, run the unit on the battery until it stops and record the days."
+      ],
+      "quantity": "endurance",
+      "requirement": "R-003",
+      "statement": "The buoy shall operate for at least 7 days on one battery charge.",
+      "title": "Battery endurance"
+    },
+    {
+      "check": "buoyancy_margin",
+      "expected": {
+        "text": ">= 0.2 ratio",
+        "unit": "ratio",
+        "value": 0.2
+      },
+      "id": "T-005",
+      "instrument": "Digital scale (0.1 g), vessel big enough to submerge the prototype, thermometer, hydrometer",
+      "limit": {
+        "min": 0.2
+      },
+      "measure_option": null,
+      "measurement_key": null,
+      "pass_rule": "Pass when the measured value is >= 0.2 ratio.",
+      "procedure": [
+        "Weigh the assembled, sealed prototype dry: total mass m in grams.",
+        "Fill the vessel with water and measure its density in g/cm3 (hydrometer).",
+        "Put the vessel on the scale and zero it. Push the prototype fully under water with a thin rod, without touching the vessel. Do not let it touch the bottom.",
+        "Read the scale: the added grams divided by the water density is the displaced volume V in cm3.",
+        "Compute margin = (V x density - m) / m. Repeat three times and use the mean.",
+        "Keep the prototype under water for 10 minutes and check the inside for leaks."
+      ],
+      "quantity": "buoyancy",
+      "requirement": "R-005",
+      "statement": "The buoy shall have a buoyancy margin of at least 0.20.",
+      "title": "Buoyancy margin"
+    },
+    {
+      "check": "metacentric_height",
+      "expected": {
+        "text": ">= 5 mm",
+        "unit": "mm",
+        "value": 5.0
+      },
+      "id": "T-006",
+      "instrument": "Calm water tank, digital inclinometer (0.1 degree), a small known mass (about 5 g), ruler",
+      "limit": {
+        "min": 5.0
+      },
+      "measure_option": null,
+      "measurement_key": null,
+      "pass_rule": "Pass when the measured value is >= 5 mm.",
+      "procedure": [
+        "Float the assembled prototype upright in calm water and let it settle.",
+        "Place the known mass w (grams) on the lid at a measured distance d (mm) from the axis.",
+        "Read the heel angle theta once it settles. Use a small angle, below 10 degrees.",
+        "Compute GM = w x d / (M x tan(theta)) in mm, where M is the total mass of the prototype in grams, including w.",
+        "Repeat with the mass on the opposite side and use the mean of the two GM values."
+      ],
+      "quantity": "tilt",
+      "requirement": "R-006",
+      "statement": "The buoy shall float upright with a metacentric height of at least 5 mm.",
+      "title": "Metacentric height by inclining test"
+    },
+    {
+      "check": "wave_tilt",
+      "expected": {
+        "text": "<= 30 deg",
+        "unit": "deg",
+        "value": 30.0
+      },
+      "id": "T-011",
+      "instrument": "Wave tank or sheltered water with a known wave height, wave staff or ruler, inclinometer (logging) or a fixed camera with a protractor overlay",
+      "limit": {
+        "max": 30.0
+      },
+      "measure_option": null,
+      "measurement_key": null,
+      "pass_rule": "Pass when the measured value is <= 30 deg.",
+      "procedure": [
+        "Float the prototype free in the tank at the wave height named in the requirement.",
+        "Run waves at the scenario period for at least 20 wave cycles.",
+        "Record the maximum tilt from vertical in degrees from the inclinometer log or video.",
+        "Repeat at every wave height in the requirement and keep the largest reading."
+      ],
+      "quantity": "tilt",
+      "requirement": "R-011",
+      "statement": "The buoy shall keep its tilt within 30 degrees in 0.5 m significant wave height.",
+      "title": "Tilt in waves"
+    }
+  ]
+}

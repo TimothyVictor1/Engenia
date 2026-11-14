@@ -11,6 +11,7 @@ import { breakSteps, deriveMission, latestRun, mergeEvents, type AgentsResponse,
 import { useReplay } from "@/lib/replay";
 import { usePresentation } from "@/lib/present";
 import { fmtDuration } from "@/lib/format";
+import { ProjectorToggle } from "@/components/ProjectorToggle";
 import { Section } from "@/components/Bits";
 import { Empty, ErrorState, Loading } from "@/components/States";
 import { Graph, type ArcSpec, type NodeStatus, type NodeView } from "@/components/mission/Graph";
@@ -44,6 +45,8 @@ function nodeStatus(state: StageState | undefined, api: string | undefined, from
   if (state?.active) return "running";
   if (state) {
     if (state.cacheHit === true) return "cached";
+    // A server that streams only "started"/"done" messages gives no phases: trust its stage status.
+    if (state.phases.length === 0 && (api === "done" || api === "failed" || api === "blocked")) return api;
     const failing = state.checks.some((c) => c.result !== "pass");
     const published = state.phases.some((p) => p.phase === "publish" && p.result === "ok");
     if (failing && !published) return "failed";
@@ -188,6 +191,7 @@ export function Mission() {
             <button onClick={replay.live} className="rounded-md border px-3 py-1 hover:bg-muted">Back to live</button>
           ) : (
             <button onClick={replay.start} className="flex items-center gap-1.5 rounded-md border px-3 py-1 hover:bg-muted"><RotateCcw className="h-3.5 w-3.5" /> Replay this run</button>))}
+          {present && <ProjectorToggle />}
           <button onClick={() => setPresent(!present)} aria-pressed={present} className="flex items-center gap-1.5 rounded-md border px-3 py-1 hover:bg-muted">
             {present ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}{present ? "Exit presentation" : "Presentation mode"}</button>
         </div>

@@ -9,6 +9,7 @@ import { deriveStudio, parseEvent, replayDelay, type LiveEvent, type Span } from
 import { fmtNumber } from "@/lib/format";
 import { Card, Section } from "@/components/Bits";
 import { Empty, ErrorState, Loading, PageHeader } from "@/components/States";
+import { resolve } from "@/lib/api";
 import { ModelViewer } from "@/components/ModelViewer";
 import { StatusBadge } from "@/components/StatusBadge";
 
@@ -44,7 +45,7 @@ function Timeline({ spans, start, end }: { spans: Span[]; start: number; end: nu
             {spans.filter((s) => s.stage === stage).map((s) => (
               <div key={s.attempt} title={`${stage} attempt ${s.attempt}: ${s.outcome}`}
                 className={`absolute top-0 h-5 min-w-2 rounded text-[10px] leading-5 text-white ${OUTCOME_BAR[s.outcome]}`}
-                style={{ left: `${((s.start - start) / total) * 100}%`, width: `${Math.max(((s.end - s.start) / total) * 100, 1.5)}%` }}>
+                style={{ left: `${Math.min(((s.start - start) / total) * 100, 98)}%`, width: `${Math.min(Math.max(((s.end - s.start) / total) * 100, 2), 100 - Math.min(((s.start - start) / total) * 100, 98))}%` }}>
                 <span className="px-1">#{s.attempt}</span>
               </div>))}
           </div>
@@ -99,7 +100,7 @@ function FeedItem({ e }: { e: LiveEvent }) {
   return (
     <li className={`flex gap-3 rounded-md border px-2.5 py-1.5 text-xs ${tinted}`}>
       <span className="shrink-0 font-mono text-muted-foreground">{time}</span>
-      <span className="w-20 shrink-0 font-mono text-muted-foreground">{e.stage}#{e.attempt}</span>
+      <span className="w-36 shrink-0 truncate font-mono text-muted-foreground">{e.stage}#{e.attempt}</span>
       <span className="min-w-0 flex-1 break-words">{body}</span>
     </li>
   );
@@ -128,7 +129,9 @@ export function Studio() {
   }, [playing, cursor, speed, source]);
 
   const startReplay = () => { setMode("replay"); setCursor(0); setPlaying(true); };
-  const files = (studio.preview?.files ?? []).map((name) => ({ name, url: api.fileUrl(studio.preview!.stage, name, studio.preview ? Date.parse(studio.preview.ts) % 100000 : 0) }));
+  const files = studio.preview?.url
+    ? [{ name: studio.preview.files[0] ?? "preview.stl", url: resolve(studio.preview.url, sample === true) }]
+    : (studio.preview?.files ?? []).map((name) => ({ name, url: api.fileUrl(studio.preview!.stage, name, studio.preview ? Date.parse(studio.preview.ts) % 100000 : 0) }));
 
   if ((sample || useSample) && sampleEvents.status === "loading") return <><PageHeader title="Live studio" subtitle="" /><Loading text="Loading the sample run…" /></>;
   if ((sample || useSample) && sampleEvents.status === "error") return <><PageHeader title="Live studio" subtitle="" /><ErrorState error={sampleEvents.error} onRetry={sampleEvents.retry} /></>;

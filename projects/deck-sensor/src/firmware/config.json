@@ -1,0 +1,19 @@
+{
+  "contract_version": 2,
+  "detector": {
+    "hold_s": 0.15,
+    "threshold": 0.25
+  },
+  "detector_type": "threshold",
+  "duty_cycle": {
+    "sample": 0.002,
+    "sleep": 0.9975,
+    "transmit": 0.0005
+  },
+  "pins_used": {
+    "LORA_CS": "GPIO5",
+    "SENSOR_SCL": "GPIO22",
+    "SENSOR_SDA": "GPIO21",
+    "VIBRATION_ADC": "GPIO34"
+  }
+}

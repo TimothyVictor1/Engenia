@@ -1,0 +1,133 @@
+{
+  "not_covered": [
+    {
+      "check": "wall_thickness_min",
+      "reason": "needs a cut section of the print; measure it from a sacrificial part",
+      "requirement": "R-004"
+    },
+    {
+      "check": "power_budget",
+      "reason": "covered indirectly by the battery endurance test (average power is logged)",
+      "requirement": "R-005"
+    },
+    {
+      "check": "erc_clean",
+      "reason": "an electrical rule check of the netlist, not a physical measurement",
+      "requirement": "R-006"
+    },
+    {
+      "check": "detection_rate",
+      "reason": "software behaviour, shown by replaying audio, not at the bench",
+      "requirement": "R-008"
+    }
+  ],
+  "project": "deck-sensor",
+  "tests": [
+    {
+      "check": "mass_budget",
+      "expected": {
+        "text": "<= 400 g",
+        "unit": "g",
+        "value": 400.0
+      },
+      "id": "T-001",
+      "instrument": "Digital scale, 0.1 g resolution or better, calibrated with a known mass",
+      "limit": {
+        "max": 400.0
+      },
+      "measure_option": "--mass-g",
+      "measurement_key": "mass_g",
+      "pass_rule": "Pass when the measured value is <= 400 g.",
+      "procedure": [
+        "Assemble the prototype as it will be deployed: hull, lid, electronics, battery, seals.",
+        "Zero the scale. Place the assembled prototype on it and wait for a stable reading.",
+        "Record the mass in grams. Repeat three times, removing the prototype each time.",
+        "Use the mean of the three readings as the measured mass.",
+        "Record it with `engenia measure <project> --mass-g <value> --waterline-mm <value>`."
+      ],
+      "quantity": "mass",
+      "requirement": "R-001",
+      "statement": "The assembled deck sensor shall have a total mass of at most 400 g.",
+      "title": "Mass of the assembled prototype"
+    },
+    {
+      "check": "print_bed_fit",
+      "expected": {
+        "text": "= 1 fits",
+        "unit": "fits",
+        "value": 1.0
+      },
+      "id": "T-002",
+      "instrument": "Calipers or steel ruler, 0.1 mm resolution; the printer's stated bed size",
+      "limit": {
+        "equals": 1.0
+      },
+      "measure_option": null,
+      "measurement_key": null,
+      "pass_rule": "Pass when the measured value is = 1 fits.",
+      "procedure": [
+        "Measure the printed hull's three bounding dimensions in millimetres. Do this on the printed part, not on the CAD file.",
+        "Sort the three dimensions and the three bed dimensions in ascending order.",
+        "The part fits if each sorted dimension is no larger than the matching bed dimension.",
+        "Record the result as 1 (fits) or 0 (does not fit), with the dimensions."
+      ],
+      "quantity": "fit",
+      "requirement": "R-002",
+      "statement": "The printed enclosure shall fit within the 220 x 220 x 250 mm print bed.",
+      "title": "Printed hull fits the print bed"
+    },
+    {
+      "check": "battery_capacity",
+      "expected": {
+        "text": ">= 14 day",
+        "unit": "day",
+        "value": 14.0
+      },
+      "id": "T-003",
+      "instrument": "Inline power meter or source meter (current to 0.01 mA, logging), the real battery (rated capacity from its datasheet), a thermometer",
+      "limit": {
+        "min": 14.0
+      },
+      "measure_option": null,
+      "measurement_key": null,
+      "pass_rule": "Pass when the measured value is >= 14 day.",
+      "procedure": [
+        "Fully charge the battery. Put the power meter in series with the battery.",
+        "Run the firmware in its normal duty cycle at about 20 C for at least 24 hours, logging current and voltage.",
+        "Compute the average power in mW over the whole log, including every sleep and transmit period.",
+        "Endurance in days = battery Wh x 1000 / average power mW / 24 x 0.8, where 0.8 is the derating the design checks use.",
+        "For a final proof, run the unit on the battery until it stops and record the days."
+      ],
+      "quantity": "endurance",
+      "requirement": "R-003",
+      "statement": "The deck sensor shall operate for at least 14 days on one battery charge.",
+      "title": "Battery endurance"
+    },
+    {
+      "check": "bay_fit",
+      "expected": {
+        "text": "= 1 fits",
+        "unit": "fits",
+        "value": 1.0
+      },
+      "id": "T-007",
+      "instrument": "Calipers, 0.1 mm resolution; the printed hull and the real board and battery",
+      "limit": {
+        "equals": 1.0
+      },
+      "measure_option": null,
+      "measurement_key": null,
+      "pass_rule": "Pass when the measured value is = 1 fits.",
+      "procedure": [
+        "Measure the bay in the printed hull, and the board and the battery, in millimetres.",
+        "Place the board, then the battery, in the bay in the orientation used in the design. Check that nothing is forced and the lid closes.",
+        "Compare the sorted dimensions of each part with the sorted dimensions of the bay.",
+        "Record the result as 1 (both fit) or 0 (either does not), with the dimensions."
+      ],
+      "quantity": "fit",
+      "requirement": "R-007",
+      "statement": "The electronics assembly shall fit inside the mechanical battery bay.",
+      "title": "Electronics and battery fit the bay"
+    }
+  ]
+}

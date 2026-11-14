@@ -39,3 +39,6 @@ tests, and the page labels them "Sample data".
 
 Presentation mode (button, `p` key, or `?present=1`) hides the navigation and bigger type; `Esc`
 leaves it.
+
+The **Projector theme** button (header; also in presentation mode; `?theme=projector`) switches to a
+high-contrast light theme with larger type for a projector. See `docs/ui-qa/` for before/after screenshots.

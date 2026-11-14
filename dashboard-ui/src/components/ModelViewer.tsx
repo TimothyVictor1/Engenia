@@ -25,7 +25,7 @@ export function ModelViewer({ files, hidden = [], height = 420 }: { files: Model
     let dead = false;
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }) /* transparent: the themed grid shows through */;
     } catch {
       setPhase({ kind: "error", message: "This browser could not start WebGL, so the 3D view is unavailable." });
       return;

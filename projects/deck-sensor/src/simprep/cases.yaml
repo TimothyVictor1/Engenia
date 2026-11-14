@@ -1,0 +1,8 @@
+- id: SIM-FLOW
+  requirement: null
+  scenarios:
+  - cold_snap
+  - heat_soak
+  - transport_vibration
+  - washdown
+  solver: flow

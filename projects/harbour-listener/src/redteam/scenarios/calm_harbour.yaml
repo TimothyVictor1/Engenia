@@ -1,0 +1,13 @@
+depth_m: 3.0
+extra:
+  shipping_traffic: false
+name: calm_harbour
+rationale: 'Baseline sheltered-harbour conditions: upright floating and the tilt limit
+  must hold in light chop.'
+targets:
+- R-006
+- R-011
+water_density: 1005.0
+water_temp_c: 15.0
+wave_height_m: 0.1
+wave_period_s: 3.0

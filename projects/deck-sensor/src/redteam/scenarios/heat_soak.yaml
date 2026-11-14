@@ -1,0 +1,17 @@
+depth_m: null
+extra:
+  air_temp_c: 35.0
+  deck_surface_temp_c: 60.0
+  solar_irradiance_w_m2: 1000.0
+name: heat_soak
+rationale: Peak summer deck heat soak in full sun. The enclosure skin reaches 60 C,
+  so the electronics must stay inside the average power budget while the battery works
+  at elevated temperature. Without wave or water fields, a deck-mounted box does not
+  float, so the wave and flow solvers skip this scenario.
+targets:
+- R-003
+- R-005
+water_density: null
+water_temp_c: 35.0
+wave_height_m: null
+wave_period_s: null

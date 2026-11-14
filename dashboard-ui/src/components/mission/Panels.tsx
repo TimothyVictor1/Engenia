@@ -58,7 +58,7 @@ export function Layers({ mission, summary }: { mission: Mission; summary: RunSum
   const audit = mission.gate.audit ?? summary?.after?.audit;
   const band = "flex flex-wrap items-center gap-2 rounded-lg border p-2.5";
   return (
-    <div className="grid gap-2 lg:grid-cols-[auto_1fr_auto]" aria-label="Verification layers">
+    <div className="grid gap-2 lg:grid-cols-2 3xl:grid-cols-[auto_auto_1fr]" aria-label="Verification layers">
       <div className={`${band} bg-info/5`} data-layer="before">
         <span className="font-mono text-[11px] font-semibold tracking-[0.14em] text-muted-foreground">BEFORE</span>
         <Step label="Independent verify-plan" why={WHY.verify} mark={verifyMark} detail={vpSummary?.model ? `${vpSummary.model} (${vpSummary.family ?? "family unknown"})` : undefined} />
@@ -69,7 +69,7 @@ export function Layers({ mission, summary }: { mission: Mission; summary: RunSum
         <Step label={checks.length ? `Scripted checks ${passed}✓${failed ? ` ${failed}✗` : ""}` : "Scripted checks"} why={WHY.scripts} mark={scriptMark} />
         <Step label="Integration check" why={WHY.integration} mark={integ.length ? (integ.every((c) => c.result === "pass") ? "pass" : "fail") : "none"} />
       </div>
-      <div className={`${band} bg-success/5`} data-layer="after">
+      <div className={`${band} bg-success/5 lg:col-span-2 3xl:col-span-1`} data-layer="after">
         <span className="font-mono text-[11px] font-semibold tracking-[0.14em] text-muted-foreground">AFTER</span>
         {gateSteps.map((k) => <Step key={k} label={k} why={WHY[k]} mark={markOf(mission.gate[k]?.result ?? gateFromSummary(k)?.result)} detail={mission.gate[k]?.detail || gateFromSummary(k)?.detail || undefined} />)}
         <Step label="Final audit" why={WHY.audit} mark={markOf(audit?.result)} detail={audit?.detail} />

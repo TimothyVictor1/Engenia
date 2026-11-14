@@ -114,3 +114,19 @@ describe("empty data", () => {
     await waitFor(() => expect(screen.getAllByText(/No facts reported|Not built yet|could not start WebGL/i).length).toBeGreaterThan(0));
   });
 });
+
+describe("projector theme", () => {
+  it("toggles a high-contrast light theme from the header and keeps the choice", async () => {
+    install((url) => ok(sampleFile(url.replace(/^sample\//, "").replace(/^files\/.*/, "files.json"))));
+    open("pipeline", "?sample=1&theme=light");
+    const button = await screen.findByRole("button", { name: /projector theme/i });
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    button.click();
+    await waitFor(() => expect(document.documentElement.classList.contains("projector")).toBe(true));
+    expect(screen.getByRole("button", { name: /projector theme/i }).getAttribute("aria-pressed")).toBe("true");
+    expect(localStorage.getItem("engenia-theme")).toBe("projector");
+    screen.getByRole("button", { name: /projector theme/i }).click();
+    await waitFor(() => expect(document.documentElement.classList.contains("projector")).toBe(false));
+    localStorage.removeItem("engenia-theme");
+  });
+});

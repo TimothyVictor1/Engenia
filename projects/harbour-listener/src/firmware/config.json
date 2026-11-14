@@ -1,0 +1,17 @@
+{
+  "contract_version": 2,
+  "detector": {
+    "frequency_hz": 200.0,
+    "hold_s": 0.15,
+    "threshold": 0.15
+  },
+  "duty_cycle": {
+    "sample": 0.003,
+    "sleep": 0.9965,
+    "transmit": 0.0005
+  },
+  "pins_used": {
+    "HYDROPHONE_ADC": "GPIO34",
+    "LORA_CS": "GPIO5"
+  }
+}
