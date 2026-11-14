@@ -70,3 +70,24 @@ def test_full_hull_under_five_minutes(tmp_path):
     result = run_case({}, ctx)
     assert time.monotonic() - start < 300
     assert result["sanity"]["passed"], result["sanity"]["messages"]
+
+
+def test_build123d_then_structure_case_in_one_process_does_not_crash(tmp_path):
+    """Regression: OCP (build123d) and gmsh's OpenCASCADE segfault if they share a process."""
+    import subprocess
+    import sys
+
+    code = (
+        "import sys, pathlib; sys.path.insert(0, 'tests/sim/structure');"
+        "import importlib.util as u;"
+        "s = u.spec_from_file_location('ts', 'tests/sim/structure/test_solver.py');"
+        "m = u.module_from_spec(s); s.loader.exec_module(m);"
+        "ctx = m._fixture(pathlib.Path(sys.argv[1]));"
+        "from engenia.sim.structure import run_case;"
+        "assert run_case({}, ctx)['sanity']['passed'];"
+        "assert 'gmsh' not in sys.modules"
+    )
+    done = subprocess.run(
+        [sys.executable, "-c", code, str(tmp_path)], capture_output=True, text=True
+    )
+    assert done.returncode == 0, done.stderr[-800:]
