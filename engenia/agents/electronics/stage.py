@@ -34,9 +34,16 @@ _ABS_PATH = re.compile(r"(?<![\w.>])(?:[A-Za-z]:)?[\\/](?:[\w.\-+~@]+[\\/])+[\w.
 
 def normalize_log(log: str, labels: list[tuple[Path, str]]) -> str:
     """Make a SKiDL log identical across directories, machines and tool installs."""
-    for path, label in labels:
-        for variant in {str(path), str(path.resolve())}:
-            log = log.replace(variant, label)
+    # Longest first. On macOS /var is a symlink to /private/var, so "/var/x" is a substring of
+    # "/private/var/x": replacing the short form first would leave a stray "/private" in front
+    # of the label. Longest-first also keeps nested labels (<build>) ahead of their parent.
+    pairs = {
+        (variant, label)
+        for path, label in labels
+        for variant in (str(path), str(path.resolve()))
+    }
+    for variant, label in sorted(pairs, key=lambda p: (-len(p[0]), p[0], p[1])):
+        log = log.replace(variant, label)
     log = _LOCATION.sub("", log)
     log = _ABS_PATH.sub(lambda m: "<path>/" + re.split(r"[\\/]", m.group(0))[-1], log)
     return log.replace("\r\n", "\n")

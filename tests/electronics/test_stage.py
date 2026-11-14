@@ -328,3 +328,46 @@ def test_normalize_log_strips_locations_and_paths(tmp_path):
     )
     out = normalize_log(raw, [(tmp_path / "b", "<build>")])
     assert out == "WARNING: x\nsee <build>/circuit.py and <path>/x.py\n"
+
+
+def test_normalize_log_maps_symlinked_and_resolved_paths_to_one_label(tmp_path):
+    """macOS: /var/... and /private/var/... name the same directory (G3 flake)."""
+    import os
+
+    from engenia.agents.electronics.stage import normalize_log
+
+    real = tmp_path / "real"
+    (real / "build").mkdir(parents=True)
+    link = tmp_path / "link"
+    try:
+        os.symlink(real, link)
+    except OSError:
+        pytest.skip("symlinks not available")
+    build = link / "build"
+    labels = [(build, "<build>"), (link, "<root>")]
+    raw = f"a {link}/x.py b {real}/x.py c {build}/y d {real}/build/y\n"
+    out = normalize_log(raw, labels)
+    assert out == "a <root>/x.py b <root>/x.py c <build>/y d <build>/y\n"
+    # same result whichever form the log uses
+    assert normalize_log(f"{real}/x.py", labels) == normalize_log(f"{link}/x.py", labels)
+
+
+def test_normalize_log_keeps_alias_prefix_from_leaking(tmp_path):
+    """A short variant that is a substring of the long one must not run first."""
+    from engenia.agents.electronics.stage import normalize_log
+
+    class Fake:
+        def __init__(self, shown, real):
+            self._s, self._r = shown, real
+
+        def __str__(self):
+            return self._s
+
+        def resolve(self):
+            from pathlib import Path
+
+            return Path(self._r)
+
+    root = Fake("/var/folders/t/proj", "/private/var/folders/t/proj")
+    out = normalize_log("at /private/var/folders/t/proj/src/c.py", [(root, "<root>")])
+    assert out == "at <root>/src/c.py"

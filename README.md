@@ -54,7 +54,7 @@ flowchart TB
     SIMPREP --> SIM
 
     SIM --> FINAL["final<br/>gate G1 to G5, then audit"]
-    TP["testplan (placeholder)"] --> FINAL
+    TP["testplan<br/>physical test procedures"] --> FINAL
     H2 --> FINAL
     FINAL --> REPORT["report<br/>trace matrix"]
     REPORT --> REL["release<br/>zip of build outputs and evidence"]
@@ -76,10 +76,10 @@ flowchart TB
     classDef human fill:#fff3cd,stroke:#8a6d00;
     classDef todo stroke-dasharray: 5 5,fill:#f2f2f2,stroke:#888;
     class H1,H2,H3 human;
-    class TP,EXPORT,PRINT todo;
+    class EXPORT,PRINT todo;
 ```
 
-Yellow nodes are human decisions. Dashed grey nodes are not automated on `main`: `testplan` is a placeholder stage, and print export and the physical print are described in [section 14](#14-physical-prototyping). `engenia measure` itself is implemented.
+Yellow nodes are human decisions. Dashed grey nodes are not automated on `main`: print export and the physical print are described in [section 14](#14-physical-prototyping). `testplan` writes the test procedures for that print, and `engenia measure` reads their ids.
 
 How the diagram maps to the code:
 
@@ -103,7 +103,7 @@ Eight agent folders sit under `engenia/agents/`. Four more pipeline stages are s
 | `electronics` | Selects parts, builds the netlist, runs the electrical rule check, computes power and battery life | contract, requirements, parts facts | `build/electronics/` (netlist, BOM, ERC, facts) | Design model may propose a selection; else deterministic. SKiDL build is a script | `engenia/agents/electronics/`, `packs/*/parts/` |
 | `firmware` | Proposes detector settings, builds with PlatformIO, runs unit tests, replays audio | contract, electronics facts | `build/firmware/` (detections, metrics) | Design model may propose settings; else deterministic. Build and replay are scripts | `engenia/agents/firmware/` |
 | `redteam` | Scenario files that stress the design (waves, cold, flooding, storm; for the enclosure: heat, cold, washdown, vibration) | project scenario files | `build/redteam/scenarios/*.yaml` | Script: four fixed scenarios, or the project's own `scenarios/*.yaml`. No model | `engenia/agents/redteam/` |
-| `testplan` | Intended to write physical test procedures | none yet | a placeholder file only | Placeholder stage on `main` | `engenia/agents/testplan/` |
+| `testplan` | Writes a physical test plan: for each approved requirement that can be checked on the printed prototype (mass, buoyancy and waterline, tilt, fit, battery endurance) the procedure, instrument, expected value and pass limit. Requirements with no bench test (stress, detection rate, ERC, power budget, wall thickness) are listed as not covered, with the reason | the approved requirements (`spec/`) | `build/testplan/physical-tests.md` and `physical-tests.json` (test `T-005` checks `R-005`) | Deterministic: fixed procedure templates chosen by `verify.check`; the numbers and limits come from the requirement. No model | `engenia/agents/testplan/` |
 | `integration` | Cross-stage checks: board fits bay, mounts match, total mass, pins match, contract version | the three design interfaces, contract | facts, `mismatches.json` | Script | `engenia/stages/integration/` |
 | `simprep` | One simulation case per simulation requirement | requirements, scenario names | `build/simprep/cases.yaml` | Script | `engenia/sim/simprep.py` |
 | `simulation` | Runs the waves, structure and drag solvers | cases, interfaces | `build/simulation/results.json` | Solvers (scripts) | `engenia/sim/` |
@@ -112,7 +112,7 @@ Eight agent folders sit under `engenia/agents/`. Four more pipeline stages are s
 Counts on `main`:
 
 - 12 pipeline stages: `verify_plan`, `architect`, `mechanical`, `electronics`, `firmware`, `redteam`, `testplan`, `simprep`, `integration`, `simulation`, `final`, `report`.
-- 8 agent folders. 6 of them can call a model: `intake`, `verify_plan`, `architect`, `mechanical`, `electronics`, `firmware`. 1 is deterministic (`redteam`). 1 is a placeholder (`testplan`).
+- 8 agent folders. 6 of them can call a model: `intake`, `verify_plan`, `architect`, `mechanical`, `electronics`, `firmware`. 2 are deterministic (`redteam`, `testplan`).
 - 5 stages are scripts: `integration`, `simprep`, `simulation`, `final`, `report`. `final` has one optional model call, the advisory audit note.
 - 2 more model call sites that are not agents: the repair loop (`engenia/harness/repair.py`, design model) and the audit note (verification model).
 - Deciding code: 16 verifier scripts in `verifiers/` (13 design checks and 3 `measured_*` checks) and the gate in `engenia/gate/`. No model is ever called there.
@@ -203,7 +203,7 @@ uv run engenia matrix harbour-listener
 | R-011 | Tilt within 30° in 0.5 m significant wave height | `wave_tilt` | simulation |
 | R-012 | Stress safety factor at least 2 at 3 m depth | `stress_safety_factor` | simulation |
 
-**Result of `engenia gate harbour-listener`:** approval, G1, G2, G3, G4 and G5 pass; `gate harbour-listener: pass`. The first gate run passed; in later repeated runs G3 failed on some of them; see [section 15](#15-limitations-and-honest-status).
+**Result of `engenia gate harbour-listener`:** approval, G1, G2, G3, G4 and G5 pass; `gate harbour-listener: pass`. The first gate run passed; in later repeated runs, made before the macOS path fix, G3 failed on some of them; see [section 15](#15-limitations-and-honest-status).
 
 **Trace matrix** (`engenia matrix harbour-listener`): 12 pass, 0 fail, 0 error, 0 unverified. 10 verdicts are `calculated`, 2 are `simulated`, 0 are `measured`.
 
@@ -262,7 +262,7 @@ No requirement limits drag; it is reported in the simulation facts.
 | R-007 | Electronics assembly fits the battery bay | `bay_fit` |
 | R-008 | Detects the reference vibration tone in the replayed test audio, rate at least 0.9 | `detection_rate` |
 
-**Result of `engenia gate deck-sensor`:** approval, G1, G2, G4 and G5 pass on every run. G3 passed in 3 of 5 consecutive gate runs on this Mac and failed in 2 (`electronics: build.log differs from rebuild`; see [section 15](#15-limitations-and-honest-status)). The table below is the same on every run.
+**Result of `engenia gate deck-sensor`:** approval, G1, G2, G4 and G5 pass on every run. G3 passed in 3 of 5 consecutive gate runs on this Mac and failed in 2 (`electronics: build.log differs from rebuild`), before the macOS path fix (see [section 15](#15-limitations-and-honest-status)). The table below is the same on every run.
 
 **Trace matrix:** 8 pass, 0 fail, 0 error, 0 unverified; all 8 verdicts are `calculated`.
 
@@ -343,8 +343,7 @@ All commands are `uv run engenia <command>`. Run `engenia <command> --help` for 
 | `release <project>` | | Runs the gate fresh and, only if it passes, writes `release/<project>-<hash>.zip` (build outputs, spec, check plan, contract, `MANIFEST.json`). Equal contents give equal bytes. | `engenia release harbour-listener` |
 | `measure <project>` | `--mass-g` (required), `--waterline-mm` (required), `--tilt-deg`, `--date YYYY-MM-DD` | Records the printed prototype's measurements, compares them with the predictions, writes `calibration.yaml`, runs the `measured` verifiers. | `engenia measure harbour-listener --mass-g 205 --waterline-mm 21` |
 | `doctor` | | Checks model configuration, the model-family guard, one tool-calling request per model, and local tools. Exits 1 on failure. | `engenia doctor` |
-| `plan <project>` | | Declared to show which stages will run and why. **Prints "not implemented" on `main`.** | |
-| `status <project>` | | Declared to show run state and open change requests. **Prints "not implemented" on `main`.** | |
+| `status <project>` | | Shows the latest run of the project from `.engenia/run.db`: per stage its status, attempts and duration; then the result of the last `engenia gate` (from `build/gate/report.json`, or `not run`) and the open change requests. Read only. | `engenia status harbour-listener` |
 
 There is no `export-print` command on `main`; see [section 14](#14-physical-prototyping). The dashboard has its own entry point (`python -m engenia.dashboard`, [section 10](#10-dashboard)), and the gate also runs as `python -m engenia.gate`.
 
@@ -385,7 +384,7 @@ Settings are read from the **process environment**. A `.env` file at the reposit
 | `ENGENIA_STORE` | Where the content-addressed cache lives. Default `<repo>/.engenia/store`; a relative path is taken from the repo root |
 | `ENGENIA_ROOT` | Repository root, if not found from the current directory (nearest parent holding `projects/`) |
 
-Other per-attempt limits in `engenia/harness/limits.py`: 40 tool calls and 600 seconds of wall time per attempt. `.env.example` also lists `ENGENIA_RUNNER` (`local` or `docker`); nothing on `main` reads it.
+Other per-attempt limits in `engenia/harness/limits.py`: 40 tool calls and 600 seconds of wall time per attempt.
 
 **Model setup on Nebius Token Factory.** Create an API key, then set the endpoint and two models from different families. The family is the part of the model ID before the first `/`.
 
@@ -459,13 +458,14 @@ The loop from a verified design to a measured one:
 1. **Release.** `engenia release <project>` runs the gate and, on a pass, writes `release/<project>-<hash>.zip`. The STEP and STL files of the mechanical stage are in it under `build/mechanical/`.
 2. **Export for printing.** *Not on `main`.* There is no `export-print` command. Until it exists, take `hull.stl` and `lid.stl` (or `body.stl` and `lid.stl`) from the release zip or from `build/mechanical/`, and slice them yourself. The mass model assumes solid PETG at density 1.27 g/cm³ with infill factor 1.0; a slicer's real infill and wall settings will give a different mass.
 3. **Print** at The Fishery.
+   The `testplan` stage has already written `build/testplan/physical-tests.md` (for the bench) and `physical-tests.json`: one test per requirement that can be checked on the print, named `T-<number>` after its requirement (`T-005` checks `R-005`), with the instrument, procedure, expected value and pass limit. Requirements with no bench test are listed there as not covered.
 4. **Measure** the printed prototype: mass in grams, waterline height above the hull base in millimetres, and optionally tilt at rest in degrees.
 
    ```bash
    uv run engenia measure harbour-listener --mass-g 205 --waterline-mm 21 --tilt-deg 1.5
    ```
 
-   (The numbers are an illustration, not a measurement.) The command saves `projects/<p>/measurements.yaml`, compares the numbers with the design's predictions, and runs the `measured_*` verifiers for every approved requirement whose method is `test`. Those verdicts carry the evidence level `measured`. A failed verdict becomes a draft requirement change proposal.
+   (The numbers are an illustration, not a measurement.) The command saves `projects/<p>/measurements.yaml`, compares the numbers with the design's predictions, and runs the `measured_*` verifiers for every approved requirement whose method is `test`. Those verdicts carry the evidence level `measured`. A failed verdict becomes a draft requirement change proposal. If `build/testplan/physical-tests.json` exists, the command also reads its test ids and prints, for each planned test whose number you just supplied (mass, waterline, tilt), `T-001 (R-001) mass: pass` or `fail` against that test's limit. These lines are informational; the verdicts decide the exit code.
 5. **Calibration.** The command writes `projects/<p>/calibration.yaml` with `mass_factor` (measured mass divided by predicted mass) and `waterline_offset_mm` (measured minus predicted waterline).
 6. **Re-run.** `engenia run <project>` again. The mechanical stage reads `calibration.yaml` and multiplies the material density by `mass_factor`, so the stages that depend on mass rebuild and the cache key changes. Today `waterline_offset_mm` is recorded but nothing reads it.
 
@@ -487,11 +487,10 @@ The loop from a verified design to a measured one:
 
 **Known gaps on `main`.**
 
-- **G3 can fail intermittently on macOS.** On the Mac used for the numbers above, `engenia gate` passed G3 on most runs and failed on some with `electronics: build.log: differs from rebuild` and `interface.json key differs`. The gate rebuilds in a temporary directory under `/var/...`, which macOS exposes as `/private/var/...`; SKiDL sometimes logs the `/private/var` form, and `normalize_log` in `engenia/agents/electronics/stage.py` then leaves a stray `/private` before the `<src>` label, so the rebuilt log differs from the recorded one. The CI runs on Ubuntu, where the temp path has no such alias. It is a bug in reproducibility, not in a design check, and is not fixed in this README change.
-- `engenia plan` and `engenia status` print "not implemented".
-- `testplan` is a placeholder; no physical test procedure is generated.
+- **G3 on macOS (fixed, not re-measured).** The gate rebuilds in a temporary directory under `/var/...`, which macOS exposes as `/private/var/...`. `normalize_log` in `engenia/agents/electronics/stage.py` replaced the shorter `/var/...` form first, which is a substring of the `/private/var/...` form, so a stray `/private` was left in front of the `<src>` label and the rebuilt `build.log` differed. It now replaces the longest path form first, and `tests/electronics/test_stage.py` covers a symlinked temp directory. The gate runs quoted in [section 7](#7-example-projects), where G3 failed on some runs, were made before this fix; the 5-run check on a Mac has not been repeated.
+- The `testplan` expected values are the requirement limits, not the design's predicted values (the stage has no upstream stage). Procedures are fixed templates, not tailored by a model. No physical test has been run against them.
 - No `export-print` command.
-- `ENGENIA_RUNNER=docker` and the container runner are not on `main`; there is no `containers/` directory, so stages run in the local environment. Reproducibility across machines is tested within one kernel and platform version only (see `engenia/agents/mechanical/README.md`).
+- A container runner is not on `main`; there is no `containers/` directory, so stages run in the local environment. Reproducibility across machines is tested within one kernel and platform version only (see `engenia/agents/mechanical/README.md`).
 - Requirement-to-check mapping for `verify_plan` is validated by script, but whether a check is a good test of the requirement's wording is a human judgement at the approval step. The audit note is advisory.
 - The structure solver reads the depth from the statement of R-012, so that requirement must state it in the form "at N m depth".
 - The wave and structure caches key on the stage classes, not on solver parameters; after editing solver settings, clear `build/simulation/` to force a rerun.
@@ -503,10 +502,7 @@ The loop from a verified design to a measured one:
 **In progress (not on `main`; nothing here should be read as done).**
 
 - Print export (`export-print`) for slicer-ready files, and the printed prototype itself.
-- The test-plan agent (physical test procedures).
-- `engenia plan` and `engenia status`.
-- A container runner (`ENGENIA_RUNNER=docker`, images by digest).
-- A fix for the macOS log-path normalisation behind the intermittent G3 failure.
+- A container runner (images by digest).
 - A flow simulation with OpenFOAM, and CalculiX for the structure case, as set out in the technical plan; `main` uses an analytic drag estimate and scikit-fem.
 - First `measured` verdicts from a printed prototype.
 

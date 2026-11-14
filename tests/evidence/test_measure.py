@@ -363,3 +363,48 @@ def test_cli_defaults_the_date_to_today(scratch_root, predictions, monkeypatch) 
     assert result.exit_code == 0, result.output
     calibration = read_yaml(scratch_root / "projects" / PROJECT / CALIBRATION_FILE)
     assert calibration["source"] == f"measured {date_type.today().isoformat()}"
+
+
+def write_plan(root: Path, tests: list[dict[str, Any]]) -> None:
+    import json
+
+    path = root / "projects" / PROJECT / "build" / "testplan" / "physical-tests.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"project": PROJECT, "tests": tests, "not_covered": []}))
+
+
+def test_measure_reads_the_test_ids_of_the_physical_test_plan(scratch_root, predictions) -> None:
+    write_plan(scratch_root, [
+        {"id": "T-001", "requirement": "R-001", "quantity": "mass", "limit": {"max": 300},
+         "measurement_key": "mass_g"},
+        {"id": "T-006", "requirement": "R-006", "quantity": "waterline", "limit": {"max": 60},
+         "measurement_key": "waterline_mm"},
+        {"id": "T-007", "requirement": "R-007", "quantity": "tilt", "limit": {"max": 10},
+         "measurement_key": "tilt_deg"},
+        {"id": "T-004", "requirement": "R-004", "quantity": "buoyancy", "limit": {"min": 0.2},
+         "measurement_key": None},
+    ])
+    result = run_measure(scratch_root, tilt_deg=None)
+    assert [(t["id"], t["result"]) for t in result.planned] == [
+        ("T-001", "fail"), ("T-006", "pass"),
+    ]
+    assert result.plan_notes == []
+    assert result.exit_code == 0  # informational: verdicts decide the exit code
+
+
+def test_measure_without_a_plan_says_so(scratch_root, predictions) -> None:
+    result = run_measure(scratch_root)
+    assert result.planned == []
+    assert "testplan" in " ".join(result.plan_notes)
+
+
+def test_cli_prints_planned_test_ids(scratch_root, predictions, monkeypatch) -> None:
+    write_plan(scratch_root, [
+        {"id": "T-001", "requirement": "R-001", "quantity": "mass", "limit": {"max": 400},
+         "measurement_key": "mass_g"},
+    ])
+    monkeypatch.setenv("ENGENIA_ROOT", str(scratch_root))
+    result = runner.invoke(
+        app, ["measure", PROJECT, "--mass-g", "352.1", "--waterline-mm", "48.2"]
+    )
+    assert "T-001 (R-001) mass: pass" in result.output
