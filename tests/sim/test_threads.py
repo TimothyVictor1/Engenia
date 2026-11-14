@@ -15,6 +15,9 @@ def _run(tmp_path, monkeypatch, name):
     root = tmp_path / name
     shutil.copytree(REPO / "projects/harbour-listener/spec",
                     root / "projects/harbour-listener/spec")
+    from tests.core.pipeline_fixture import approve_fixture
+
+    approve_fixture(root, "harbour-listener")
     monkeypatch.setenv("ENGENIA_ROOT", str(root))
     monkeypatch.setenv("ENGENIA_STORE", str(root / "store"))
     result = CliRunner().invoke(app, ["run", "harbour-listener", "-j", "4"])

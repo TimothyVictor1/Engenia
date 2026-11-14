@@ -532,7 +532,7 @@ def test_wave_tilt_pass_on_fallback_scenarios(write_interface, make_ctx):
     write_interface(
         "simulation",
         {
-            "scenarios": {
+            "wave_tilt": {
                 "calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 8.0},
                 "baltic_winter": {"wave_height_m": 1.5, "max_tilt_deg": 20.0},
             }
@@ -555,7 +555,7 @@ def test_wave_tilt_fail_on_fallback_scenarios(write_interface, make_ctx):
     write_interface(
         "simulation",
         {
-            "scenarios": {
+            "wave_tilt": {
                 "calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 8.0},
                 "baltic_winter": {"wave_height_m": 1.5, "max_tilt_deg": 45.0},
             }
@@ -579,7 +579,7 @@ def test_wave_tilt_condition_selects_matching_scenarios(write_interface, make_ct
     write_interface(
         "simulation",
         {
-            "scenarios": {
+            "wave_tilt": {
                 "calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 10.0},
                 "baltic_winter": {"wave_height_m": 1.5, "max_tilt_deg": 20.0},
                 "storm": {"wave_height_m": 4.0, "max_tilt_deg": 50.0},
@@ -602,7 +602,7 @@ def test_wave_tilt_condition_selects_matching_scenarios(write_interface, make_ct
 def test_wave_tilt_condition_with_no_matching_scenario(write_interface, make_ctx):
     write_interface(
         "simulation",
-        {"scenarios": {"storm": {"wave_height_m": 4.0, "max_tilt_deg": 50.0}}},
+        {"wave_tilt": {"storm": {"wave_height_m": 4.0, "max_tilt_deg": 50.0}}},
     )
     verdict = load("wave_tilt")(
         make_ctx(
@@ -621,7 +621,7 @@ def test_wave_tilt_condition_requires_scenario_wave_height(write_interface, make
     write_interface(
         "simulation",
         {
-            "scenarios": {
+            "wave_tilt": {
                 "calm_harbour": {"max_tilt_deg": 10.0},
                 "baltic_winter": {"wave_height_m": 1.5, "max_tilt_deg": 20.0},
             }
@@ -642,7 +642,7 @@ def test_wave_tilt_condition_requires_scenario_wave_height(write_interface, make
     )
 
 
-def test_wave_tilt_missing_scenarios_fact(write_interface, make_ctx):
+def test_wave_tilt_missing_wave_tilt_fact(write_interface, make_ctx):
     write_interface("simulation", {"safety_factor": 2.5})
     verdict = load("wave_tilt")(
         make_ctx(
@@ -653,13 +653,13 @@ def test_wave_tilt_missing_scenarios_fact(write_interface, make_ctx):
         )
     )
     assert verdict.result == "error"
-    assert "no 'scenarios' fact" in (verdict.message or "")
+    assert "no 'wave_tilt' fact" in (verdict.message or "")
 
 
 def test_wave_tilt_missing_fallback_scenario(write_interface, make_ctx):
     write_interface(
         "simulation",
-        {"scenarios": {"calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 8.0}}},
+        {"wave_tilt": {"calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 8.0}}},
     )
     verdict = load("wave_tilt")(
         make_ctx(
@@ -677,7 +677,7 @@ def test_wave_tilt_scenario_without_tilt(write_interface, make_ctx):
     write_interface(
         "simulation",
         {
-            "scenarios": {
+            "wave_tilt": {
                 "calm_harbour": {"wave_height_m": 0.5, "max_tilt_deg": 8.0},
                 "baltic_winter": {"wave_height_m": 1.5},
             }
