@@ -43,7 +43,8 @@ function List({ items, filter, setFilter, open }: { items: Requirement[]; filter
             <tbody>{shown.map((r) => (
               <tr key={r.id} id={r.id} className={`border-t align-top ${open === r.id ? "bg-accent/50" : ""}`}>
                 <th scope="row" className="whitespace-nowrap px-3 py-2 text-left font-mono text-xs font-medium">{r.id}</th>
-                <td className="px-3 py-2"><div>{r.statement}</div>
+                <td className="px-3 py-2"><div>{r.statement} {r.origin === "derived" && <span className="rounded bg-accent px-1.5 py-0.5 text-xs" title={r.reason ?? "Pack baseline"}>derived engineering requirement</span>}</div>
+                  {r.origin === "derived" && r.reason && <div className="mt-1 text-xs text-muted-foreground">{r.reason}</div>}
                   <div className="mt-1 font-mono text-[10px] text-muted-foreground">{r.method} · affects {r.affects.join(", ")}</div>
                   {r.verdict?.message && <div className="mt-1 text-xs text-muted-foreground">{r.verdict.message}</div>}</td>
                 <td className="whitespace-nowrap px-3 py-2 font-mono text-xs tabular-nums">{fmtLimit(r.limit)}{r.unit && r.unit !== "fits" ? ` ${r.unit}` : ""}</td>

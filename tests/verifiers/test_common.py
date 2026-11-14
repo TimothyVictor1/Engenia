@@ -99,3 +99,15 @@ def test_checked_measured_verdict_explains_a_fail(make_ctx):
     assert verdict.result == "fail"
     assert verdict.evidence_level == "measured"
     assert "above max 400" in (verdict.message or "")
+
+
+@pytest.mark.parametrize("value,limit,expected", [
+    (12, Limit(min=10), 20), (8, Limit(max=10), 20),
+    (12, Limit(max=10), -20), (5, Limit(min=4, max=10), 25),
+    (0, Limit(equals=0), None), (1, Limit(min=0), None),
+    (None, Limit(max=10), None),
+])
+def test_margin_uses_the_tightest_normalized_bound(value, limit, expected):
+    from verifiers._common import margin_pct
+
+    assert margin_pct(value, limit) == expected

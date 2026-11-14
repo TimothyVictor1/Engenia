@@ -9,3 +9,59 @@ templates:
     checks: [mass_budget, print_bed_fit, wall_thickness_min]
 firmware:
   detector: threshold  # block-RMS level detector; no tuned frequency to propose.
+
+# Engineering policies for human review; pack limits, not certification claims.
+baseline:
+- check: erc_clean
+  value: 0
+  unit: errors
+  method: analysis
+  limit:
+    equals: 0
+  affects:
+  - electronics
+  statement: The schematic shall have zero electrical rule check errors.
+  reason: 'Pack electrical integrity policy: zero ERC errors.'
+- check: bay_fit
+  value: 1
+  unit: ratio
+  method: analysis
+  limit:
+    equals: 1
+  affects:
+  - electronics
+  - mechanical
+  statement: The board and battery shall fit the electronics bay.
+  reason: 'Pack assembly policy: both components must fit the allocated bay.'
+- check: wall_thickness_min
+  value: 3
+  unit: mm
+  method: analysis
+  limit:
+    min: 3
+  affects:
+  - mechanical
+  statement: The printed shell shall have a minimum wall thickness of 3 mm.
+  reason: 'Pack fabrication baseline: the existing mechanical builder uses a 3 mm
+    default wall.'
+- check: power_budget
+  value: 7.5
+  unit: mW
+  method: analysis
+  limit:
+    max: 7.5
+  affects:
+  - electronics
+  statement: The electronics shall draw at most 7.5 mW average power.
+  reason: 'Pack default_contract.json electronics energy budget: 180 mWh per day /
+    24 h.'
+- check: print_bed_fit
+  value: 1
+  unit: ratio
+  method: analysis
+  limit:
+    equals: 1
+  affects:
+  - mechanical
+  statement: Every printed part shall fit the pack print bed.
+  reason: Pack printing.bed_mm defines the available machine envelope.

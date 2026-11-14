@@ -70,7 +70,8 @@ def template_intake(text: str, project: str, root: Path, *, pack: str = "buoy") 
     has_files = spec_dir.is_dir() and any(spec_dir.glob("R-*.yaml"))
     existing = spec.load_requirements(spec_dir) if has_files else []
     have = {r.verify.check for r in existing}
-    next_number = max((int(r.id[2:]) for r in existing), default=0) + 1
+    reserved = [int(p.stem[2:]) for p in (spec_dir / "rejected").glob("R-*.yaml")]
+    next_number = max([int(r.id[2:]) for r in existing] + reserved, default=0) + 1
 
     drafts: list[tuple[str, dict]] = []
     for rule, value in match_rules(text, rules):

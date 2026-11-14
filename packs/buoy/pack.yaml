@@ -13,3 +13,86 @@ structure:
   poisson_ratio: 0.38  # Assumption: isotropic PETG Poisson ratio.
   allowable_stress_mpa: 35  # Assumption: PETG yield-based allowable stress.
   printed_knock_down_factor: 0.60  # Assumption: reduction for layer bonding and defects.
+
+# Engineering policies for human review; pack limits, not certification claims.
+baseline:
+- check: erc_clean
+  value: 0
+  unit: errors
+  method: analysis
+  limit:
+    equals: 0
+  affects:
+  - electronics
+  statement: The schematic shall have zero electrical rule check errors.
+  reason: 'Pack electrical integrity policy: zero ERC errors.'
+- check: bay_fit
+  value: 1
+  unit: ratio
+  method: analysis
+  limit:
+    equals: 1
+  affects:
+  - electronics
+  - mechanical
+  statement: The board and battery shall fit the electronics bay.
+  reason: 'Pack assembly policy: both components must fit the allocated bay.'
+- check: wall_thickness_min
+  value: 3
+  unit: mm
+  method: analysis
+  limit:
+    min: 3
+  affects:
+  - mechanical
+  statement: The printed shell shall have a minimum wall thickness of 3 mm.
+  reason: 'Pack fabrication baseline: the existing mechanical builder uses a 3 mm
+    default wall.'
+- check: power_budget
+  value: 7.5
+  unit: mW
+  method: analysis
+  limit:
+    max: 7.5
+  affects:
+  - electronics
+  statement: The electronics shall draw at most 7.5 mW average power.
+  reason: 'Pack default_contract.json electronics energy budget: 180 mWh per day /
+    24 h.'
+- check: metacentric_height
+  value: 0
+  unit: mm
+  method: analysis
+  limit:
+    min: 0
+  affects:
+  - mechanical
+  statement: The buoy shall have a strictly positive metacentric height.
+  reason: Pack static stability criterion GM > 0; zero is neutral stability and fails.
+  params:
+    strict_min: true
+- check: stress_safety_factor
+  value: 1
+  unit: ratio
+  method: simulation
+  limit:
+    min: 1
+  affects:
+  - simulation
+  statement: The hull shall have a stress safety factor of at least 1 at 3 m submersion
+    depth.
+  reason: 'Pack no-yield criterion: allowable stress / computed stress >= 1 at the
+    3 m splash/submersion load case.'
+  params:
+    depth_m: 3
+- check: buoyancy_margin
+  value: 0
+  unit: ratio
+  method: analysis
+  limit:
+    min: 0
+  affects:
+  - mechanical
+  statement: The buoy shall retain a nonnegative buoyancy margin.
+  reason: 'Pack flotation criterion: displaced water weight must cover total product
+    mass.'

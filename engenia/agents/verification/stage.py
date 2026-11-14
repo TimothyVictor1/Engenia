@@ -94,12 +94,10 @@ def load_requirements(spec_dir: Path) -> dict[str, Requirement]:
 
 
 def _pack(ctx: StageContext) -> dict[str, Any]:
-    for base in (ctx.root, Path(__file__).resolve().parents[3]):
-        path = base / "packs" / "buoy" / "pack.yaml"
-        if path.is_file():
-            loaded = yaml.safe_load(path.read_text("utf-8"))
-            return loaded if isinstance(loaded, dict) else {}
-    return {}
+    from engenia.harness.packs import pack_file
+
+    loaded = yaml.safe_load(pack_file(ctx, "pack.yaml").read_text("utf-8"))
+    return loaded if isinstance(loaded, dict) else {}
 
 
 def _requirement_limit(requirement: Requirement) -> Limit:
@@ -125,6 +123,10 @@ def deterministic_plan(
     )
     for number, requirement in enumerate(approved, start=1):
         params: dict[str, Any] = {}
+        if requirement.origin == "derived":
+            for item in pack.get("baseline", []):
+                if item["check"] == requirement.verify.check:
+                    params.update(item.get("params", {}))
         if requirement.verify.check == "print_bed_fit" and bed:
             params["bed_mm"] = list(bed)
         plan.append(

@@ -8,11 +8,14 @@ from pathlib import Path
 
 import yaml
 
+from engenia.contracts.models import StageContext
 from engenia.core import agents as agent_registry
 from engenia.core import events
+from engenia.core.baseline import BaselineError, derive_baseline
 from engenia.core.errors import CoreError
 from engenia.core.intake_template import IntakeTemplateError, template_intake
 from engenia.harness.llm import agent_model
+from engenia.harness.packs import project_pack
 
 MODEL_ENV = ("ENGENIA_LLM_API_KEY", "ENGENIA_LLM_BASE_URL")
 
@@ -64,8 +67,19 @@ def summary_lines(paths: list[Path], intents: list[dict]) -> list[str]:
     """Every drafted requirement with its check, value, unit and limit, then the design intents
     as a separate list that says they are not verified."""
     lines: list[str] = []
+    user = []
+    derived = []
     for path in paths:
+        data = yaml.safe_load(path.read_text("utf-8")) or {}
+        (derived if data.get("origin") == "derived" else user).append(path)
+    for path in user:
         lines.extend(requirement_lines(path))
+    if derived:
+        lines.append("derived engineering requirements (pack baseline):")
+        for path in derived:
+            lines.extend(requirement_lines(path))
+            data = yaml.safe_load(path.read_text("utf-8"))
+            lines.append(f"    reason: {data.get('reason')}")
     if intents:
         lines.append(INTENTS_TITLE)
         lines.extend(f"  - {i.get('intent')} ({i.get('reason')})" for i in intents)
@@ -78,8 +92,10 @@ def model_configured() -> bool:
     )
 
 
-def run_intake(request: str, project: str, root: Path, *, pack: str = "buoy") -> IntakeResult:
+def run_intake(request: str, project: str, root: Path, *, pack: str | None = None) -> IntakeResult:
     root = Path(root)
+    if pack is None:
+        pack = project_pack(StageContext(project=project, stage="verify_plan", root=root))
     (root / "projects" / project / INTENTS_REL).unlink(missing_ok=True)  # never a stale list
     # Intake is planning work: it logs as the intake agent in the plan phase, to the active
     # run when there is one, else to the project's newest run log.
@@ -100,6 +116,16 @@ def run_intake(request: str, project: str, root: Path, *, pack: str = "buoy") ->
             try:
                 paths = template_intake(request, project, root, pack=pack)
             except IntakeTemplateError as exc:
-                raise IntakeFailed(str(exc)) from exc
+                if "nothing was written" not in str(exc):
+                    raise IntakeFailed(str(exc)) from exc
+                paths = []
             how = f"template ({pack} pack, no model configured)"
+        try:
+            paths.extend(derive_baseline(project, root, pack=pack))
+        except BaselineError as exc:
+            raise IntakeFailed(str(exc)) from exc
+        if not paths:
+            raise IntakeFailed(
+                "nothing was written: all requested and baseline checks already covered"
+            )
     return IntakeResult(paths, how, read_intents(root, project))

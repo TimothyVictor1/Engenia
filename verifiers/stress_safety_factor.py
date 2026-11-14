@@ -21,6 +21,10 @@ from verifiers._common import checked_simulated_verdict, fact_from, guard
 @guard
 def run(ctx: CheckContext) -> Verdict:
     measured, _ = fact_from(ctx, "safety_factor", ctx.stage, "simulation")
+    if "depth_m" in ctx.params:
+        depth, _ = fact_from(ctx, "structure_depth_m", ctx.stage, "simulation")
+        if depth < ctx.params["depth_m"]:
+            raise ValueError("structural evidence does not cover the required submersion depth")
     if measured <= 0:
         raise ValueError(f"safety_factor must be positive, got {measured}")
     return checked_simulated_verdict(ctx, measured)

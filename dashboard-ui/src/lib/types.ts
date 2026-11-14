@@ -28,6 +28,7 @@ export interface RequirementVerdict {
   evidence_level: Evidence; message: string | null; stage: string;
 }
 export interface Requirement {
+  origin?: "user" | "derived"; reason?: string | null;
   id: string; statement: string; unit: string | null; limit: Limit; affects: string[];
   method: string; status: Result | "unverified"; verdict: RequirementVerdict | null;
 }

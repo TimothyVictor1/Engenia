@@ -146,6 +146,8 @@ class ProjectReader:
                 {
                     "id": data["id"],
                     "statement": data["statement"],
+                    "origin": data.get("origin", "user"),
+                    "reason": data.get("reason"),
                     "unit": data.get("unit"),
                     "limit": {key: limit.get(key) for key in ("min", "max", "equals")},
                     "affects": data["affects"],

@@ -25,6 +25,7 @@ def _fixture(tmp_path: Path) -> StageContext:
         folder.mkdir(parents=True)
     (spec / "R-012.yaml").write_text(
         "id: R-012\nstatement: The hull shall survive at 3 m depth.\n"
+        "status: approved\nverify: {check: stress_safety_factor}\n"
     )
     (pack / "pack.yaml").write_text(
         yaml.safe_dump({"structure": {"youngs_modulus_mpa": 2100,
