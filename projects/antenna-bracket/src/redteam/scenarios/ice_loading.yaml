@@ -1,0 +1,17 @@
+depth_m: null
+extra:
+  air_temp_c: -15.0
+  ice_thickness_mm: 10.0
+  load_factor: 1.5
+name: ice_loading
+rationale: Freezing spray coats the antenna and the arm. Ice adds mass at the load
+  point and stiffens the lever; a 1.5 factor on the load is an allowance for it (an
+  assumption, not an icing calculation). The arm must still hold its bending safety
+  factor, and the section must stay at the printed wall minimum.
+targets:
+- R-001
+- R-003
+water_density: null
+water_temp_c: -5.0
+wave_height_m: null
+wave_period_s: null

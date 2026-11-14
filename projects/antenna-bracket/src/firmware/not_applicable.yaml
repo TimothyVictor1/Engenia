@@ -1,0 +1,2 @@
+contract_version: 2
+reason: the project's pack declares no firmware (skip_stages in pack.yaml)

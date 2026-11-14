@@ -1,0 +1,50 @@
+# Deterministic intake for the bracket pack (used when no design model is configured).
+# Same shape as packs/buoy/intake.yaml. Rule keys beyond it:
+#   value_group: which number the pattern found is the requirement's value (default 1);
+#   {n1}, {n2}...: in a statement, the numbers the pattern's groups found, in order.
+# The bending requirement carries its load and distance in the statement, which the pack's
+# proposer and the bending_stress verifier both read (engenia.sim.loads).
+requirements:
+  - name: bending_mast
+    pattern: '(\d+(?:\.\d+)?)\s*kg\D{0,40}?(\d+(?:\.\d+)?)\s*mm\s+(?:from|out)\D{0,30}?(\d+(?:\.\d+)?)\s*mm\s+mast\D{0,40}?safety factor\D{0,12}?(\d+(?:\.\d+)?)'
+    statement: The bracket shall hold a {n1} kg load {n2} mm from the axis of a {n3} mm mast with a bending safety factor of at least {value}.
+    unit: ratio
+    method: analysis
+    check: bending_stress
+    bound: min
+    value_group: 4
+    affects: [mechanical]
+  - name: bending_wall
+    pattern: '(\d+(?:\.\d+)?)\s*kg\D{0,40}?(\d+(?:\.\d+)?)\s*mm\s+(?:from|out)\D{0,30}?(?:wall|surface)\D{0,40}?safety factor\D{0,12}?(\d+(?:\.\d+)?)'
+    statement: The bracket shall hold a {n1} kg load {n2} mm from the wall with a bending safety factor of at least {value}.
+    unit: ratio
+    method: analysis
+    check: bending_stress
+    bound: min
+    value_group: 3
+    affects: [mechanical]
+  - name: mass
+    pattern: '(?:mass|weigh\w*|under|below|less than|lighter than)\D{0,40}?(\d+(?:\.\d+)?)\s*(?:g|grams?)\b'
+    statement: The total mass of the bracket shall not exceed {value} g.
+    unit: g
+    method: analysis
+    check: mass_budget
+    bound: max
+    affects: [mechanical]
+  - name: wall_thickness
+    pattern: 'wall\D{0,60}?(\d+(?:\.\d+)?)\s*mm\b'
+    statement: The bracket shall have a minimum wall thickness of at least {value} mm.
+    unit: mm
+    method: analysis
+    check: wall_thickness_min
+    bound: min
+    affects: [mechanical]
+  - name: print_bed_fit
+    pattern: '(?:print\w*|3d)\W+(?:bed|printer)|fit\w*\W+(?:on|in|within)\W+(?:the\W+|a\W+)?(?:print\w*|3d)'
+    statement: The bracket shall fit within the print bed.
+    unit: ratio
+    method: analysis
+    check: print_bed_fit
+    bound: equals
+    value: 1
+    affects: [mechanical]

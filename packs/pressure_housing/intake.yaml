@@ -2,7 +2,8 @@
 # Same shape as packs/buoy/intake.yaml. Two optional rule keys:
 #   limit:  the bound the requirement carries, when it is not the number the request gave
 #           (the request gives a depth; the limit is the pack's safety factor).
-#   {captured} in a statement is the number the pattern found; {value} is the limit.
+#   {captured} in a statement is the first number the pattern found, {n1}, {n2}... all of them;
+#           {value} is the limit.
 requirements:
   - name: mass
     pattern: '(?:mass|weigh\w*|under|below|less than|lighter than)\D{0,40}?(\d+(?:\.\d+)?)\s*(?:g|grams?)\b'

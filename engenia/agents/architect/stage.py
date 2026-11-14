@@ -27,7 +27,7 @@ from engenia.core.hashing import file_hash
 from engenia.harness.limits import Limits
 from engenia.harness.llm import ChatFn, agent_model, chat, check_model_families
 from engenia.harness.loop import run_agent
-from engenia.harness.packs import pack_file, project_pack
+from engenia.harness.packs import pack_file, project_pack, skipped_stages
 from engenia.harness.tools import Toolbox, ToolError
 
 CONTRACT_FILE = "contract.json"
@@ -85,8 +85,11 @@ class ContractReport:
         return not self.problems
 
 
-def check_contract(text: str) -> ContractReport:
-    """Validate a contract.json text. Pure function; the numbers it reports are measured."""
+def check_contract(text: str, skip: frozenset[str] = frozenset()) -> ContractReport:
+    """Validate a contract.json text. Pure function; the numbers it reports are measured.
+
+    `skip` names the stages the pack leaves out (electronics, firmware): their budgets may be
+    zero, and the bay, mounts and pins that only an electronics design needs are not checked."""
     report = ContractReport()
     try:
         contract = Contract.model_validate_json(text)
@@ -116,32 +119,44 @@ def check_contract(text: str) -> ContractReport:
 
     positives = {
         "budgets.mechanical.mass_g": mech.mass_g,
-        "budgets.electronics.mass_g": elec.mass_g,
-        "budgets.electronics.energy_mwh_per_day": elec.energy_mwh_per_day,
-        "budgets.firmware.flash_kb": firm.flash_kb,
-        "budgets.firmware.ram_kb": firm.ram_kb,
         "totals.mass_g_max": maximum,
         **{
             f"budgets.mechanical.outer_envelope_mm[{i}]": v
             for i, v in enumerate(mech.outer_envelope_mm)
         },
-        **{f"budgets.electronics.bay_mm[{i}]": v for i, v in enumerate(elec.bay_mm)},
     }
+    if "electronics" not in skip:
+        positives |= {
+            "budgets.electronics.mass_g": elec.mass_g,
+            "budgets.electronics.energy_mwh_per_day": elec.energy_mwh_per_day,
+            **{f"budgets.electronics.bay_mm[{i}]": v for i, v in enumerate(elec.bay_mm)},
+        }
+    if "firmware" not in skip:
+        positives |= {"budgets.firmware.flash_kb": firm.flash_kb,
+                      "budgets.firmware.ram_kb": firm.ram_kb}
     for path, value in positives.items():
         if not value > 0:
             report.problems.append(f"{path} must be greater than 0, got {value}")
+    for stage, value in (("electronics", elec.mass_g), ("firmware", firm.flash_kb)):
+        if stage in skip and value != 0:
+            report.problems.append(
+                f"the pack skips {stage}, so its budget must be 0, got {value}"
+            )
 
-    bay, envelope = sorted(elec.bay_mm), sorted(mech.outer_envelope_mm)
-    if any(b > e for b, e in zip(bay, envelope, strict=True)):
-        report.problems.append(
-            f"electronics bay {list(elec.bay_mm)} mm does not fit the mechanical envelope "
-            f"{list(mech.outer_envelope_mm)} mm"
-        )
+    if "electronics" not in skip:
+        bay, envelope = sorted(elec.bay_mm), sorted(mech.outer_envelope_mm)
+        if any(b > e for b, e in zip(bay, envelope, strict=True)):
+            report.problems.append(
+                f"electronics bay {list(elec.bay_mm)} mm does not fit the mechanical envelope "
+                f"{list(mech.outer_envelope_mm)} mm"
+            )
 
-    bx, by, _ = elec.bay_mm
-    for hx, hy in contract.interfaces.mounts.board_holes_mm:
-        if not (0 <= hx <= bx and 0 <= hy <= by):
-            report.problems.append(f"board hole ({hx}, {hy}) lies outside the {bx} x {by} mm bay")
+        bx, by, _ = elec.bay_mm
+        for hx, hy in contract.interfaces.mounts.board_holes_mm:
+            if not (0 <= hx <= bx and 0 <= hy <= by):
+                report.problems.append(
+                    f"board hole ({hx}, {hy}) lies outside the {bx} x {by} mm bay"
+                )
 
     seen: dict[str, str] = {}
     for signal, pin in contract.interfaces.pin_map.items():
@@ -304,7 +319,7 @@ class ArchitectStage:
             json.loads(default_path.read_text("utf-8")),
             base="model" if source == "model" else "pack default",
         )
-        if check_contract(json.dumps(derived)).ok:
+        if check_contract(json.dumps(derived), skipped_stages(ctx)).ok:
             ctx.contract_path.write_text(json.dumps(derived, indent=2) + "\n", encoding="utf-8")
         else:  # the derived numbers do not fit together: keep what was proposed, claim nothing
             sources = dict.fromkeys(sources, "model" if source == "model" else "pack default")
@@ -327,7 +342,7 @@ class ArchitectStage:
         def check() -> ContractReport:
             if not ctx.contract_path.is_file():
                 return ContractReport(problems=["contract.json has not been written"])
-            return check_contract(ctx.contract_path.read_text("utf-8"))
+            return check_contract(ctx.contract_path.read_text("utf-8"), skipped_stages(ctx))
 
         def build() -> None:
             report = check()
@@ -365,7 +380,7 @@ class ArchitectStage:
     def build(self, ctx: StageContext) -> None:
         if not ctx.contract_path.is_file():
             raise FileNotFoundError(f"missing {ctx.contract_path}")
-        report = check_contract(ctx.contract_path.read_text("utf-8"))
+        report = check_contract(ctx.contract_path.read_text("utf-8"), skipped_stages(ctx))
         if not report.ok:
             raise ValueError(
                 f"contract is not valid (measured {report.sums}):\n- "
@@ -377,7 +392,7 @@ class ArchitectStage:
         shutil.copyfile(ctx.contract_path, ctx.build_dir / CONTRACT_FILE)
 
     def interface(self, ctx: StageContext) -> dict[str, Any]:
-        report = check_contract(ctx.contract_path.read_text("utf-8"))
+        report = check_contract(ctx.contract_path.read_text("utf-8"), skipped_stages(ctx))
         source, budget_sources = "unknown", {}
         try:
             meta = json.loads((ctx.src_dir / META_FILE).read_text("utf-8"))

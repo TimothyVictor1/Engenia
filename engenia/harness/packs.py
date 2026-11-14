@@ -46,3 +46,33 @@ def pack_file(ctx: StageContext, name: str) -> Path:
     pack = project_pack(ctx)
     local = ctx.root / "packs" / pack / name
     return local if local.is_file() else REPO / "packs" / pack / name
+
+
+# Stages a product can leave out. A bracket has no electronics and so no firmware to write.
+SKIPPABLE = ("electronics", "firmware")
+
+
+def pack_config(ctx: StageContext) -> dict:
+    """The project's pack.yaml as a dict (empty when the file is missing or not a mapping)."""
+    try:
+        data = yaml.safe_load(pack_file(ctx, "pack.yaml").read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def skipped_stages(ctx: StageContext) -> frozenset[str]:
+    """Stages the project's pack leaves out: `skip_stages:` in pack.yaml, electronics and
+    firmware only. A skipped stage still runs and publishes a `not_applicable` interface, so
+    the graph, the cache and the gate treat it like any other stage."""
+    names = pack_config(ctx).get("skip_stages") or []
+    unknown = sorted(set(names) - set(SKIPPABLE))
+    if not isinstance(names, list) or unknown:
+        raise ValueError(
+            f"pack.yaml: skip_stages may only name {list(SKIPPABLE)}, got {names!r}"
+        )
+    if "electronics" in names and "firmware" not in names:
+        raise ValueError(
+            "pack.yaml: skip_stages: skipping electronics also skips firmware, which needs it"
+        )
+    return frozenset(names)

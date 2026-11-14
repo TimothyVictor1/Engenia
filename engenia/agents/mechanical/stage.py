@@ -7,6 +7,7 @@ import json
 import logging
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -237,6 +238,18 @@ def _emit_previews(ctx: StageContext) -> None:
         })
 
 
+def _template_checks(ctx: StageContext, pack: dict, current: list[str]) -> list[str]:
+    """The checks of the template src/mechanical/model.py was generated for, so a build that
+    follows an unchanged `generate` (cached source) verifies the same checks."""
+    try:
+        text = (ctx.src_dir / "model.py").read_text(encoding="utf-8")
+    except OSError:
+        return current
+    found = re.search(r"^template = '([^']+)'", text, re.MULTILINE)
+    entry = (pack.get("templates") or {}).get(found.group(1)) if found else None
+    return list(entry["checks"]) if entry else current
+
+
 class MechanicalStage:
     name = "mechanical"
     needs = ["architect"]
@@ -314,6 +327,7 @@ class MechanicalStage:
         if pack_path.is_file():
             pack = yaml.safe_load(pack_path.read_text(encoding="utf-8"))
             density = float(pack["materials"]["PETG"]["density_g_cm3"])
+            self.checks = _template_checks(ctx, pack, self.checks)
         else:
             LOG.warning("Missing %s; using PETG density 1.27 g/cm3", pack_path)
         if not math.isfinite(density) or density <= 0:
