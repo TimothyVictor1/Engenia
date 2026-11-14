@@ -71,7 +71,7 @@ def root(tmp_path: Path, registry, monkeypatch) -> Path:
     for req in (
         requirement(1, "mass_budget", {"max": 400}),
         requirement(2, "wall_thickness_min", {"min": 3}),
-        requirement(3, "flow_drag", {"min": 0.9}),  # verifier does not exist yet
+        requirement(3, "flow_drag", {"min": 0.9}, "draft"),  # no verifier yet; draft is not gated
     ):
         (project / "spec" / f"{req['id']}.yaml").write_text(yaml.safe_dump(req), encoding="utf-8")
     (project / "contract").mkdir()

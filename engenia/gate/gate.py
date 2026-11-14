@@ -122,11 +122,20 @@ def _requirement_ids_by_status(
     )
 
 
+# Checks whose requirement is about the assembled product, not one stage's budget. They run at
+# integration against the requirement's own limit; stage budgets stay separate internal checks.
+REQUIREMENT_LEVEL_STAGE = {"mass_budget": "integration"}
+
+
 def producing_stage(
     item: CheckPlanItem, requirement: Requirement | None, registry: graph.Registry, order: list[str]
 ) -> str | None:
-    """The stage whose facts the check reads: the last stage that lists the check in `checks`,
-    else the last stage the requirement affects."""
+    """The stage whose facts the check reads: the integration stage for a requirement-level
+    check, else the last stage that lists the check in `checks`, else the last stage the
+    requirement affects."""
+    level = REQUIREMENT_LEVEL_STAGE.get(item.check)
+    if level is not None and level in registry:
+        return level
     listing = [s for s in order if item.check in registry[s].checks]
     if listing:
         return listing[-1]
@@ -384,6 +393,9 @@ def run_gate(
         for v, _, item_id in results
         if v.result != VerdictResult.PASS
     ]
+    g1 += [
+        f"{u['check']} for {u['requirement']}: unverified ({u['reason']})" for u in unverified
+    ]
 
     # G2
     g2: list[str] = []
@@ -408,6 +420,12 @@ def run_gate(
             g2.append(f"build/{name}/verdict.json is unreadable: {exc}")
             continue
         for index, verdict in enumerate(stored):
+            if verdict.result != VerdictResult.PASS:
+                g2.append(
+                    f"build/{name}/verdict.json[{index}] {verdict.check}: stored result is "
+                    f"{verdict.result.value}"
+                    + (f" ({verdict.message})" if verdict.message else "")
+                )
             if (problem := verdict_problem(verdict)) is not None:
                 g2.append(f"build/{name}/verdict.json[{index}] {verdict.check}: {problem}")
 
@@ -429,6 +447,9 @@ def run_gate(
                         "reason": f"no verifier verifiers/{requirement.verify.check}.py yet",
                     }
                 )
+            g4.append(
+                f"{requirement.id}: no runnable verifier verifiers/{requirement.verify.check}.py"
+            )
             continue
         if not any(
             v.requirement == requirement.id
