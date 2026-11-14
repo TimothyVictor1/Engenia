@@ -2,7 +2,7 @@
 // sample/*.json (served next to the page), with the same shapes.
 
 import type {
-  ContractData, FilesList, Pipeline, Requirement, ScenariosData, StageDetail,
+  ContractData, FilesList, Pipeline, ProjectList, Requirement, ScenariosData, StageDetail,
 } from "./types";
 import { normalizeAgents, type AgentsResponse, type RunSummary } from "./mission";
 
@@ -90,6 +90,8 @@ async function postFault(faultId?: string): Promise<{ run_id: number; fault: Ava
 }
 
 export const makeApi = (sample: boolean) => ({
+  /** Live only: the sample data has no other projects to switch to. */
+  projects: () => json<ProjectList>("/api/projects", false),
   pipeline: () => json<Pipeline>("/api/pipeline", sample),
   requirements: () => json<{ requirements: Requirement[] }>("/api/requirements", sample),
   stage: (name: string) =>

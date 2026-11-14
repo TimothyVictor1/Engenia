@@ -21,6 +21,25 @@ def read_json(path: Path, default: Any = None) -> Any:
         return default
 
 
+def list_projects(root: Path) -> list[dict[str, Any]]:
+    """Every project under `root`/projects that has requirements: its name, its product pack
+    (project.yaml, buoy when absent) and how many requirements it has. Sorted by name."""
+    found = []
+    for directory in sorted((Path(root) / "projects").glob("*/")):
+        requirements = sorted((directory / "spec").glob("R-*.yaml"))
+        if not requirements or directory.is_symlink():
+            continue
+        pack = "buoy"
+        try:
+            data = yaml.safe_load((directory / "project.yaml").read_text(encoding="utf-8"))
+            if isinstance(data, dict) and isinstance(data.get("pack"), str):
+                pack = data["pack"]
+        except (OSError, yaml.YAMLError):
+            pass
+        found.append({"name": directory.name, "pack": pack, "requirements": len(requirements)})
+    return found
+
+
 class ProjectReader:
     def __init__(self, root: Path, project: str):
         self.root = root.resolve()

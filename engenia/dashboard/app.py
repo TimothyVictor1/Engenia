@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
@@ -15,12 +15,13 @@ from engenia.core.cli import find_root
 from engenia.core.summary import run_summary as compute_run_summary
 from engenia.dashboard import files as build_files
 from engenia.dashboard.changes import merged_stream, stream_design_log, stream_events
-from engenia.dashboard.reader import ProjectReader
+from engenia.dashboard.reader import ProjectReader, list_projects
 from engenia.dashboard.schemas import (
     AgentsResponse,
     ContractResponse,
     FilesResponse,
     PipelineResponse,
+    ProjectsResponse,
     ReleaseResponse,
     RequirementsResponse,
     RunSummaryResponse,
@@ -31,7 +32,9 @@ from engenia.harness.llm import agent_models
 from engenia.stages.registry import REGISTRY
 
 
-def create_app(project: str, root: Path | None = None) -> FastAPI:
+def create_app(project: str, root: Path | None = None, *, switchable: bool = False) -> FastAPI:
+    """The read-only API and the UI for one project. `switchable` says the server also serves
+    the other projects at /p/<name>/ (create_multi_app), so the UI may offer a switcher."""
     reader = ProjectReader(root if root is not None else find_root(), project)
     app = FastAPI(title="Engenia project dashboard", docs_url=None, redoc_url=None)
     app.state.reader = reader
@@ -51,6 +54,12 @@ def create_app(project: str, root: Path | None = None) -> FastAPI:
         ValidationError,
     ):
         app.add_exception_handler(error, unavailable)
+
+    @app.get("/api/projects", response_model=ProjectsResponse)
+    def projects():
+        """Every project under the repository root, with its pack."""
+        return {"current": reader.project, "switchable": switchable,
+                "projects": list_projects(reader.root)}
 
     @app.get("/api/pipeline", response_model=PipelineResponse)
     def pipeline():
@@ -242,4 +251,30 @@ def create_app(project: str, root: Path | None = None) -> FastAPI:
     static = Path(__file__).parent / "static"
     if static.is_dir():
         app.mount("/", StaticFiles(directory=static, html=True), name="static")
+    return app
+
+
+def create_multi_app(root: Path | None = None, default: str | None = None) -> FastAPI:
+    """One server for every project: each is served by its own create_app at /p/<name>/ (the UI
+    uses relative URLs, so it works unchanged there) and the UI's project switcher moves between
+    them. `/` redirects to the default project: `default`, else harbour-listener, else the first."""
+    root = root if root is not None else find_root()
+    names = [item["name"] for item in list_projects(root)]
+    if not names:
+        raise ValueError(f"no projects with requirements under {Path(root) / 'projects'}")
+    if default is not None and default not in names:
+        raise ValueError(f"unknown project: {default}")
+    start = default or ("harbour-listener" if "harbour-listener" in names else names[0])
+    app = FastAPI(title="Engenia dashboard", docs_url=None, redoc_url=None)
+    for name in names:
+        app.mount(f"/p/{name}", create_app(name, root, switchable=True))
+
+    @app.get("/api/projects", response_model=ProjectsResponse)
+    def projects():
+        return {"current": start, "switchable": True, "projects": list_projects(root)}
+
+    @app.get("/", include_in_schema=False)
+    def index():
+        return RedirectResponse(f"/p/{start}/")
+
     return app

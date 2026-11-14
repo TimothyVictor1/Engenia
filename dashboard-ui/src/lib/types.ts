@@ -15,6 +15,10 @@ export interface PipelineStage {
   duration_s?: number | null;
   message?: string | null;
 }
+export interface ProjectEntry { name: string; pack: string; requirements: number }
+/** The projects the server can show. `switchable` means each has its own address (/p/<name>/). */
+export interface ProjectList { current: string; switchable: boolean; projects: ProjectEntry[] }
+
 export interface Pipeline {
   project: string;
   updated: string;

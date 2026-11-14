@@ -147,6 +147,21 @@ class PhaseStat(ResponseModel):
     ok: bool
 
 
+class ProjectEntry(ResponseModel):
+    name: str
+    pack: str
+    requirements: int
+
+
+class ProjectsResponse(ResponseModel):
+    """The projects this server can show; `switchable` is true when each has its own address
+    (/p/<name>/), so the UI can offer a switcher."""
+
+    current: str
+    switchable: bool
+    projects: list[ProjectEntry]
+
+
 class StageSummary(ResponseModel):
     phases: dict[str, PhaseStat]
     total_ms: int
