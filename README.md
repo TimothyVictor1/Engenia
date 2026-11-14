@@ -20,3 +20,5 @@ Engenia takes a written product request and produces a verified design. See `PRO
    ```
 
    Open the forwarded port 8080 from the **Ports** tab.
+
+   The dashboard is a React app in `dashboard-ui/`. Its built files are committed in `engenia/dashboard/static/`, so no Node is needed to run it. To change the UI, edit `dashboard-ui/` and rebuild: `cd dashboard-ui && npm install && npm run build` (use `npm run dev` for live reload against a running dashboard on port 8080, and `npm test` for its tests).
