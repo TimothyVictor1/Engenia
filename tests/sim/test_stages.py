@@ -2,6 +2,7 @@ import json
 import shutil
 import types
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
@@ -103,6 +104,7 @@ def test_real_structure_module_absent_gives_not_run(root):
     assert simulation._solver("structure") is None
 
 
+@pytest.mark.slow
 def test_pipeline_gives_wave_tilt_for_every_scenario(tmp_path, monkeypatch):
     shutil.copytree(REPO / "projects/harbour-listener/spec",
                     tmp_path / "projects/harbour-listener/spec")

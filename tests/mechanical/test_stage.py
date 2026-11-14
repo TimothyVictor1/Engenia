@@ -74,6 +74,7 @@ def hashes(ctx):
             for name in (*ARTIFACTS, "interface.json")}
 
 
+@pytest.mark.slow
 def test_build_produces_real_artifacts_and_valid_interface(built):
     stage, ctx = built
     assert isinstance(stage, Stage)
@@ -114,6 +115,7 @@ def test_build_produces_real_artifacts_and_valid_interface(built):
         assert len(data) == 84 + 50 * triangle_count
 
 
+@pytest.mark.slow
 def test_two_builds_from_same_source_have_identical_hashes(built, caplog):
     stage, ctx = built
     # Fresh worker, different directory, byte-for-byte source copy, no generate().
@@ -136,6 +138,7 @@ def test_two_builds_from_same_source_have_identical_hashes(built, caplog):
         assert str(clone.build_dir) not in step
 
 
+@pytest.mark.slow
 def test_taller_battery_bay_increases_internal_volume(built):
     stage, ctx = built
     changed = StageContext(root=ctx.root, project="taller-bay", stage="mechanical")
@@ -152,6 +155,7 @@ def test_taller_battery_bay_increases_internal_volume(built):
     assert hashes(changed) != hashes(ctx)
 
 
+@pytest.mark.slow
 def test_default_bbox_fits_print_bed_and_contract(built):
     stage, ctx = built
     size = stage.interface(ctx)["bbox_mm"]
@@ -160,6 +164,7 @@ def test_default_bbox_fits_print_bed_and_contract(built):
     assert all(dimension <= limit for dimension, limit in zip(size, envelope, strict=True))
 
 
+@pytest.mark.slow
 def test_wall_min_matches_source_params_and_actual_shell(built):
     stage, ctx = built
     params = yaml.safe_load((ctx.src_dir / "params.yaml").read_text())
@@ -176,6 +181,7 @@ def test_wall_min_matches_source_params_and_actual_shell(built):
     assert (shell & material).volume == pytest.approx(0.001, abs=1e-8)
 
 
+@pytest.mark.slow
 def test_geometric_facts_and_mass_match_exported_solids(built):
     stage, ctx = built
     facts = stage.interface(ctx)
@@ -192,6 +198,7 @@ def test_geometric_facts_and_mass_match_exported_solids(built):
     assert facts["centre_of_mass_mm"] == pytest.approx(expected, abs=1e-6)
 
 
+@pytest.mark.slow
 def test_pack_density_and_infill_are_applied(built):
     stage, ctx = built
     root = ctx.root / "custom-pack"
@@ -210,6 +217,7 @@ def test_pack_density_and_infill_are_applied(built):
     )
 
 
+@pytest.mark.slow
 def test_calibration_scales_mass(built):
     stage, ctx = built
     custom = StageContext(root=ctx.root, project="calibrated", stage="mechanical")
@@ -225,6 +233,7 @@ def test_calibration_scales_mass(built):
     )
 
 
+@pytest.mark.slow
 def test_build_respects_edited_source_wall_without_regenerating(built):
     stage, ctx = built
     custom = clone_source(ctx, "thicker-wall")
@@ -287,6 +296,7 @@ def test_generate_uses_replaceable_proposal_and_reads_requirements(tmp_path, mon
     assert not ctx.contract_path.exists()
 
 
+@pytest.mark.slow
 def test_cli_repeated_runs_publish_identical_mechanical_interfaces(tmp_path, monkeypatch):
     from typer.testing import CliRunner
 
@@ -352,6 +362,7 @@ def test_invalid_parameters_fail_before_cad(updates):
         replace(params, **updates)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("source,version", [("project", 9), ("default", 7), ("packaged", None)])
 def test_interface_records_contract_version_used_for_generation(tmp_path, source, version):
     ctx = StageContext(root=tmp_path, project="version-fixture", stage="mechanical")
@@ -377,6 +388,7 @@ def test_interface_records_contract_version_used_for_generation(tmp_path, source
     assert stage.interface(ctx)["contract_version"] == version
 
 
+@pytest.mark.slow
 def test_mast_housing_build_is_reproducible(tmp_path):
     ctx = StageContext(root=tmp_path, project="mast", stage="mechanical")
     contract = default_contract().model_dump(mode="json")

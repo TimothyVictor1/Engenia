@@ -4,8 +4,12 @@ import json
 import shutil
 from pathlib import Path
 
+import pytest
+
 from engenia.agents.firmware.stage import FirmwareStage, _run
 from engenia.contracts.models import StageContext
+
+pytestmark = pytest.mark.slow
 
 
 def hashes(directory):

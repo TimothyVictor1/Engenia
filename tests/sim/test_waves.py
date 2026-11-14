@@ -9,6 +9,8 @@ from engenia.sim.waves import hull, run_case
 from engenia.sim.waves.solver import load_buoy, load_params, mesh_messages
 from tests.sim.conftest import write_interface, write_scenario
 
+pytestmark = pytest.mark.slow
+
 CASE = {"id": "SIM-011", "solver": "waves", "requirement": "R-011", "scenarios": []}
 
 

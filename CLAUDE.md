@@ -158,6 +158,7 @@ The agent does steps 1 to 5. The person does step 6.
 
 1. `uv run ruff check .` passes.
 2. `uv run pytest tests/<lane> -q` passes.
+   Mark any test that builds CAD, meshes, or runs the full pipeline with `@pytest.mark.slow`.
 3. `git status` shows changes only inside the seat's folders.
 4. Commit with message `<seat>: <what changed>`.
 5. `git push -u origin <branch>` then `gh pr create --fill --base main`.

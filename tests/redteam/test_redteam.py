@@ -145,6 +145,7 @@ def test_build_copies_validated_scenarios_and_interface_lists_them(workdir):
     }
 
 
+@pytest.mark.slow
 def test_run_builds_redteam_scenarios_in_the_pipeline(workdir):
     result = runner.invoke(app, ["run", PROJECT])
     assert result.exit_code == 0, result.output

@@ -26,6 +26,9 @@ from engenia.agents.verification.stage import (
 from engenia.core.cli import app
 from engenia.core.hashing import file_hash
 
+pytestmark = pytest.mark.slow
+
+
 REPO = Path(__file__).resolve().parents[2]
 PROJECT = "deck-sensor"
 runner = CliRunner()
