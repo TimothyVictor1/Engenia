@@ -40,6 +40,11 @@ def test_native_pipeline_and_reproduction(tmp_path):
     assert facts['detection_rate'] >= 0.9
     assert facts['false_alarms_per_hour'] <= 2
     assert facts['tests_passed'] == facts['tests_total'] == 2
+    assert facts['evidence'] == 'simulated'
+    by_snr = facts['detection_rate_by_snr_db']
+    assert set(by_snr) == {'-6', '0', '6'}
+    assert by_snr['0'] == facts['detection_rate']
+    assert by_snr['6'] >= by_snr['0'] >= by_snr['-6']
     assert facts['contract_version'] == contract['version']
     assert '#define SENSOR "GPIO12"' in (ctx.src_dir / 'include/pins.h').read_text()
     assert '#define DUTY_SAMPLE 0.01' in (ctx.src_dir / 'src/duty.h').read_text()

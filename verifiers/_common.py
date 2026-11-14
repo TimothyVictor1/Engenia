@@ -374,6 +374,30 @@ def checked_measured_verdict(
     )
 
 
+def raise_if_not_run(ctx: CheckContext, *stages: str) -> None:
+    """Raise :class:`MissingInput` with the published reason when a stage says ``not_run``.
+
+    A stage that could not run its replay (for example PlatformIO missing) publishes
+    ``{"not_run": {"reason": ...}}`` instead of numbers. That is an error, never a pass.
+    """
+    for stage in _ordered_stages(ctx, stages):
+        facts = try_read_interface(ctx, stage)
+        if facts is not None and "not_run" in facts:
+            entry = facts["not_run"]
+            reason = entry.get("reason") if isinstance(entry, Mapping) else entry
+            raise MissingInput(f"{stage} replay not run: {reason}")
+
+
+def evidence_verdict(
+    ctx: CheckContext, measured: float, source_stage: str
+) -> Verdict:
+    """Verdict at the evidence level the stage's facts declare ("simulated"), else calculated."""
+    facts = try_read_interface(ctx, source_stage) or {}
+    if facts.get("evidence") == "simulated":
+        return checked_simulated_verdict(ctx, measured)
+    return checked_verdict(ctx, measured)
+
+
 def error_verdict(ctx: CheckContext, message: str) -> Verdict:
     """Build an ``error`` verdict with no measured value."""
     return calculated_verdict(
