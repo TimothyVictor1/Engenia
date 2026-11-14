@@ -154,6 +154,7 @@ class ElectronicsStage:
             "battery_mm": list(parts["battery"].size_mm),
             "board_holes_mm": selection["board_holes_mm"],
             "contract_version": selection["contract_version"],
+            "duty_cycle": dict(profile.duty_cycle),
             "assembly_mm": assembly_size(parts["battery"], facts, selection["bay_mm"]),
             **power_facts(parts, facts, profile.duty_cycle),
             "pins_used": erc["pins_used"],

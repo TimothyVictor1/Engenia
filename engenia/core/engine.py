@@ -17,7 +17,8 @@ For each stage, in dependency order:
    when the stage's inputs changed since the code was written. Rewriting is never done for any
    other reason, because `generate` is the only step that calls a model.
 3. Look the full stage key up in the cache. A hit restores build/<stage>/ and nothing runs.
-4. On a miss, run `build`, write interface.json and verdict.json, and store the result.
+4. On a miss, build, publish the interface, run scripted checks, and cache only passing results.
+   Failed/error verdicts (including final) fail the stage and block its dependants.
 
 Change propagation needs no extra code. A downstream stage's key contains its upstream
 interface.json, so a stage that reruns but writes the same interface.json leaves every
@@ -52,6 +53,7 @@ from engenia.core.hashing import StageKeys, compute_keys, tree_files, tree_hash
 from engenia.core.mismatches import write_mismatches
 from engenia.core.runstate import RunStore
 from engenia.core.scheduler import Hooks, schedule
+from engenia.core.verification import verify_stage
 from engenia.stages.base import Stage
 
 MARKER_DIR = ".generated-from"
@@ -181,9 +183,12 @@ def _run_keyed(stage: Stage, ctx: StageContext, cache: Cache, keys: StageKeys) -
         ctx.build_dir.parent.mkdir(parents=True, exist_ok=True)
         _call(stage, "build", lambda: stage.build(ctx))
         _write_build_files(stage, ctx)
+        _call(stage, "checks", lambda: verify_stage(stage, ctx))
         cache.put(keys.stage_key, ctx.build_dir)
         built = True
 
+    if restored:
+        _call(stage, "checks", lambda: verify_stage(stage, ctx, restored=True))
     status = Status.RAN if generated or built else Status.CACHED
     return StageResult(stage.name, status, generated, built, keys.stage_key)
 
@@ -267,6 +272,7 @@ def execute(
                 except CoreError:
                     key = None  # the normal path reports what is wrong
                 if key == kept[name]["key"] and ctx.stage_interface_path(name).is_file():
+                    _call(reg[name], "checks", lambda: verify_stage(reg[name], ctx, restored=True))
                     skipped.add(name)
                     return StageResult(name, Status.CACHED, False, False, key, resumed=True)
             return _run_stage(reg[name], ctx, cache)

@@ -21,10 +21,10 @@ class Node:
 
 
 def test_independent_stages_run_at_the_same_time(root, fake_registry):
-    # mechanical, electronics and firmware all need only the architect. Each waits for the
+    # mechanical and electronics need only the architect. Each waits for the
     # others inside build(), so the run can only finish if they really overlap.
-    barrier = threading.Barrier(3, timeout=10)
-    overrides = {name: {"barrier": barrier} for name in ("mechanical", "electronics", "firmware")}
+    barrier = threading.Barrier(2, timeout=10)
+    overrides = {name: {"barrier": barrier} for name in ("mechanical", "electronics")}
     results = run_pipeline(PROJECT, root, registry=fake_registry(overrides), workers=3)
     assert len(results) == 12
     assert all(r.status is Status.RAN for r in results)

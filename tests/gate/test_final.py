@@ -15,7 +15,7 @@ from engenia.contracts.models import (
     Verdict,
     VerdictResult,
 )
-from engenia.core.engine import run_pipeline
+from engenia.core.engine import RunFailed, run_pipeline
 from engenia.gate.final import FinalStage
 from engenia.harness.llm import FakeLLM, ModelFamilyError, text_response
 from tests.gate.conftest import PROJECT
@@ -34,9 +34,13 @@ def make_registry(registry, **kwargs):
     return reg
 
 
-def run_final(root, registry, store="store-final", **kwargs):
+def run_final(root, registry, store="store-final", expect_failure=False, **kwargs):
     reg = make_registry(registry, **kwargs)
-    run_pipeline(PROJECT, root, registry=reg, store=root / store)
+    if expect_failure:
+        with pytest.raises(RunFailed, match="stage final failed in checks"):
+            run_pipeline(PROJECT, root, registry=reg, store=root / store)
+    else:
+        run_pipeline(PROJECT, root, registry=reg, store=root / store)
     return root / "projects" / PROJECT / "build" / "final"
 
 
@@ -55,7 +59,7 @@ def test_fails_when_a_requirement_has_no_verdict_though_every_verdict_passes(
     # R-003 names a verifier that does not exist: the gate (G4) fails it as unverified.
     add_requirement(3, "flow_drag", {"min": 0.9})
     set_plan()
-    build = run_final(root, registry)
+    build = run_final(root, registry, expect_failure=True)
 
     by_check = {v["check"]: v for v in verdicts_of(build)}
     assert by_check["final_gate"]["result"] == "fail"
@@ -84,7 +88,7 @@ def test_a_failing_gate_fails_the_final_stage(root, registry, project_dir, set_p
     drop_unverifiable(project_dir, set_plan)
     (project_dir / "checks" / "APPROVED").unlink()
 
-    build = run_final(root, registry)
+    build = run_final(root, registry, expect_failure=True)
 
     by_check = {v["check"]: v["result"] for v in verdicts_of(build)}
     assert by_check == {

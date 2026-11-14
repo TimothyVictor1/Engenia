@@ -3,7 +3,7 @@
 A stage key is a sha256 over everything a stage's output may depend on. Same key, same output:
 that is what lets the cache skip a stage (rule 5). Everything that feeds a key is listed here.
 
-The key covers six parts, always in this order:
+The key covers seven parts, always in this order:
 
 1. requirements: the raw bytes of the R-*.yaml files whose `affects` names the stage. A
    spec-wide stage (see SPEC_WIDE_STAGES) reads the whole specification instead, so it gets
@@ -14,7 +14,9 @@ The key covers six parts, always in this order:
 5. stage_class: the source of the stage class and of its base classes in the same package
 6. container: the text of containers/<family>/DIGEST, if that file exists
 
-Each part is reduced to one digest and the key is the sha256 of the canonical JSON of the six
+7. declared: explicit input files/trees from core.inputs or stage input_files/input_trees
+
+Each part is reduced to one digest and the key is the sha256 of the canonical JSON of the seven
 (label, digest) pairs. Canonical JSON means sorted keys and no whitespace. `input_key` is the
 same hash without part 4. It decides whether the agent must write new code, because the code
 cannot be part of the question "does the code need rewriting?" (technical plan, section 6).
@@ -46,9 +48,10 @@ from typing import Any
 from engenia.contracts.models import StageContext
 from engenia.core import graph, spec
 from engenia.core.errors import CoreError
+from engenia.core.inputs import declared_inputs
 from engenia.stages.base import Stage
 
-KEY_VERSION = 1  # bump when the way keys are built changes, so old cache entries stop matching
+KEY_VERSION = 2  # bump when the way keys are built changes, so old cache entries stop matching
 
 # Stages that read every requirement, not only those whose `affects` names them. A stage class
 # outside this set can opt in by setting `reads_all_requirements = True`; no contract change.
@@ -56,7 +59,7 @@ SPEC_WIDE_STAGES = frozenset(
     {"verify_plan", "architect", "testplan", "simprep", "redteam", "final", "report"}
 )
 
-PART_ORDER = ("requirements", "upstream", "contract", "src", "stage_class", "container")
+PART_ORDER = ("requirements", "upstream", "contract", "src", "stage_class", "container", "declared")
 
 IGNORED_FILES = frozenset({".DS_Store", "Thumbs.db"})
 IGNORED_DIRS = frozenset({"__pycache__"})
@@ -214,8 +217,17 @@ def _contract_part(stage: Stage, ctx: StageContext) -> str:
         return _digest({"contract": "absent"})  # a missing contract is a state, not an error
 
 
-def _src_part(ctx: StageContext) -> str:
-    return tree_hash(ctx.src_dir) if ctx.src_dir.is_dir() else EMPTY_TREE_HASH
+def _src_part(stage: Stage, ctx: StageContext) -> str:
+    source = tree_hash(ctx.src_dir) if ctx.src_dir.is_dir() else EMPTY_TREE_HASH
+    # These stages build from their published editable snapshot, not just src/.
+    # Include it in the full key, but not the generation input key: otherwise
+    # generating the snapshot would itself immediately make generation stale.
+    published = {"verify_plan": ctx.checks_path, "architect": ctx.contract_path}
+    if type(stage).__module__.startswith("engenia.") and stage.name in published:
+        path = published[stage.name]
+        return _digest({"source": source,
+                        "published": file_hash(path) if path.is_file() else "absent"})
+    return source
 
 
 def _class_part(stage: Stage) -> str:
@@ -253,15 +265,51 @@ def _container_part(stage: Stage, ctx: StageContext) -> str:
         return _digest({"family": family, "digest": None})
 
 
+def _declared_part(stage: Stage, ctx: StageContext) -> str:
+    files, trees = declared_inputs(stage)
+    pairs = []
+    for kind, names in (("file", files), ("tree", trees)):
+        for name in sorted(set(names)):
+            relative = name.replace("{project}", f"projects/{ctx.project}")
+            path = ctx.root / relative
+            if Path(relative).is_absolute() or ".." in Path(relative).parts:
+                raise HashError(f"declared input must be repository-relative: {name}")
+            if path.is_symlink():
+                raise HashError(f"symlink not allowed in a declared input: {name}")
+            if not path.exists():
+                digest = "absent"
+            elif kind == "file" and path.is_file():
+                digest = file_hash(path)
+            elif kind == "tree" and path.is_dir():
+                digest = tree_hash(path)
+            else:
+                raise HashError(f"declared {kind} input has the wrong type: {name}")
+            pairs.append([kind, relative, digest])
+            # Python helpers execute from the installed checkout; pack readers also
+            # fall back there when a scratch/project root omits a pack file. Hash
+            # that runtime copy too, without putting absolute paths in the key.
+            if relative.startswith(("engenia/", "packs")) or relative == "uv.lock":
+                runtime = Path(__file__).resolve().parents[2] / relative
+                if runtime.is_symlink():
+                    raise HashError(f"symlink not allowed in a runtime input: {name}")
+                runtime_digest = (
+                    tree_hash(runtime) if runtime.is_dir() else
+                    file_hash(runtime) if runtime.is_file() else "absent"
+                )
+                pairs.append(["runtime:" + kind, relative, runtime_digest])
+    return _digest(pairs)
+
+
 def compute_keys(stage: Stage, ctx: StageContext) -> StageKeys:
     """Hash every declared input of `stage`. Raises SpecError, HashError."""
     parts = {
         "requirements": _requirements_part(stage, ctx),
         "upstream": _upstream_part(stage, ctx),
         "contract": _contract_part(stage, ctx),
-        "src": _src_part(ctx),
+        "src": _src_part(stage, ctx),
         "stage_class": _class_part(stage),
         "container": _container_part(stage, ctx),
+        "declared": _declared_part(stage, ctx),
     }
     assert tuple(parts) == PART_ORDER
 

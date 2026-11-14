@@ -57,7 +57,7 @@ def test_second_run_executes_zero_stages(run, recorder):
     assert all(r.status is Status.CACHED and not r.generated and not r.built for r in results)
 
 
-def test_editing_r003_reruns_the_spec_wide_stages_and_what_follows_but_not_firmware(
+def test_editing_r003_reruns_firmware_after_electronics_changes(
     run, recorder, project_dir, edit
 ):
     run()
@@ -66,13 +66,12 @@ def test_editing_r003_reruns_the_spec_wide_stages_and_what_follows_but_not_firmw
     run()
     # R-003 affects electronics and mechanical; integration follows their new interfaces;
     # the spec-wide stages read it whether or not `affects` names them.
-    rerun = SPEC_WIDE | {"electronics", "mechanical", "integration", "simulation"}
+    rerun = SPEC_WIDE | {"electronics", "mechanical", "firmware", "integration", "simulation"}
     assert recorder.stages("build") == rerun
     assert recorder.stages("generate") == rerun
-    # The architect reran, but its facts did not change, so firmware (which needs only the
-    # architect) has no reason to.
+    # Firmware consumes the changed electronics interface.
     assert "architect" in recorder.stages("build")
-    assert "firmware" not in recorder.stages("build") | recorder.stages("generate")
+    assert "firmware" in recorder.stages("build") & recorder.stages("generate")
     assert recorder.count("build", "mechanical") == 1  # once, not once per downstream stage
 
 
