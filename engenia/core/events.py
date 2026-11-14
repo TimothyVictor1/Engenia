@@ -1,8 +1,15 @@
 """The live design log: one JSON line per event in <root>/.engenia/events/<run_id>.jsonl.
 
-    {"ts", "run_id", "project", "stage", "attempt", "kind", "data", "agent"}
+    {"ts", "run_id", "project", "stage", "attempt", "kind", "data", "agent", "phase"}
 
-kind is one of message, tool_call, tool_result, code, decision, preview, verdict, repair.
+kind is one of message, tool_call, tool_result, code, decision, preview, verdict, repair,
+phase_start, phase_end, change_request, proposal, cache, gate_step, approval, fault.
+
+Every event also names its actor: `agent` is {name, role, model, family, kind} (kind is
+"llm", "deterministic" or "script") and `phase` is the stage phase the actor is in (plan,
+propose, generate, build, check, repair, publish or cache). Both may be null when nothing
+is known. phase_start / phase_end wrap every stage phase; phase_end carries duration_ms and
+a result (ok | fail | skipped).
 
 The log is a side channel. It is written outside projects/ and outside build/, nothing reads it
 back into a stage, and emitting never raises: a failure to log must not change a run, its
@@ -10,6 +17,8 @@ outputs or its cache keys. Secrets are scrubbed from every event before it is wr
 
 The engine marks a run active with `activate(root, run_id)`. With no active run, `emit` does
 nothing, so code that is called outside a run (unit tests, a lone `repair_stage`) stays silent.
+`attach(root, project)` borrows the project's newest run log when no run is active, so
+stand-alone steps (the gate, an approval) land in the log the dashboard already follows.
 """
 
 from __future__ import annotations
@@ -20,21 +29,28 @@ import json
 import os
 import re
 import threading
-from collections.abc import Iterator
+import time
+from collections.abc import Iterator, Mapping
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-KINDS = ("message", "tool_call", "tool_result", "code", "decision", "preview", "verdict", "repair")
-_agent_context: ContextVar[dict[str, str] | None] = ContextVar("event_agent", default=None)
-
+KINDS = (
+    "message", "tool_call", "tool_result", "code", "decision", "preview", "verdict", "repair",
+    "phase_start", "phase_end", "change_request", "proposal", "cache", "gate_step", "approval",
+    "fault",
+)
+PHASES = ("plan", "propose", "generate", "build", "check", "repair", "publish", "cache")
 MAX_TEXT = 20_000  # one string in one event; longer text is cut and marked
 
 _lock = threading.Lock()
 _active: dict[str, int] = {}  # resolved root -> run id
 _projects: dict[tuple[str, int], str] = {}  # (resolved root, run id) -> project
 _attempts: dict[tuple[str, str], int] = {}  # (resolved root, stage) -> current attempt
+_agents: dict[tuple[str, str], Any] = {}  # (resolved root, stage) -> agent identity
+_phases: dict[tuple[str, str], str] = {}  # (resolved root, stage) -> current phase
+_agent_context: ContextVar[dict[str, str] | None] = ContextVar("event_agent", default=None)
 
 _SECRET_PATTERNS = [
     re.compile(r"sk-[A-Za-z0-9_\-]{16,}"),
@@ -93,6 +109,84 @@ def current_attempt(root: Path, stage: str) -> int:
         return _attempts.get((_key(root), stage), 1)
 
 
+def set_agent(root: Path, stage: str, agent: Mapping[str, Any] | None) -> None:
+    """Record the agent acting on `stage` at `root`; its identity is stamped on the stage's
+    events until another `set_agent` for the same stage."""
+    with _lock:
+        if agent is None:
+            _agents.pop((_key(root), stage), None)
+        else:
+            _agents[(_key(root), stage)] = dict(agent)
+
+
+def agent_for(root: Path, stage: str) -> dict[str, Any] | None:
+    with _lock:
+        found = _agents.get((_key(root), stage))
+    return dict(found) if found else None
+
+
+@contextlib.contextmanager
+def as_agent(root: Path, stage: str, agent: Mapping[str, Any] | None) -> Iterator[None]:
+    """Act as `agent` on `stage` for the block; restores what was there before."""
+    previous = agent_for(root, stage)
+    set_agent(root, stage, agent)
+    try:
+        yield
+    finally:
+        set_agent(root, stage, previous)
+
+
+@contextlib.contextmanager
+def phase(root: Path, stage: str, name: str) -> Iterator[None]:
+    """Wrap one stage phase: emits phase_start, then phase_end with duration_ms and a result
+    (ok | fail, plus error text when it failed), and makes `name` the stage's phase for events
+    emitted inside the block."""
+    key = (_key(root), stage)
+    with _lock:
+        previous = _phases.get(key)
+        _phases[key] = name
+    started = time.monotonic()
+    emit(root, stage, "phase_start", {"phase": name}, phase=name)
+    error: str | None = None
+    try:
+        yield
+    except BaseException as exc:
+        error = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        duration = int((time.monotonic() - started) * 1000)
+        data: dict[str, Any] = {
+            "phase": name, "duration_ms": duration, "ok": error is None,
+            "result": "fail" if error else "ok",
+        }
+        if error is not None:
+            data["error"] = error
+        emit(root, stage, "phase_end", data, phase=name)
+        with _lock:
+            if previous is None:
+                _phases.pop(key, None)
+            else:
+                _phases[key] = previous
+
+
+@contextlib.contextmanager
+def attach(root: Path, project: str) -> Iterator[None]:
+    """Log to the active run when there is one, else to the project's newest run log.
+
+    For stand-alone steps (the gate, an approval, intake) that run outside `execute` but whose
+    events belong in the log the dashboard follows. With no run at all, emits stay silent.
+    """
+    if active_run(root) is not None:
+        yield
+        return
+    run_id = latest_run_id(root, project)
+    if run_id is None:
+        yield
+        return
+    with activate(root, run_id, project):
+        yield
+
+
 # --- scrubbing --------------------------------------------------------------------------------
 
 
@@ -149,14 +243,22 @@ def agent_context(agent: str, model: str) -> Iterator[None]:
         _agent_context.reset(token)
 
 
-def _event_agent(stage: str | None) -> dict[str, str] | None:
+def _event_agent(root: Path, stage: str | None) -> dict[str, Any] | None:
+    """The agent to stamp on an event: the actual model caller when the harness set one, else
+    the identity registered for this stage, else the harness's model map for the stage."""
     from engenia.harness.llm import agent_models
 
     actual = _agent_context.get()
     if actual is not None:
         return actual
+    if stage:
+        registered = agent_for(root, stage)
+        if registered is not None:
+            return registered
     configured = agent_models().get(stage or "")
-    return {"name": stage, **configured} if configured is not None else None
+    if configured is None or not configured.get("model"):
+        return None
+    return {"name": stage, "kind": "llm", **configured}
 
 
 def emit(
@@ -168,16 +270,33 @@ def emit(
     attempt: int | None = None,
     run_id: int | None = None,
     project: str | None = None,
+    agent: Mapping[str, Any] | None = None,
+    phase: str | None = None,
 ) -> None:
-    """Append one event to the active run's log. Never raises; does nothing with no active run."""
+    """Append one event to the active run's log. Never raises; does nothing with no active run.
+
+    `agent` and `phase` override what is stamped; by default the phase comes from an open
+    `phase` block and the agent from the actual model caller (`agent_context`), else the
+    identity registered for this stage (`set_agent`), else the harness model map."""
     try:
         if kind not in KINDS:
             raise ValueError(f"unknown event kind {kind!r}")
+        if phase is not None and phase not in PHASES:
+            phase = None
         run = run_id if run_id is not None else active_run(root)
         if run is None:
             return
         with _lock:
             project = project or _projects.get((_key(root), run))
+            if phase is None and stage:
+                phase = _phases.get((_key(root), stage))
+        if agent is None:
+            base = agent_for(root, stage) if stage else None
+            if base is not None:
+                live = _agent_context.get()
+                agent = {**base, **live} if live else base
+            else:
+                agent = _event_agent(root, stage)
         if attempt is None:
             attempt = current_attempt(root, stage) if stage else 1
         event = {
@@ -188,7 +307,8 @@ def emit(
             "attempt": attempt,
             "kind": kind,
             "data": scrub(data),
-            "agent": scrub(_event_agent(stage)),
+            "agent": scrub(dict(agent)) if agent else None,
+            "phase": phase,
         }
         line = json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n"
         path = events_path(root, run)

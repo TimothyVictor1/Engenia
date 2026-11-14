@@ -7,7 +7,7 @@ from engenia.core.engine import execute
 
 from .test_repair_loop import Script, gate_result, go, verdict
 
-KEYS = {"ts", "run_id", "project", "stage", "attempt", "kind", "data", "agent"}
+KEYS = {"ts", "run_id", "project", "stage", "attempt", "kind", "data", "agent", "phase"}
 
 
 def lines(root, run_id=1):
@@ -24,6 +24,7 @@ def test_emit_writes_the_exact_format(root):
     assert (event["run_id"], event["stage"], event["attempt"], event["kind"]) == (
         7, "mechanical", 1, "message")
     assert event["data"] == {"text": "hi"}
+    assert event["agent"] is None and event["phase"] is None  # nothing registered them
 
 
 def test_no_active_run_means_no_file_and_no_error(root):
@@ -76,8 +77,18 @@ def test_engine_logs_stage_messages_and_events_do_not_touch_keys(root, fake_regi
     first = execute("harbour-listener", root, registry=registry)
     found = lines(root, first.run_id)
     assert {e["stage"] for e in found} >= {"mechanical"}
-    assert all(set(e) == KEYS and e["kind"] == "message" for e in found)
+    assert all(
+        set(e) == KEYS
+        and e["kind"] in ("message", "cache", "phase_start", "phase_end")
+        for e in found
+    )
     assert any("started" in e["data"]["text"] for e in found)
+    # every event names its agent: the deterministic stage registry has no models configured
+    assert all(
+        e["agent"] is None or set(e["agent"]) == {"name", "role", "model", "family", "kind"}
+        for e in found
+    )
+    assert any(e["agent"] and e["agent"]["name"] == "mechanical" for e in found)
     # the log lives outside projects/, so no stage input or output can see it
     assert not list((root / "projects").rglob("*.jsonl"))
     # a second run, with the first run's log on disk, sees the same keys: everything is cached

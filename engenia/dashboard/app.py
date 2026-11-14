@@ -9,20 +9,25 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
+from engenia.core import agents as agent_registry
 from engenia.core import events as design_events
 from engenia.core.cli import find_root
+from engenia.core.summary import run_summary as compute_run_summary
 from engenia.dashboard import files as build_files
 from engenia.dashboard.changes import merged_stream, stream_design_log, stream_events
 from engenia.dashboard.reader import ProjectReader
 from engenia.dashboard.schemas import (
+    AgentsResponse,
     ContractResponse,
     FilesResponse,
     PipelineResponse,
     ReleaseResponse,
     RequirementsResponse,
+    RunSummaryResponse,
     ScenariosResponse,
     StageResponse,
 )
+from engenia.harness.llm import agent_models
 from engenia.stages.registry import REGISTRY
 
 
@@ -119,6 +124,33 @@ def create_app(project: str, root: Path | None = None) -> FastAPI:
             build_files.stream_zip(entries), media_type="application/zip",
             headers={"Content-Disposition": f'attachment; filename="{reader.project}-{name}.zip"'},
         )
+
+    @app.get("/api/agents", response_model=AgentsResponse)
+    def agent_list():
+        """The whole agent registry with live state, from the events log and run database."""
+        configured = agent_models()
+        agents = []
+        for agent in agent_registry.live_state(reader.root, reader.project).values():
+            real = configured.get(agent["name"])
+            if real is not None:  # the harness's model map is the truth for who runs what
+                agent = {**agent, "model": real["model"], "family": real["family"], "kind": "llm"}
+            agents.append(agent)
+        return {"project": reader.project, "agents": agents}
+
+    @app.get("/api/run/summary", response_model=RunSummaryResponse)
+    def run_summary(run_id: int | None = None):
+        """One run's timing picture: per-stage phase durations, parallelism over time and
+        totals. Defaults to the project's newest run with a log."""
+        run = (run_id if run_id is not None
+               else design_events.latest_run_id(reader.root, reader.project))
+        if run is None:
+            empty = {
+                "duration_ms": 0, "model_calls": 0, "tool_calls": 0, "repairs": 0,
+                "cache_hits": 0, "cache_misses": 0,
+                "max_parallel_stages": 0, "max_parallel_agents": 0,
+            }
+            return {"run_id": None, "stages": {}, "parallelism": [], "totals": empty}
+        return compute_run_summary(reader.root, run)
 
     @app.get("/api/files/{stage}/{filename:path}")
     def file(stage: str, filename: str):

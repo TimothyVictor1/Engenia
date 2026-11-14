@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from engenia.contracts.models import StageContext, Verdict, VerdictResult
+from engenia.core import agents as agent_registry
 from engenia.core import events, graph, spec
 from engenia.core.engine import RunReport, StageResult, execute
 from engenia.core.runstate import RunStore
@@ -114,7 +115,9 @@ def run_with_repair(
         for name in order:
             ctx = StageContext(project=project, stage=name, root=root)  # type: ignore[arg-type]
             with events.activate(root, run_id, project):
-                outcome = repair(registry[name], ctx, failures[name])
+                with events.as_agent(root, name, agent_registry.repair_agent().as_log()):
+                    with events.phase(root, name, "repair"):
+                        outcome = repair(registry[name], ctx, failures[name])
                 events.emit(root, name, "repair", {
                     "phase": "round", "round": rounds, "outcome": outcome,
                     "failed": [v.check for v in failures[name]],
@@ -128,7 +131,8 @@ def run_with_repair(
             break
         run = execute(project, root, on_result=on_result, run_id=run_id, **common)
         result.run = run
-        verdict_gate = _checked_gate(run, project, root, registry, gate)
+        with events.activate(root, run_id, project):
+            verdict_gate = _checked_gate(run, project, root, registry, gate)
         result.gate = verdict_gate
         if verdict_gate is None:
             result.reason = "stages failed after repair: " + "; ".join(run.failed.values())
@@ -191,6 +195,7 @@ def _propose(
             if verdict.requirement is not None:
                 entry = by_requirement.setdefault(verdict.requirement, (stage, []))
                 entry[1].append(verdict)
+    repair = agent_registry.repair_agent().as_log()
     for requirement_id in sorted(by_requirement):
         stage, verdicts = by_requirement[requirement_id]
         requirement = next((r for r in requirements if r.id == requirement_id), None)
@@ -199,11 +204,12 @@ def _propose(
             continue
         ctx = StageContext(project=project, stage=stage, root=root)  # type: ignore[arg-type]
         try:
-            result.proposals.append(propose(requirement, verdicts, ctx=ctx))
-            events.emit(root, stage, "repair", {
-                "phase": "proposal", "requirement": requirement_id,
-                "file": result.proposals[-1].name,
-            })
+            with events.as_agent(root, stage, repair), events.phase(root, stage, "propose"):
+                written = propose(requirement, verdicts, ctx=ctx)
+                result.proposals.append(written)
+                events.emit(root, stage, "proposal", {
+                    "requirement": requirement_id, "file": written.name,
+                })
         except ValueError as exc:
             result.no_proposal[requirement_id] = str(exc)
 

@@ -55,3 +55,52 @@ def app(project):
 def client(app):
     with TestClient(app) as client:
         yield client
+
+
+def event_line(run_id, agent, stage, kind, data, ts, phase=None):
+    return json.dumps({
+        "ts": ts, "run_id": run_id, "project": PROJECT, "stage": stage,
+        "attempt": 1, "kind": kind, "data": data, "agent": agent, "phase": phase,
+    })
+
+
+MECHANICAL = {
+    "name": "mechanical", "role": "design", "model": "", "family": "", "kind": "deterministic",
+}
+
+
+@pytest.fixture
+def root_events(project):
+    """Two finished runs in the dashboard root's event log: run 1 has a tool call only; run 2,
+    the newest, has loop counts, a closed build phase, a cache hit and a check phase still open."""
+    verifiers = project.parents[1] / "verifiers"  # the registry lists verifier scripts too
+    verifiers.mkdir(exist_ok=True)
+    (verifiers / "buoyancy_margin.py").write_text("# stub\n")
+    events_dir = project.parents[1] / ".engenia" / "events"
+    events_dir.mkdir(parents=True)
+    run1 = [
+        event_line(1, MECHANICAL, "mechanical", "tool_call", {"id": "t1"},
+                   "2026-11-14T08:00:00.000+00:00"),
+    ]
+    run2 = [
+        event_line(2, MECHANICAL, "mechanical", "message",
+                   {"role": "assistant", "text": "hi", "tool_calls": 0},
+                   "2026-11-14T08:01:00.000+00:00"),
+        event_line(2, MECHANICAL, "mechanical", "tool_call", {"id": "t2"},
+                   "2026-11-14T08:01:00.100+00:00"),
+        event_line(2, MECHANICAL, "mechanical", "tool_call", {"id": "t3"},
+                   "2026-11-14T08:01:00.200+00:00"),
+        event_line(2, MECHANICAL, "mechanical", "phase_start", {"phase": "build"},
+                   "2026-11-14T08:01:00.300+00:00", phase="build"),
+        event_line(2, MECHANICAL, "mechanical", "phase_end",
+                   {"phase": "build", "duration_ms": 12, "ok": True},
+                   "2026-11-14T08:01:00.312+00:00", phase="build"),
+        event_line(2, MECHANICAL, "mechanical", "cache",
+                   {"key": "sha256:abcdef0123456789", "hit": True},
+                   "2026-11-14T08:01:00.330+00:00", phase="cache"),
+        event_line(2, MECHANICAL, "mechanical", "phase_start", {"phase": "check"},
+                   "2026-11-14T08:01:00.400+00:00", phase="check"),
+    ]
+    (events_dir / "1.jsonl").write_text("\n".join(run1) + "\n")
+    (events_dir / "2.jsonl").write_text("\n".join(run2) + "\n")
+    return project.parents[1]

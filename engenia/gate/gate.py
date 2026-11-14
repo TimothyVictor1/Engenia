@@ -51,7 +51,7 @@ from engenia.contracts.models import (
     Verdict,
     VerdictResult,
 )
-from engenia.core import graph
+from engenia.core import agents, events, graph
 from engenia.core.hashing import file_hash, tree_files, tree_hash
 from engenia.gate.canary import CASES, CONTRACT
 from engenia.harness.build import run_captured
@@ -360,12 +360,42 @@ def run_gate(
 ) -> GateResult:
     """Run the gate. `stages` limits G3 (rebuild) and the stored-verdict part of G2 to those
     stages. The default is every stage except `final`, whose output is made by the gate itself
-    (rebuilding it would run the gate again, without end)."""
+    (rebuilding it would run the gate again, without end).
+
+    Each gate step is logged as a gate_step event (start, then end with result and the items
+    it covered), and the approval check as an approval event (needed/given, with the plan's
+    hash). The events go to the active run's log, else to the project's newest one; they are
+    a side channel and never affect the gate's decisions."""
     root = Path(root)
     if registry is None:
         from engenia.stages.registry import REGISTRY
 
         registry = REGISTRY
+    with events.attach(root, project):
+        return _run_gate(
+            project, root, registry, write_report=write_report, stages=stages,
+        )
+
+
+def _run_gate(
+    project: str,
+    root: Path,
+    registry: graph.Registry,
+    *,
+    write_report: bool = True,
+    stages: Sequence[str] | None = None,
+) -> GateResult:
+    gate_agent = agents.gate_agent().as_log()
+
+    def step(name: str, action: str, *, result: str | None = None, items: list | None = None
+             ) -> None:
+        data: dict[str, Any] = {"gate": name, "action": action}
+        if result is not None:
+            data["result"] = result
+        if items is not None:
+            data["items"] = items
+        events.emit(root, None, "gate_step", data, agent=gate_agent)
+
     order = graph.topo_order(registry)
     covered = [n for n in order if (n in stages if stages is not None else n != "final")]
     project_dir = root / "projects" / project
@@ -381,8 +411,17 @@ def run_gate(
         plan = validate_plan(checks_path.read_text("utf-8"), requirements, verifiers)
         approval_problems += [f"plan: {p}" for p in plan.problems]
     items = _load_plan_items(checks_path)
+    wanted_hash = (
+        file_hash(checks_path).removeprefix("sha256:") if checks_path.is_file() else None
+    )
+    events.emit(root, None, "approval", {
+        "status": "needed" if approval_problems else "given",
+        "hash": f"sha256:{wanted_hash}" if wanted_hash else None,
+        "problems": approval_problems,
+    }, agent=gate_agent)
 
     # G1
+    step("G1", "start")
     results, unverified = _run_items(
         project, root, items, requirements, verifiers, registry, order
     )
@@ -396,8 +435,11 @@ def run_gate(
     g1 += [
         f"{u['check']} for {u['requirement']}: unverified ({u['reason']})" for u in unverified
     ]
+    step("G1", "end", result="fail" if g1 else "pass",
+         items=[item.id for item in items])
 
     # G2
+    step("G2", "start")
     g2: list[str] = []
     items_by_id = {i.id: i for i in items}
     for verdict, _, item_id in results:
@@ -428,11 +470,15 @@ def run_gate(
                 )
             if (problem := verdict_problem(verdict)) is not None:
                 g2.append(f"build/{name}/verdict.json[{index}] {verdict.check}: {problem}")
+    step("G2", "end", result="fail" if g2 else "pass", items=[item.id for item in items])
 
     # G3
+    step("G3", "start")
     g3 = _reproduce(project, root, registry, covered)
+    step("G3", "end", result="fail" if g3 else "pass", items=list(covered))
 
     # G4
+    step("G4", "start")
     g4: list[str] = []
     unverified_ids: list[str] = []
     for requirement in approved:
@@ -457,13 +503,18 @@ def run_gate(
             for v in verdicts
         ):
             g4.append(f"{requirement.id}: no pass or fail Verdict")
+    step("G4", "end", result="fail" if g4 else "pass",
+         items=[r.id for r in approved])
 
     # G5
+    step("G5", "start")
     g5 = [
         problem
         for name in sorted({i.check for i in items if i.check in verifiers})
         if (problem := _canary(root, name)) is not None
     ]
+    step("G5", "end", result="fail" if g5 else "pass",
+         items=sorted({i.check for i in items if i.check in verifiers}))
 
     gates = {
         "approval": approval_problems,

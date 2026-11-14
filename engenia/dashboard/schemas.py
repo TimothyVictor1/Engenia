@@ -122,6 +122,60 @@ class EventsResponse(ResponseModel):
     changed: list[Area]
 
 
+class AgentInfo(ResponseModel):
+    """One agent's identity plus its live state (see engenia.core.agents.live_state)."""
+
+    name: str
+    role: str
+    model: str
+    family: str
+    kind: Literal["llm", "deterministic", "script"]
+    status: Literal["idle", "running", "waiting"]
+    stage: str | None
+    phase: str | None
+    counts: dict[str, int]
+
+
+class AgentsResponse(ResponseModel):
+    project: str
+    agents: list[AgentInfo]
+
+
+class PhaseStat(ResponseModel):
+    count: int
+    duration_ms: int
+    ok: bool
+
+
+class StageSummary(ResponseModel):
+    phases: dict[str, PhaseStat]
+    total_ms: int
+
+
+class ParallelPoint(ResponseModel):
+    t_ms: int
+    stages: int
+    agents: int
+
+
+class RunTotals(ResponseModel):
+    duration_ms: int
+    model_calls: int
+    tool_calls: int
+    repairs: int
+    cache_hits: int
+    cache_misses: int
+    max_parallel_stages: int
+    max_parallel_agents: int
+
+
+class RunSummaryResponse(ResponseModel):
+    run_id: int | None
+    stages: dict[str, StageSummary]
+    parallelism: list[ParallelPoint]
+    totals: RunTotals
+
+
 class InterfaceFile(ResponseModel):
     """Example downloaded interface.json; downloads themselves are arbitrary bytes."""
 

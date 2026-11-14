@@ -6,6 +6,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from engenia.core import agents as agent_registry
+from engenia.core import events
 from engenia.core.errors import CoreError
 from engenia.core.intake_template import IntakeTemplateError, template_intake
 from engenia.harness.llm import agent_model
@@ -31,18 +33,25 @@ def model_configured() -> bool:
 
 def run_intake(request: str, project: str, root: Path, *, pack: str = "buoy") -> IntakeResult:
     root = Path(root)
-    if model_configured():
-        from engenia.agents.intake import IntakeError
-        from engenia.agents.intake import intake as model_intake
+    # Intake is planning work: it logs as the intake agent in the plan phase, to the active
+    # run when there is one, else to the project's newest run log.
+    with events.attach(root, project), events.as_agent(
+        root, "intake", agent_registry.intake_agent().as_log()
+    ), events.phase(root, "intake", "plan"):
+        if model_configured():
+            from engenia.agents.intake import IntakeError
+            from engenia.agents.intake import intake as model_intake
 
-        try:
-            requirements = model_intake(request, project)
-        except IntakeError as exc:
-            raise IntakeFailed(str(exc)) from exc
-        paths = [root / "projects" / project / "spec" / f"{r.id}.yaml" for r in requirements]
-        return IntakeResult(paths, "model")
-    try:
-        paths = template_intake(request, project, root, pack=pack)
-    except IntakeTemplateError as exc:
-        raise IntakeFailed(str(exc)) from exc
-    return IntakeResult(paths, f"template ({pack} pack, no model configured)")
+            try:
+                requirements = model_intake(request, project)
+            except IntakeError as exc:
+                raise IntakeFailed(str(exc)) from exc
+            paths = [root / "projects" / project / "spec" / f"{r.id}.yaml" for r in requirements]
+            how = "model"
+        else:
+            try:
+                paths = template_intake(request, project, root, pack=pack)
+            except IntakeTemplateError as exc:
+                raise IntakeFailed(str(exc)) from exc
+            how = f"template ({pack} pack, no model configured)"
+    return IntakeResult(paths, how)

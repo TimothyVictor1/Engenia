@@ -59,6 +59,62 @@ def test_endpoint_shapes(client, endpoint, model):
     )
 
 
+def test_agents_lists_the_registry_with_live_state(client, root_events):
+    response = client.get("/api/agents")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["project"] == "harbour-listener"
+    names = {a["name"] for a in body["agents"]}
+    assert {"mechanical", "verify_plan", "repair", "intake", "gate", "buoyancy_margin"} <= names
+    by_name = {a["name"]: a for a in body["agents"]}
+    assert by_name["mechanical"]["status"] == "running"
+    assert by_name["mechanical"]["phase"] == "check"  # the newest run leaves it open
+    assert by_name["gate"]["status"] == "idle" and by_name["gate"]["kind"] == "script"
+    assert by_name["mechanical"]["counts"] == {"model_calls": 1, "tool_calls": 2, "repairs": 0}
+
+
+def test_run_summary_defaults_to_the_newest_run(client, root_events):
+    response = client.get("/api/run/summary")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["run_id"] == 2
+    assert body["stages"]["mechanical"]["phases"]["build"] == {
+        "count": 1, "duration_ms": 12, "ok": True}
+    totals = body["totals"]
+    assert totals["model_calls"] == 1 and totals["tool_calls"] == 2
+    assert totals["cache_hits"] == 1 and totals["cache_misses"] == 0
+    assert totals["max_parallel_stages"] == 1
+    assert body["parallelism"][-1]["stages"] == 1  # the check phase is still open
+
+
+def test_run_summary_for_a_specific_run(client, root_events):
+    body = client.get("/api/run/summary", params={"run_id": 1}).json()
+    assert body["run_id"] == 1
+    assert body["totals"]["tool_calls"] == 1
+
+
+def test_run_summary_with_no_runs_is_empty(app):
+    body = client_for(app).get("/api/run/summary").json()
+    assert body == {
+        "run_id": None, "stages": {}, "parallelism": [],
+        "totals": {
+            "duration_ms": 0, "model_calls": 0, "tool_calls": 0, "repairs": 0,
+            "cache_hits": 0, "cache_misses": 0,
+            "max_parallel_stages": 0, "max_parallel_agents": 0,
+        },
+    }
+
+
+def test_agents_with_no_runs_are_all_idle(app):
+    body = client_for(app).get("/api/agents").json()
+    assert all(a["status"] == "idle" and a["stage"] is None for a in body["agents"])
+
+
+def client_for(app):
+    with TestClient(app) as client:
+        return client
+
+
 def test_statuses_and_unverified(client):
     stages = {item["name"]: item for item in client.get("/api/pipeline").json()["stages"]}
     assert stages["mechanical"]["status"] == "failed"
