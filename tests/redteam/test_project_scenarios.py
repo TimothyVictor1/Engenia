@@ -112,7 +112,10 @@ def test_generate_falls_back_to_the_fixed_scenarios_without_a_project_directory(
     ctx = make_ctx(workdir)
     RedteamStage().generate(ctx)
     written = sorted(path.stem for path in (ctx.src_dir / SCENARIOS_DIRNAME).glob("*.yaml"))
-    assert written == ["baltic_winter", "calm_harbour", "flooded_bay", "storm"]
+    # deck-sensor has no tilt, stress or buoyancy requirement: only baltic_winter (power
+    # budget) matches, the other pack scenarios are skipped with a recorded reason.
+    assert written == ["baltic_winter"]
+    assert (ctx.src_dir / "skipped_scenarios.yaml").is_file()
 
 
 def test_generate_falls_back_when_the_project_directory_is_empty(workdir):
@@ -120,7 +123,10 @@ def test_generate_falls_back_when_the_project_directory_is_empty(workdir):
     ctx = make_ctx(workdir)
     RedteamStage().generate(ctx)
     written = sorted(path.stem for path in (ctx.src_dir / SCENARIOS_DIRNAME).glob("*.yaml"))
-    assert written == ["baltic_winter", "calm_harbour", "flooded_bay", "storm"]
+    # deck-sensor has no tilt, stress or buoyancy requirement: only baltic_winter (power
+    # budget) matches, the other pack scenarios are skipped with a recorded reason.
+    assert written == ["baltic_winter"]
+    assert (ctx.src_dir / "skipped_scenarios.yaml").is_file()
 
 
 def test_generate_raises_on_a_broken_project_scenario(workdir):
