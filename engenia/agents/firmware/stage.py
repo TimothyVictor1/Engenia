@@ -14,7 +14,7 @@ import yaml
 from engenia.contracts.models import Contract, Requirement, StageContext
 from engenia.core import events
 from engenia.core.spec import SpecError, load_requirements
-from engenia.harness.packs import pack_file
+from engenia.harness.packs import pack_file, skipped_stages
 from engenia.harness.proposer import propose_firmware_detector, proposer_fact
 
 TEMPLATES = Path(__file__).with_name("templates")
@@ -116,6 +116,17 @@ def propose_firmware(ctx: StageContext) -> None:
     if not contract_path.is_file():
         contract_path = pack_file(ctx, "default_contract.json")
     contract = Contract.model_validate_json(contract_path.read_text())
+    if "firmware" in skipped_stages(ctx):
+        ctx.src_dir.mkdir(parents=True, exist_ok=True)
+        (ctx.src_dir / NOT_APPLICABLE).write_text(
+            yaml.safe_dump({"reason": REASON, "contract_version": contract.version}),
+            encoding="utf-8",
+        )
+        events.emit_decision(
+            ctx.root, ctx.stage, title="Firmware", choice="not applicable", reason=REASON,
+            requirements=[], numbers={},
+        )
+        return
     electronics = ctx.stage_interface_path("electronics")
     duty = json.loads(electronics.read_text())["facts"]["duty_cycle"]
     detector_type = _detector_type(ctx)
@@ -155,17 +166,29 @@ def propose_firmware(ctx: StageContext) -> None:
     _run([sys.executable, "tools/make_data.py"], ctx.src_dir)
 
 
+NOT_APPLICABLE = "not_applicable.yaml"
+REASON = "the project's pack declares no firmware (skip_stages in pack.yaml)"
+CHECKS = ["detection_rate", "false_alarm_rate"]
+
+
 class FirmwareStage:
     name = "firmware"
     needs = ["architect", "electronics"]
     reads_contract = True
-    checks = ["detection_rate", "false_alarm_rate"]
+    checks = CHECKS.copy()
 
     def generate(self, ctx: StageContext) -> None:
+        self.checks = [] if "firmware" in skipped_stages(ctx) else list(CHECKS)
         propose_firmware(ctx)
 
     def build(self, ctx: StageContext) -> None:
         ctx.build_dir.mkdir(parents=True, exist_ok=True)
+        if (ctx.src_dir / NOT_APPLICABLE).is_file():
+            self.checks = []
+            _write(ctx.build_dir / "detections.json", {})
+            _write(ctx.build_dir / "metrics.json", {"not_applicable": True, "reason": REASON})
+            return
+        self.checks = list(CHECKS)
         if shutil.which("pio") is None:
             # No PlatformIO: publish why, never raise. Verifiers turn this into an error verdict.
             reason = "PlatformIO (pio) is not installed; firmware replay was not run"
@@ -222,6 +245,11 @@ class FirmwareStage:
         _write(ctx.build_dir / "metrics.json", metrics)
 
     def interface(self, ctx: StageContext) -> dict:
+        marker = ctx.src_dir / NOT_APPLICABLE
+        if marker.is_file():
+            note = yaml.safe_load(marker.read_text(encoding="utf-8"))
+            return {"not_applicable": True, "reason": note["reason"],
+                    "contract_version": note["contract_version"]}
         return {
             **json.loads((ctx.src_dir / "config.json").read_text()),
             **json.loads((ctx.build_dir / "metrics.json").read_text()),

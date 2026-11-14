@@ -71,6 +71,12 @@ def int_contract_version(facts: dict, contract: dict) -> bool:
     return all(version == contract["version"] for version in versions)
 
 
+def _not_applicable(facts: dict) -> set[str]:
+    """Stages the project's pack left out; they publish `not_applicable` and have no board,
+    pins or firmware to compare."""
+    return {stage for stage in STAGES if facts.get(stage, {}).get("not_applicable")}
+
+
 CHECKS = (
     (int_board_fits_bay, ("mechanical", "electronics")),
     (int_mounts_match, ("electronics",)),
@@ -138,7 +144,12 @@ class IntegrationStage:
             json.dumps({"facts": facts, "contract": contract}, sort_keys=True).encode()
         ).hexdigest()
         verdicts, mismatches = [], []
+        left_out = _not_applicable(facts)
         for check, stages in CHECKS:
+            if left_out & set(stages) and check not in (int_contract_version, int_mass_total):
+                continue  # a board, mounts or pins check against a left-out stage has no subject
+            if check is int_contract_version:
+                stages = tuple(s for s in stages if s not in left_out)
             name = check.__name__
             message = None
             measured = None

@@ -1,0 +1,10 @@
+id: R-004
+statement: The bracket shall fit within the print bed.
+value: 1
+unit: ratio
+verify:
+  method: analysis
+  check: print_bed_fit
+  limit: {equals: 1}
+affects: [mechanical]
+status: approved

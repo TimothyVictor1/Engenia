@@ -1,0 +1,17 @@
+depth_m: null
+extra:
+  air_temp_c: 5.0
+  load_factor: 2.0
+  wind_speed_ms: 35.0
+name: gust_load
+rationale: A storm gust shakes the antenna on its arm. The load at the end of the
+  arm is doubled, a rough allowance for a dynamic amplification of the dead weight
+  (it is an assumption, not a wind-load calculation), so the arm must hold its bending
+  safety factor at twice the load. The pack sizes the arm for it and the bending_stress
+  verifier applies the same factor.
+targets:
+- R-001
+water_density: null
+water_temp_c: 5.0
+wave_height_m: null
+wave_period_s: null

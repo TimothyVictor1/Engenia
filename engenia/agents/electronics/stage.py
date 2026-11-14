@@ -17,7 +17,7 @@ from engenia.agents.electronics.facts import Facts, load_facts, required_functio
 from engenia.agents.electronics.selection import assembly_size, power_facts, propose_selection
 from engenia.contracts.models import ChangeRequest, Contract, Requirement, StageContext
 from engenia.core import events
-from engenia.harness.packs import pack_file, project_pack
+from engenia.harness.packs import pack_file, project_pack, skipped_stages
 from engenia.harness.proposer import propose_electronics_selection, proposer_fact
 
 
@@ -164,17 +164,35 @@ def _emit_selection_decisions(
     )
 
 
+NOT_APPLICABLE = "not_applicable.yaml"
+REASON = "the project's pack declares no electronics (skip_stages in pack.yaml)"
+CHECKS = ["power_budget", "battery_capacity", "erc_clean", "mass_budget", "bay_fit"]
+
+
 class ElectronicsStage:
     name = "electronics"
     needs = ["architect"]
     reads_contract = True
-    checks = ["power_budget", "battery_capacity", "erc_clean", "mass_budget", "bay_fit"]
+    checks = CHECKS.copy()
 
     def generate(self, ctx: StageContext) -> None:
         contract_path = ctx.contract_path
         if not contract_path.is_file():
             contract_path = pack_file(ctx, "default_contract.json")
         contract = Contract.model_validate_json(contract_path.read_text(encoding="utf-8"))
+        if "electronics" in skipped_stages(ctx):
+            self.checks = []
+            ctx.src_dir.mkdir(parents=True, exist_ok=True)
+            (ctx.src_dir / NOT_APPLICABLE).write_text(
+                yaml.safe_dump({"reason": REASON, "contract_version": contract.version}),
+                encoding="utf-8",
+            )
+            events.emit_decision(
+                ctx.root, ctx.stage, title="Electronics", choice="not applicable",
+                reason=REASON, requirements=[], numbers={},
+            )
+            return
+        self.checks = list(CHECKS)
         requirements = [
             Requirement.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
             for path in sorted(ctx.spec_dir.glob("R-*.yaml"))
@@ -205,6 +223,16 @@ class ElectronicsStage:
 
     def build(self, ctx: StageContext) -> None:
         ctx.build_dir.mkdir(parents=True, exist_ok=True)
+        marker = ctx.src_dir / NOT_APPLICABLE
+        if marker.is_file():
+            self.checks = []
+            note = yaml.safe_load(marker.read_text(encoding="utf-8"))
+            _write_json(ctx.build_dir / "build_facts.json", {
+                "not_applicable": True, "reason": note["reason"], "mass_g": 0.0,
+                "contract_version": note["contract_version"],
+            })
+            return
+        self.checks = list(CHECKS)
         for name in ("build_facts.json", "circuit.net", "erc.json", "erc.txt", "bom.csv"):
             (ctx.build_dir / name).unlink(missing_ok=True)
         selection = yaml.safe_load((ctx.src_dir / "selection.yaml").read_text(encoding="utf-8"))

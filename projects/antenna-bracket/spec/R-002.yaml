@@ -1,0 +1,10 @@
+id: R-002
+statement: The total mass of the bracket shall not exceed 120 g.
+value: 120
+unit: g
+verify:
+  method: analysis
+  check: mass_budget
+  limit: {max: 120}
+affects: [mechanical]
+status: approved

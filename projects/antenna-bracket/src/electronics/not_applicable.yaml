@@ -1,0 +1,2 @@
+contract_version: 2
+reason: the project's pack declares no electronics (skip_stages in pack.yaml)

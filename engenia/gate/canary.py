@@ -107,6 +107,13 @@ CASES: dict[str, CanaryCase] = {
     "stress_safety_factor": CanaryCase(
         "simulation", {"simulation": {"safety_factor": 1.2}}, {"min": 2.0}
     ),
+    "bending_stress": CanaryCase(
+        "mechanical",
+        {"mechanical": {"bending_root_section_mm": [5.0, 5.0], "bending_root_offset_mm": 0.0}},
+        {"min": 3.0},
+        files={"spec/R-000.yaml": {
+            "statement": "The bracket shall hold a 2 kg load 150 mm from the wall."}},
+    ),
     "measured_mass": CanaryCase(
         "mechanical", {}, {"max": 400.0},
         files={"measurements.yaml": {"mass_g": 500.0}},

@@ -134,6 +134,16 @@ _KNOWN: tuple[CheckInfo, ...] = (
                  "print_bed_fit", "analysis", "equals", "mechanical"),
     ),
     CheckInfo(
+        "bending_stress", "safety factor of a cantilever arm at its root, allowable stress over "
+        "M c / I for the load the requirement names", "ratio", "min", "analysis",
+        ("mechanical",),
+        _example("R-014", "The bracket shall hold a 0.5 kg load 150 mm from the axis of a 40 mm "
+                 "mast with a bending safety factor of at least 3.", 3, "ratio",
+                 "bending_stress", "analysis", "min", "mechanical"),
+        note="the statement must name the load and its distance ('0.5 kg load 150 mm from the "
+             "mast axis'): the verifier reads them from it",
+    ),
+    CheckInfo(
         "bay_fit", "whether the board and battery fit the electronics bay (1 fits, 0 does not)",
         "ratio", "equals", "analysis", ("electronics", "mechanical"),
         _example("R-012", "The board and battery shall fit the electronics bay.", 1, "ratio",

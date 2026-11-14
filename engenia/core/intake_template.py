@@ -40,11 +40,14 @@ def _number(text: str) -> float | int:
     return int(value) if value.is_integer() else value
 
 
-def match_rules(text: str, rules: list[dict]) -> list[tuple[dict, float | int, float | int | None]]:
-    """(rule, value, captured) for every rule that finds a match in some clause of `text`.
+def match_rules(
+    text: str, rules: list[dict]
+) -> list[tuple[dict, float | int, list[float | int]]]:
+    """(rule, value, numbers) for every rule that finds a match in some clause of `text`.
 
-    `captured` is the number the pattern found (None when it has no group). `value` is the rule's
-    fixed `value`, else its `limit`, else the captured number: what the requirement carries."""
+    `numbers` are the numbers the pattern's groups found, in order (empty when it has none).
+    `value` is what the requirement carries: the rule's fixed `value`, else its `limit`, else
+    the number of group `value_group` (1 is the first, the default)."""
     clauses = [c.strip() for c in _CLAUSES.split(text) if c.strip()]
     found = []
     for rule in rules:
@@ -54,9 +57,11 @@ def match_rules(text: str, rules: list[dict]) -> list[tuple[dict, float | int, f
             if match:
                 # A rule with a fixed `value` (a yes/no property) needs no number in the request.
                 given = [g for g in match.groups() if g is not None]
-                captured = _number(given[0]) if given else None
+                numbers = [_number(g) for g in given]
                 fixed = rule.get("value", rule.get("limit"))
-                found.append((rule, fixed if fixed is not None else captured, captured))
+                if fixed is None:
+                    fixed = numbers[int(rule.get("value_group", 1)) - 1]
+                found.append((rule, fixed, numbers))
                 break
     return found
 
@@ -78,13 +83,16 @@ def template_intake(text: str, project: str, root: Path, *, pack: str = "buoy") 
     next_number = max((int(r.id[2:]) for r in existing), default=0) + 1
 
     drafts: list[tuple[str, dict]] = []
-    for rule, value, captured in match_rules(text, rules):
+    for rule, value, numbers in match_rules(text, rules):
         if rule["check"] in have:
             continue
         identifier = f"R-{next_number + len(drafts):03d}"
         data = {
             "id": identifier,
-            "statement": rule["statement"].format(value=value, captured=captured),
+            "statement": rule["statement"].format(
+                value=value, captured=numbers[0] if numbers else None,
+                **{f"n{i}": n for i, n in enumerate(numbers, start=1)},
+            ),
             "value": value,
             "unit": rule["unit"],
             "verify": {

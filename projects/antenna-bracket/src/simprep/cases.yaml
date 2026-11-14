@@ -1,0 +1,6 @@
+- id: SIM-FLOW
+  requirement: null
+  scenarios:
+  - gust_load
+  - ice_loading
+  solver: flow

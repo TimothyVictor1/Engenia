@@ -1,0 +1,35 @@
+{
+  "version": 2,
+  "budgets": {
+    "mechanical": {
+      "mass_g": 108.0,
+      "outer_envelope_mm": [
+        220,
+        100,
+        100
+      ]
+    },
+    "electronics": {
+      "mass_g": 0.0,
+      "bay_mm": [
+        0,
+        0,
+        0
+      ],
+      "energy_mwh_per_day": 0
+    },
+    "firmware": {
+      "flash_kb": 0,
+      "ram_kb": 0
+    }
+  },
+  "interfaces": {
+    "pin_map": {},
+    "mounts": {
+      "board_holes_mm": []
+    }
+  },
+  "totals": {
+    "mass_g_max": 120.0
+  }
+}

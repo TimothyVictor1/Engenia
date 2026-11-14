@@ -1,0 +1,11 @@
+id: R-001
+statement: The bracket shall hold a 0.5 kg load 150 mm from the axis of a 40 mm mast
+  with a bending safety factor of at least 3.
+value: 3
+unit: ratio
+verify:
+  method: analysis
+  check: bending_stress
+  limit: {min: 3}
+affects: [mechanical]
+status: approved
