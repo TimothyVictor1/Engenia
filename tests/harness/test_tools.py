@@ -18,9 +18,9 @@ def make_tools(allowed, build=lambda: None, verdicts=None, **kwargs):
     return Toolbox(allowed, build=build, verdicts_path=verdicts, **kwargs)
 
 
-def test_exactly_three_tools(sandbox):
+def test_exactly_four_tools(sandbox):
     names = [schema["function"]["name"] for schema in make_tools(sandbox).schemas()]
-    assert names == ["write_file", "run_build", "read_verdicts"]
+    assert names == ["write_file", "run_build", "read_verdicts", "record_decision"]
 
 
 def test_write_file_inside_sandbox(sandbox):

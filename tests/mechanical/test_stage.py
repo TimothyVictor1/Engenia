@@ -412,3 +412,42 @@ def test_mast_housing_build_is_reproducible(tmp_path):
     before = hashes(ctx)
     stage.build(ctx)
     assert hashes(ctx) == before
+
+
+def test_generate_and_build_emit_decisions_code_and_previews(tmp_path):
+    from engenia.core import events
+
+    ctx = StageContext(root=tmp_path, project="events", stage="mechanical")
+    ctx.spec_dir.mkdir(parents=True)
+    requirement = {
+        "id": "R-004", "statement": "The wall shall be at least 4 mm thick.",
+        "value": 4, "unit": "mm",
+        "verify": {"method": "analysis", "check": "wall_thickness_min", "limit": {"min": 4}},
+        "affects": ["mechanical"], "status": "approved",
+    }
+    (ctx.spec_dir / "R-004.yaml").write_text(yaml.safe_dump(requirement))
+    stage = MechanicalStage()
+    with events.activate(tmp_path, 5, "events"):
+        stage.generate(ctx)
+        events.set_attempt(tmp_path, "mechanical", 2)
+        stage.build(ctx)
+    found = [json.loads(x) for x in events.events_path(tmp_path, 5).read_text().splitlines()]
+    decisions = {e["data"]["title"]: e["data"] for e in found if e["kind"] == "decision"}
+    assert {"Wall thickness", "Outer diameter", "Hull height"} <= set(decisions)
+    wall = decisions["Wall thickness"]
+    assert wall["reason"] == "wall 4 mm, because R-004 min 4 mm"
+    assert wall["requirements"] == ["R-004"] and wall["numbers"]["wall_mm"] == 4
+    assert {e["data"]["file"] for e in found if e["kind"] == "code"} == {"params.yaml", "model.py"}
+    previews = [e for e in found if e["kind"] == "preview"]
+    assert [e["attempt"] for e in previews] == [2, 2]
+    for event in previews:
+        assert event["data"]["stl"] == f"/api/previews/5/{event['data']['file'].split('/')[-1]}"
+        assert (tmp_path / ".engenia" / event["data"]["file"]).stat().st_size > 84
+    assert {e["data"]["stl"].rsplit("-", 1)[-1] for e in previews} == {"hull.stl", "lid.stl"}
+
+
+def test_nothing_is_logged_outside_a_run(tmp_path):
+    ctx = StageContext(root=tmp_path, project="quiet", stage="mechanical")
+    ctx.spec_dir.mkdir(parents=True)
+    MechanicalStage().generate(ctx)
+    assert not (tmp_path / ".engenia").exists()

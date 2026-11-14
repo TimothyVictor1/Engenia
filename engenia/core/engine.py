@@ -46,7 +46,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from engenia.contracts.models import Interface, StageContext
-from engenia.core import board, graph, spec
+from engenia.core import board, events, graph, spec
 from engenia.core.cache import Cache, default_store
 from engenia.core.errors import CoreError
 from engenia.core.hashing import StageKeys, compute_keys, tree_files, tree_hash
@@ -278,6 +278,7 @@ def execute(
             return _run_stage(reg[name], ctx, cache)
 
         def started(name: str) -> None:
+            events.emit(root, name, "message", {"text": f"stage {name} started"})
             if name not in kept:
                 state.stage_started(run_id, name)
 
@@ -290,6 +291,7 @@ def execute(
             if name not in skipped:
                 restarted(name)
                 status = "done" if result.status is Status.RAN else "cached"
+                events.emit(root, name, "message", {"text": f"stage {name} {status}"})
                 state.stage_finished(run_id, name, status, key=result.key)
             if on_result:
                 on_result(result)
@@ -297,6 +299,7 @@ def execute(
         def fail(name: str, exc: Exception) -> None:
             message = _failure_message(name, exc)
             failed[name] = message
+            events.emit(root, name, "message", {"text": message, "level": "error"})
             restarted(name)
             state.stage_finished(
                 run_id, name, "failed", key=getattr(exc, "stage_key", None), message=message
@@ -309,9 +312,10 @@ def execute(
             started=started,
             done=done, failed=fail, blocked=block,
         )
-        outcome = schedule(
-            order, reg, work, workers=workers or default_workers(), hooks=hooks
-        )
+        with events.activate(root, run_id, project):
+            outcome = schedule(
+                order, reg, work, workers=workers or default_workers(), hooks=hooks
+            )
         state.finish_run(run_id, "failed" if failed else "done")
     finally:
         state.close()

@@ -14,6 +14,7 @@ from pathlib import Path
 import yaml
 
 from engenia.contracts.models import Contract, Requirement, StageContext
+from engenia.core import events
 from engenia.harness.packs import pack_file, project_pack
 from engenia.harness.proposer import propose_mechanical_params, proposer_fact
 
@@ -106,6 +107,75 @@ def _request_budget(ctx: StageContext, path: str, requested, reason: str) -> Non
     submit_change_request(ctx, path=path, requested=requested, reason=reason)
 
 
+def _write_src(ctx: StageContext, name: str, content: str) -> None:
+    """Write a source file and log it as a code event with its diff."""
+    path = ctx.src_dir / name
+    try:
+        old = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        old = None
+    path.write_text(content, encoding="utf-8")
+    events.emit_code(ctx.root, ctx.stage, name, old, content)
+
+
+def _emit_param_decisions(
+    ctx: StageContext, contract: Contract, requirements: list[Requirement], params: dict
+) -> None:
+    """Deterministic fallback: one decision event per headline parameter, from the same facts."""
+    walls = [
+        r for r in requirements
+        if r.status == "approved" and r.verify.check == "wall_thickness_min"
+    ]
+    wall = params["wall_thickness_mm"]
+    ex, ey, ez = contract.budgets.mechanical.outer_envelope_mm
+    bay = contract.budgets.electronics.bay_mm
+    if walls:
+        strongest = max(walls, key=lambda r: r.verify.limit.min)
+        reason = f"wall {wall:g} mm, because {strongest.id} min {strongest.verify.limit.min:g} mm"
+        ids, numbers = [r.id for r in walls], {"wall_mm": wall,
+                                               "min_mm": strongest.verify.limit.min}
+    else:
+        reason = f"wall {wall:g} mm: no approved wall requirement, so the default 3.0 mm"
+        ids, numbers = [], {"wall_mm": wall}
+    events.emit_decision(
+        ctx.root, ctx.stage, title="Wall thickness", choice=f"{wall:g} mm", reason=reason,
+        requirements=ids, numbers=numbers,
+    )
+    diameter, height = params["outer_diameter_mm"], params["height_mm"]
+    events.emit_decision(
+        ctx.root, ctx.stage, title="Outer diameter", choice=f"{diameter:g} mm",
+        reason=(f"diameter {diameter:g} mm clears the {bay[0]:g} x {bay[1]:g} mm battery bay, "
+                f"its mounts and the walls; the envelope allows {min(ex, ey):g} mm"),
+        numbers={"outer_diameter_mm": diameter, "envelope_xy_mm": min(ex, ey)},
+    )
+    events.emit_decision(
+        ctx.root, ctx.stage, title="Hull height", choice=f"{height:g} mm",
+        reason=(f"height {height:g} mm holds the {bay[2]:g} mm bay on a "
+                f"{params['standoff_height_mm']:g} mm standoff; the envelope allows {ez:g} mm "
+                "with the lid"),
+        numbers={"height_mm": height, "bay_height_mm": bay[2], "envelope_z_mm": ez},
+    )
+
+
+def _emit_previews(ctx: StageContext) -> None:
+    """Copy this attempt's STL files to .engenia/previews and log a preview event for each."""
+    run = events.active_run(ctx.root)
+    if run is None:
+        return
+    attempt = events.current_attempt(ctx.root, ctx.stage)
+    for stl in sorted(ctx.build_dir.glob("*.stl")):
+        try:
+            relative = Path("previews") / str(run) / f"{ctx.stage}-a{attempt:02d}-{stl.name}"
+            target = ctx.root / ".engenia" / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(stl, target)
+        except OSError:
+            continue
+        events.emit(ctx.root, ctx.stage, "preview", {
+            "stl": f"/api/previews/{run}/{target.name}", "file": relative.as_posix(),
+        })
+
+
 class MechanicalStage:
     name = "mechanical"
     needs = ["architect"]
@@ -137,11 +207,11 @@ class MechanicalStage:
             )
             raise
         self.checks = list(templates[template]["checks"])
+        if proposer_fact(ctx) == "deterministic":
+            _emit_param_decisions(ctx, contract, requirements, params)
         params["infill_factor"] = pack.get("printing", {}).get("infill_factor", 1.0)
         ctx.src_dir.mkdir(parents=True, exist_ok=True)
-        (ctx.src_dir / "params.yaml").write_text(
-            yaml.safe_dump(params, sort_keys=True), encoding="utf-8"
-        )
+        _write_src(ctx, "params.yaml", yaml.safe_dump(params, sort_keys=True))
         if project_pack(ctx) == "enclosure" and template == "deck_enclosure":
             model = (
                 MODEL.replace(
@@ -166,9 +236,9 @@ class MechanicalStage:
                 .replace("HullParams(**", "MastHousingParams(**")
                 .replace("build_hull(params)", "build_mast_housing(params)")
             )
-        (ctx.src_dir / "model.py").write_text(
+        _write_src(
+            ctx, "model.py",
             model + f"\ncontract_version = {contract.version}\n" + f"template = {template!r}\n",
-            encoding="utf-8",
         )
 
     def build(self, ctx: StageContext) -> None:
@@ -213,6 +283,7 @@ class MechanicalStage:
             env=env,
             check=True,
         )
+        _emit_previews(ctx)
         facts = json.loads((ctx.build_dir / "interface.json").read_text(encoding="utf-8"))["facts"]
         contract_path = (ctx.contract_path if ctx.contract_path.is_file()
                          else _pack_file(ctx, "default_contract.json"))

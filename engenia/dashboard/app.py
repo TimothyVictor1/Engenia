@@ -8,8 +8,9 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
+from engenia.core import events as design_events
 from engenia.core.cli import find_root
-from engenia.dashboard.changes import stream_events
+from engenia.dashboard.changes import merged_stream, stream_design_log, stream_events
 from engenia.dashboard.reader import ProjectReader
 from engenia.dashboard.schemas import (
     ContractResponse,
@@ -87,13 +88,69 @@ def create_app(project: str, root: Path | None = None) -> FastAPI:
             raise HTTPException(404, "File not found")
         return FileResponse(path)
 
+    def checked_stage(stage: str | None) -> str | None:
+        if stage is not None and stage not in REGISTRY:
+            raise HTTPException(404, "Unknown stage")
+        return stage
+
     @app.get("/api/events")
-    async def events(request: Request):
+    async def events(
+        request: Request, stage: str | None = None, run_id: int | None = None,
+        project: str | None = None,
+    ):
+        """Change notifications (plain messages) plus the live design log (`event: design`
+        messages, one per log line), filterable by ?stage=, ?run_id= and ?project=
+        (default: this dashboard's project)."""
+        stage = checked_stage(stage)
+        project = project or reader.project
         return StreamingResponse(
-            stream_events(reader, request),
+            merged_stream(
+                stream_events(reader, request),
+                stream_design_log(reader, request, stage, run_id, project),
+            ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    @app.get("/api/events/history")
+    def events_history(
+        stage: str | None = None, run_id: int | None = None, project: str | None = None
+    ):
+        """A finished run's whole log (the project's newest run when run_id is omitted),
+        oldest first. ?project= defaults to this dashboard's project."""
+        stage = checked_stage(stage)
+        project = project or reader.project
+        run = (run_id if run_id is not None
+               else design_events.latest_run_id(reader.root, project))
+        if run is None:
+            return {"run_id": None, "events": []}
+        found, _ = design_events.read_events(reader.root, run, stage=stage, project=project)
+        return {"run_id": run, "events": found}
+
+    @app.get("/api/previews/{run_id}/{filename}")
+    def preview(run_id: int, filename: str):
+        """An STL written by a mechanical build attempt; only for runs of this project."""
+        directory = reader.root / ".engenia" / "previews" / str(run_id)
+        if (
+            not filename.endswith(".stl")
+            or "/" in filename or "\\" in filename or "\0" in filename
+            or filename.startswith(".")
+            or design_events.run_project(reader.root, run_id) != reader.project
+        ):
+            raise HTTPException(404, "File not found")
+        try:
+            path = (directory / filename).resolve()
+            allowed = (
+                not (reader.root / ".engenia").is_symlink()
+                and not directory.is_symlink()
+                and path.parent == directory.resolve()
+                and path.is_file()
+            )
+        except (OSError, RuntimeError, ValueError):
+            allowed = False
+        if not allowed:
+            raise HTTPException(404, "File not found")
+        return FileResponse(path, media_type="model/stl")
 
     static = Path(__file__).parent / "static"
     if static.is_dir():

@@ -44,6 +44,7 @@ Validator = Callable[[dict[str, Any]], list[Verdict]]
 PROPOSER_PROMPT = """\
 You propose design parameters for the {stage} stage of an engineering project. Write one file,
 proposal.json, containing a single JSON object with exactly the parameters described in the task.
+Call record_decision for every parameter you choose, citing the requirement ids and numbers.
 Use run_build to load it; scripts then check your numbers against the requirements and the
 contract, and any failing numbers are sent back to you. When the file is complete, reply with a
 short summary and no tool calls.

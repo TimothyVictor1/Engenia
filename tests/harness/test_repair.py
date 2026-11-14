@@ -43,12 +43,12 @@ def test_failing_check_gets_repaired(ctx, stage):
     assert "mass=450" in first  # the model is shown the current source
 
 
-def test_model_gets_only_the_three_tools(ctx, stage):
+def test_model_gets_only_the_four_tools(ctx, stage):
     failed = failing_ctx(ctx, stage)
     llm = FakeLLM([tool_call_response(write_design(380)), text_response("ok")])
     repair(stage, ctx, failed, llm)
     names = {t["function"]["name"] for t in llm.calls[0].tools}
-    assert names == {"write_file", "run_build", "read_verdicts"}
+    assert names == {"write_file", "run_build", "read_verdicts", "record_decision"}
 
 
 def test_writes_outside_the_stage_src_are_refused(ctx, stage, root):

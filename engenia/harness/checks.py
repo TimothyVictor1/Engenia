@@ -29,6 +29,7 @@ from engenia.contracts.models import (
     Verdict,
     VerdictResult,
 )
+from engenia.core import events
 from engenia.stages.base import Stage
 
 VERIFIER_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
@@ -60,6 +61,8 @@ def write_verdicts(ctx: StageContext, verdicts: list[Verdict]) -> None:
     ctx.build_dir.mkdir(parents=True, exist_ok=True)
     payload = [v.model_dump(mode="json") for v in verdicts]
     verdict_path(ctx).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    for item in payload:
+        events.emit(ctx.root, ctx.stage, "verdict", item)
 
 
 def _load_plan(ctx: StageContext) -> list[CheckPlanItem]:

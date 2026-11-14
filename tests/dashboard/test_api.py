@@ -376,3 +376,133 @@ def test_build_directory_symlink_cannot_escape(project, client):
     build.rename(elsewhere)
     build.symlink_to(elsewhere, target_is_directory=True)
     assert client.get("/api/files/mechanical/interface.json").status_code == 404
+
+
+def write_log(root, run_id, *rows, project=PROJECT):
+    from engenia.core import events
+
+    with events.activate(root, run_id, project):
+        for stage, kind, data in rows:
+            events.emit(root, stage, kind, data)
+
+
+def test_history_returns_a_finished_runs_log_filtered_by_stage(client, project):
+    root = project.parents[1]
+    write_log(root, 1, ("mechanical", "message", {"text": "old run"}))
+    write_log(root, 2, ("mechanical", "message", {"text": "a"}),
+              ("firmware", "message", {"text": "b"}))
+    newest = client.get("/api/events/history").json()
+    assert newest["run_id"] == 2 and [e["data"]["text"] for e in newest["events"]] == ["a", "b"]
+    only = client.get("/api/events/history", params={"run_id": 2, "stage": "firmware"}).json()
+    assert [e["data"]["text"] for e in only["events"]] == ["b"]
+    old = client.get("/api/events/history", params={"run_id": 1}).json()
+    assert old["events"][0]["run_id"] == 1
+    assert client.get("/api/events/history", params={"stage": "nope"}).status_code == 404
+
+
+def test_history_is_empty_without_any_run(client):
+    assert client.get("/api/events/history").json() == {"run_id": None, "events": []}
+
+
+def test_design_log_streams_new_lines_as_named_sse_events_with_stage_filter(project):
+    from engenia.dashboard.changes import stream_design_log
+
+    root = project.parents[1]
+    reader = ProjectReader(root, PROJECT)
+
+    class Request:
+        disconnected = False
+
+        async def is_disconnected(self):
+            return self.disconnected
+
+    request = Request()
+    write_log(root, 3, ("mechanical", "message", {"text": "first"}),
+              ("firmware", "message", {"text": "other stage"}))
+
+    async def consume():
+        stream = stream_design_log(reader, request, "mechanical", None)
+        first = await anext(stream)
+        assert first.startswith("event: design\ndata: ")
+        assert json.loads(first.split("data: ", 1)[1])["data"] == {"text": "first"}
+        write_log(root, 3, ("firmware", "message", {"text": "skip"}),
+                  ("mechanical", "message", {"text": "second"}))  # appended while following
+        second = await anext(stream)
+        assert json.loads(second.split("data: ", 1)[1])["data"] == {"text": "second"}
+        request.disconnected = True
+        with pytest.raises(StopAsyncIteration):
+            await anext(stream)
+
+    asyncio.run(consume())
+
+
+def test_events_endpoint_carries_both_streams_and_ends_with_the_change_stream(client, monkeypatch):
+    app_module = importlib.import_module("engenia.dashboard.app")
+
+    async def changes(reader, request):
+        yield f"data: {json.dumps(sample('events'))}\n\n"
+
+    async def log(reader, request, stage, run_id, project):
+        assert stage == "mechanical" and project == PROJECT
+        yield 'event: design\ndata: {"kind": "message"}\n\n'
+        await asyncio.sleep(3600)  # never ends on its own
+
+    monkeypatch.setattr(app_module, "stream_events", changes)
+    monkeypatch.setattr(app_module, "stream_design_log", log)
+    body = client.get("/api/events", params={"stage": "mechanical"}).text
+    assert "data: " + json.dumps(sample("events")) in body
+    assert client.get("/api/events", params={"stage": "nope"}).status_code == 404
+
+
+def test_history_and_stream_show_only_the_requested_project(client, project):
+    root = project.parents[1]
+    write_log(root, 1, ("mechanical", "message", {"text": "mine"}))
+    write_log(root, 2, ("mechanical", "message", {"text": "theirs"}), project="other")
+    mine = client.get("/api/events/history").json()  # defaults to this dashboard's project
+    assert mine["run_id"] == 1 and [e["project"] for e in mine["events"]] == [PROJECT]
+    theirs = client.get("/api/events/history", params={"project": "other"}).json()
+    assert theirs["run_id"] == 2
+    wrong = client.get("/api/events/history", params={"run_id": 2}).json()
+    assert wrong["events"] == []  # run 2 is another project's
+
+
+def test_log_stream_follows_only_the_projects_newest_run(project):
+    from engenia.dashboard.changes import stream_design_log
+
+    root = project.parents[1]
+    reader = ProjectReader(root, PROJECT)
+
+    class Request:
+        async def is_disconnected(self):
+            return False
+
+    write_log(root, 1, ("mechanical", "message", {"text": "mine"}))
+    write_log(root, 2, ("mechanical", "message", {"text": "theirs"}), project="other")
+
+    async def consume():
+        stream = stream_design_log(reader, Request(), None, None, PROJECT)
+        got = await anext(stream)
+        assert json.loads(got.split("data: ", 1)[1])["data"] == {"text": "mine"}
+
+    asyncio.run(consume())
+
+
+def test_previews_are_served_safely_and_only_for_the_projects_runs(client, project):
+    root = project.parents[1]
+    write_log(root, 1, ("mechanical", "message", {}))
+    write_log(root, 2, ("mechanical", "message", {}), project="other")
+    for run in (1, 2):
+        folder = root / ".engenia" / "previews" / str(run)
+        folder.mkdir(parents=True)
+        (folder / "mechanical-a01-hull.stl").write_bytes(b"solid")
+    (root / ".engenia" / "previews" / "secret.stl").write_bytes(b"nope")
+    (root / ".engenia" / "previews" / "1" / "notes.txt").write_text("x")
+    ok = client.get("/api/previews/1/mechanical-a01-hull.stl")
+    assert ok.status_code == 200 and ok.content == b"solid"
+    assert ok.headers["content-type"].startswith("model/stl")
+    assert client.get("/api/previews/2/mechanical-a01-hull.stl").status_code == 404  # other project
+    assert client.get("/api/previews/9/mechanical-a01-hull.stl").status_code == 404
+    assert client.get("/api/previews/1/notes.txt").status_code == 404
+    assert client.get("/api/previews/1/..%2Fsecret.stl").status_code == 404
+    assert client.get("/api/previews/1/%2e%2e%2fsecret.stl").status_code == 404
+    assert client.get("/api/previews/1/..\\secret.stl").status_code == 404

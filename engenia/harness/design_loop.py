@@ -15,6 +15,7 @@ from typing import Literal
 import yaml
 
 from engenia.contracts.models import Requirement, StageContext, Verdict
+from engenia.core.events import Emitter
 from engenia.harness.build import preserved_dir, run_captured
 from engenia.harness.checks import (
     BUILD_CHECK_NAME,
@@ -36,9 +37,11 @@ CheckRunner = Callable[[Stage, StageContext], list[Verdict]]
 DEFAULT_SYSTEM_PROMPT = """\
 You are a design agent for the {stage} stage of an engineering project.
 
-You have three tools: write_file (writes files under your source directory), run_build (runs the
-stage build and returns its output), and read_verdicts (shows the results of the latest
-verification run). Write the source files for this stage, run the build, and fix any build errors.
+You have four tools: write_file (writes files under your source directory), run_build (runs the
+stage build and returns its output), read_verdicts (shows the results of the latest
+verification run) and record_decision. You MUST call record_decision for every design choice you
+make (a dimension, material, part or layout), citing the requirement ids it answers and the numbers
+behind it. Write the source files for this stage, run the build, and fix any build errors.
 Verification is carried out by separate scripts after you finish. When your files are complete,
 reply with a short summary and no tool calls.
 """
@@ -128,7 +131,8 @@ def generate_until_pass(
             stage.build(ctx)
 
     ctx.src_dir.mkdir(parents=True, exist_ok=True)
-    tools = Toolbox(ctx.src_dir, build=build, verdicts_path=verdict_path(ctx))
+    tools = Toolbox(ctx.src_dir, build=build, verdicts_path=verdict_path(ctx),
+                   events=Emitter(ctx.root, ctx.stage))
 
     history = None
     for attempt in range(1, limits.max_attempts + 1):

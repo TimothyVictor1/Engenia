@@ -15,6 +15,7 @@ import yaml
 from engenia.agents.electronics.facts import Facts, load_facts, required_functions
 from engenia.agents.electronics.selection import assembly_size, power_facts, propose_selection
 from engenia.contracts.models import ChangeRequest, Contract, Requirement, StageContext
+from engenia.core import events
 from engenia.harness.packs import pack_file, project_pack
 from engenia.harness.proposer import propose_electronics_selection, proposer_fact
 
@@ -65,6 +66,66 @@ def _request_bay(ctx: StageContext, selection: dict) -> None:
     raise RuntimeError("change request id space exhausted")
 
 
+# Roles in the pack's part catalogue, in the words a reader of the live log expects.
+ROLE_TITLES = {
+    "lora": "Radio", "audio": "Sensor (audio)", "microcontroller": "Microcontroller",
+    "regulator": "Regulator", "battery": "Battery",
+}
+
+
+def _emit_selection_decisions(
+    ctx: StageContext, contract: Contract, requirements: list[Requirement], facts: Facts,
+    selection: dict,
+) -> None:
+    """Deterministic fallback: one decision event per part role, the board and the bay."""
+    by_id = {p.id: p for p in facts.parts}
+    budget_ids = events.relevant_requirements(
+        requirements, "electronics", ("power_budget", "mass_budget"))
+    battery_ids = events.relevant_requirements(
+        requirements, "electronics", ("battery_capacity", "power_budget"))
+    fit_ids = events.relevant_requirements(requirements, "electronics", ("bay_fit",))
+    for role, part_id in sorted(selection["parts"].items()):
+        part = by_id[part_id]
+        title = ROLE_TITLES.get(role, role.replace("_", " ").capitalize())
+        if role == "battery":
+            target = selection["target_endurance_days"]
+            promise = f"the {target:g} day target" if target else "no endurance target"
+            events.emit_decision(
+                ctx.root, ctx.stage, title=title, choice=part_id,
+                reason=(f"{part_id}: {part.capacity_mah:g} mAh gives "
+                        f"{selection['endurance_days']:.2f} days against {promise}; "
+                        "the smallest approved cell that meets it"),
+                requirements=battery_ids,
+                numbers={"capacity_mah": part.capacity_mah,
+                         "endurance_days": round(selection["endurance_days"], 6),
+                         "target_days": target, "mass_g": part.mass_g},
+            )
+            continue
+        events.emit_decision(
+            ctx.root, ctx.stage, title=title, choice=part_id,
+            reason=(f"{part_id}: lowest id among approved {role} parts that run at "
+                    f"{part.supply_voltage_v[0]:g}-{part.supply_voltage_v[1]:g} V; "
+                    f"{part.active_current_ma:g} mA active, {part.mass_g:g} g"),
+            requirements=budget_ids,
+            numbers={"active_current_ma": part.active_current_ma,
+                     "sleep_current_ma": part.sleep_current_ma, "mass_g": part.mass_g},
+        )
+    board, bay = selection["board_mm"], contract.budgets.electronics.bay_mm
+    assembly, asked = selection["assembly_mm"], selection["requested_bay_mm"]
+    fits = asked is None
+    events.emit_decision(
+        ctx.root, ctx.stage, title="Board size vs bay",
+        choice=f"board {board[0]:g} x {board[1]:g} x {board[2]:g} mm",
+        reason=(f"battery and board stack to {assembly[0]:g} x {assembly[1]:g} x {assembly[2]:g} "
+                f"mm, which {'fits' if fits else 'does not fit'} the "
+                f"{bay[0]:g} x {bay[1]:g} x {bay[2]:g} mm bay"
+                + ("" if fits else f"; a bay of {asked} mm is requested")),
+        requirements=fit_ids,
+        numbers={"board_x_mm": board[0], "board_y_mm": board[1], "board_z_mm": board[2],
+                 "assembly_z_mm": assembly[2], "bay_z_mm": bay[2]},
+    )
+
+
 class ElectronicsStage:
     name = "electronics"
     needs = ["architect"]
@@ -84,6 +145,8 @@ class ElectronicsStage:
         selection = propose_electronics_selection(
             ctx, contract, requirements, facts, propose_selection
         )
+        if proposer_fact(ctx) == "deterministic":
+            _emit_selection_decisions(ctx, contract, requirements, facts, selection)
         selection["pins_used"] = dict(sorted(contract.interfaces.pin_map.items()))
         selection["board_holes_mm"] = [
             list(hole) for hole in contract.interfaces.mounts.board_holes_mm

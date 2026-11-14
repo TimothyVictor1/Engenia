@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 from collections.abc import AsyncIterator
 
 from fastapi import Request
 
+from engenia.core import events
 from engenia.dashboard.reader import ProjectReader
 from engenia.dashboard.schemas import EventsResponse
 
@@ -81,3 +83,58 @@ async def stream_events(reader: ProjectReader, request: Request) -> AsyncIterato
         before = after
         if changed:
             yield f"data: {EventsResponse(changed=changed).model_dump_json()}\n\n"
+
+
+LOG_POLL_SECONDS = 0.5
+
+
+def format_log_event(event: dict) -> str:
+    """One log line as a named SSE message. Named, so a plain `onmessage` listener (the change
+    notifications above) never sees it; log readers use addEventListener("design", ...)."""
+    return f"event: design\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+
+async def stream_design_log(
+    reader: ProjectReader, request: Request, stage: str | None, run_id: int | None,
+    project: str | None = None,
+) -> AsyncIterator[str]:
+    """Replay the run's log, then follow it. Without a run id it follows the project's newest
+    run, and switches to a newer one when it appears. Only `project`'s events are sent."""
+    root = reader.root
+    current, offset = run_id, 0
+    while not await request.is_disconnected():
+        if run_id is None:
+            newest = await asyncio.to_thread(events.latest_run_id, root, project)
+            if newest is not None and newest != current:
+                current, offset = newest, 0
+        if current is not None:
+            batch, offset = await asyncio.to_thread(
+                events.read_events, root, current, stage=stage, offset=offset, project=project
+            )
+            for event in batch:
+                yield format_log_event(event)
+        await asyncio.sleep(LOG_POLL_SECONDS)
+
+
+async def merged_stream(
+    changes: AsyncIterator[str], log: AsyncIterator[str]
+) -> AsyncIterator[str]:
+    """Both streams on one connection. Ends when the change stream ends (client gone)."""
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+    async def pump(source: AsyncIterator[str], *, last: bool) -> None:
+        try:
+            async for item in source:
+                await queue.put(item)
+        finally:
+            if last:
+                await queue.put(None)
+
+    tasks = [asyncio.create_task(pump(changes, last=True)),
+             asyncio.create_task(pump(log, last=False))]
+    try:
+        while (item := await queue.get()) is not None:
+            yield item
+    finally:
+        for task in tasks:
+            task.cancel()

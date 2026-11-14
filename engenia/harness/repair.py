@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Literal
 
 from engenia.contracts.models import StageContext, Verdict
+from engenia.core import events
 from engenia.harness.checks import run_stage_checks
 from engenia.harness.design_loop import CheckRunner, generate_until_pass
 from engenia.harness.limits import Limits
@@ -38,9 +39,11 @@ MAX_SOURCE_CHARS = 80_000
 
 REPAIR_PROMPT = """\
 You repair the {stage} stage of an engineering project. Its checks failed. You get the failed
-verdicts and the current source files. You have three tools: write_file (writes files under this
-stage's source directory only), run_build (runs the stage build and returns its output) and
-read_verdicts (shows the latest verification results). Change only what the failures require.
+verdicts and the current source files. You have four tools: write_file (writes files under this
+stage's source directory only), run_build (runs the stage build and returns its output),
+read_verdicts (shows the latest verification results) and record_decision, which you MUST call
+for every design choice you change (dimension, material, part, layout), citing the requirement
+ids and the numbers. Change only what the failures require.
 Run the build after your changes. Verification is carried out by separate scripts, and the numbers
 in them decide, not your own summary. When the files are ready, reply with a short summary and no
 tool calls.
@@ -128,6 +131,9 @@ def repair_stage(
     limits = limits or Limits.from_env()
     limits = replace(limits, max_attempts=min(limits.max_attempts, MAX_REPAIR_ATTEMPTS))
     task = repair_task(stage, ctx, failed)
+    events.emit(
+        ctx.root, stage.name, "repair", {"phase": "start", "failed": failed_summary(failed)}
+    )
 
     with tempfile.TemporaryDirectory(prefix="engenia-repair-") as tmp:
         backup = Path(tmp) / "src"
@@ -139,6 +145,7 @@ def repair_stage(
             system_prompt=REPAIR_PROMPT.format(stage=stage.name),
             task=task, chat_fn=chat_fn, run_checks=run_checks,
         )
+        events.emit(ctx.root, stage.name, "repair", {"phase": "end", "outcome": status})
         if status == "pass":
             return "repaired"
         shutil.rmtree(ctx.src_dir, ignore_errors=True)
