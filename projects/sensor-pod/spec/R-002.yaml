@@ -1,0 +1,10 @@
+id: R-002
+statement: The pod shall keep a stress safety factor of at least 1.5 at 50 m depth.
+value: 1.5
+unit: ratio
+verify:
+  method: simulation
+  check: stress_safety_factor
+  limit: {min: 1.5}
+affects: [simulation]
+status: approved

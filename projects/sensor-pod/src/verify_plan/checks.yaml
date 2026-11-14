@@ -1,0 +1,40 @@
+- check: mass_budget
+  id: C-001
+  limit:
+    max: 250.0
+  params: {}
+  requirement: R-001
+- check: stress_safety_factor
+  id: C-002
+  limit:
+    min: 1.5
+  params: {}
+  requirement: R-002
+- check: wall_thickness_min
+  id: C-003
+  limit:
+    min: 3.0
+  params: {}
+  requirement: R-003
+- check: buoyancy_margin
+  id: C-004
+  limit:
+    min: -0.05
+  params: {}
+  requirement: R-004
+- check: bay_fit
+  id: C-005
+  limit:
+    equals: 1.0
+  params: {}
+  requirement: R-005
+- check: print_bed_fit
+  id: C-006
+  limit:
+    equals: 1.0
+  params:
+    bed_mm:
+    - 220
+    - 220
+    - 250
+  requirement: R-006

@@ -1,0 +1,24 @@
+battery_bay_mm:
+- 64.0
+- 36.0
+- 22.0
+bore_diameter_mm: 45.5
+boss_diameter_mm: 19.7
+boss_height_mm: 7.0
+cable_gland: true
+design_depth_m: 60.0
+design_pressure_mpa: 0.604874
+fit_gap_mm: 0.15
+flange_thickness_mm: 5.6
+gland_hole_mm: 12.5
+gland_mass_g: 4.0
+groove_depth_mm: 1.45
+groove_land_mm: 2.5
+groove_width_mm: 2.8
+infill_factor: 1.0
+o_ring_cs_mm: 2.0
+o_ring_id_mm: 42.0
+outer_diameter_mm: 52.7
+plug_depth_mm: 8.0
+tube_length_mm: 84.0
+wall_thickness_mm: 3.6

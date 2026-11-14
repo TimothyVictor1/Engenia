@@ -1,0 +1,11 @@
+id: R-004
+statement: The pod shall stay near neutral buoyancy, with a buoyancy margin of at
+  least -0.05.
+value: -0.05
+unit: ratio
+verify:
+  method: analysis
+  check: buoyancy_margin
+  limit: {min: -0.05}
+affects: [mechanical]
+status: approved

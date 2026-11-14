@@ -40,8 +40,11 @@ def _number(text: str) -> float | int:
     return int(value) if value.is_integer() else value
 
 
-def match_rules(text: str, rules: list[dict]) -> list[tuple[dict, float | int]]:
-    """(rule, number) for every rule that finds a number in some clause of `text`."""
+def match_rules(text: str, rules: list[dict]) -> list[tuple[dict, float | int, float | int | None]]:
+    """(rule, value, captured) for every rule that finds a match in some clause of `text`.
+
+    `captured` is the number the pattern found (None when it has no group). `value` is the rule's
+    fixed `value`, else its `limit`, else the captured number: what the requirement carries."""
     clauses = [c.strip() for c in _CLAUSES.split(text) if c.strip()]
     found = []
     for rule in rules:
@@ -51,7 +54,9 @@ def match_rules(text: str, rules: list[dict]) -> list[tuple[dict, float | int]]:
             if match:
                 # A rule with a fixed `value` (a yes/no property) needs no number in the request.
                 given = [g for g in match.groups() if g is not None]
-                found.append((rule, rule["value"] if "value" in rule else _number(given[0])))
+                captured = _number(given[0]) if given else None
+                fixed = rule.get("value", rule.get("limit"))
+                found.append((rule, fixed if fixed is not None else captured, captured))
                 break
     return found
 
@@ -73,13 +78,13 @@ def template_intake(text: str, project: str, root: Path, *, pack: str = "buoy") 
     next_number = max((int(r.id[2:]) for r in existing), default=0) + 1
 
     drafts: list[tuple[str, dict]] = []
-    for rule, value in match_rules(text, rules):
+    for rule, value, captured in match_rules(text, rules):
         if rule["check"] in have:
             continue
         identifier = f"R-{next_number + len(drafts):03d}"
         data = {
             "id": identifier,
-            "statement": rule["statement"].format(value=value),
+            "statement": rule["statement"].format(value=value, captured=captured),
             "value": value,
             "unit": rule["unit"],
             "verify": {

@@ -1,0 +1,150 @@
+# Electronics catalogue for the pressure_housing pack: the sensor pod's hydrophone channel,
+# an environment sensor that watches the cavity for leaks, the MCU, regulator and a battery.
+# Every part is the datasheet-backed entry the buoy or enclosure pack already carries; only the
+# design profile (duty cycle, board size) is the pod's own. See README.md for the limits.
+[design]
+duty_cycle = { sample = 0.003, transmit = 0.0, sleep = 0.997 }
+# The hydrophone channel stays powered to catch events, the MCU sleeps between them, and the
+# environment sensor is read once per sample burst. There is no radio: a sealed pod logs to
+# flash and is read out when it is recovered.
+active_modes = { microcontroller = ["sample"], audio = ["sample", "transmit", "sleep"], environment_sensor = ["sample"] }
+regulator_efficiency = 0.85
+usable_capacity_fraction = 0.8
+board_mm = [60.0, 32.0, 8.0]
+support_mass_g = 8.0
+support_current_ma = 0.2
+assembly_clearance_mm = 2.0
+source = "Engenia pressure-housing electronics design assumptions, README.md p. 1: duty fractions, a 60 mm sensor carrier board, support mass/current, clearance, efficiency and usable-capacity derating; these are design allowances, not vendor specifications."
+
+[[parts]]
+id = "ESP32-WROVER-B"
+function = "microcontroller"
+approved = true
+mass_g = 2.4
+size_mm = [31.5, 18.0, 3.3]
+supply_voltage_v = [3.0, 3.6]
+active_current_ma = 68.0
+sleep_current_ma = 0.15
+source = "Espressif ESP32-WROVER-B Datasheet v2.4 pp. 27-29, 38; ESP32 Series Datasheet v5.3 p. 30; Adafruit 3979 Technical Details (mass/dimensions). See README.md."
+[parts.sources]
+mass_g = "Adafruit ESP32-WROVER-B 3979, Technical Details: product weight 2.4 g (https://www.adafruit.com/product/3979)."
+size_mm = "Adafruit 3979 Technical Details: 31.5 x 18.0 x 3.3 mm; ESP32-WROVER-B Datasheet v2.4 p. 38 module drawing."
+supply_voltage_v = "ESP32-WROVER-B Datasheet v2.4 p. 27, Table 14 recommended supply."
+active_current_ma = "ESP32 Series Datasheet v5.3 p. 30, Table 4-2: dual core 240 MHz modem-sleep upper value 68 mA, RF disabled. Module-memory overhead covered by README.md p. 1 modelling limitation."
+sleep_current_ma = "ESP32 Series Datasheet v5.3 p. 30, Table 4-2: deep sleep with ULP powered, 150 uA / 1000 = 0.15 mA. Memory power-down assumed; see README.md p. 1."
+
+[[parts]]
+id = "MAX4466EUK"
+function = "audio"
+approved = true
+mass_g = 0.1
+size_mm = [3.0, 3.0, 1.45]
+supply_voltage_v = [2.4, 5.5]
+active_current_ma = 0.024
+sleep_current_ma = 0.024
+source = "Analog Devices MAX4465-MAX4469 Datasheet Rev. 2 pp. 1-2, 11; SOT23-5 outline 21-0057 p. 1; Engenia README.md p. 1 mass allowance (not a manufacturer mass)."
+[parts.sources]
+mass_g = "Engenia README.md p. 1: 0.1 g conservative procurement allowance for the SOT23-5 device; provisional engineering assumption, not measured or vendor specified."
+size_mm = "Analog Devices SOT23-5 package outline 21-0057 p. 1: 3.0 x 3.0 x 1.45 mm maximum envelope (https://mds.analog.com/api/public/content/sot-23_21-0057.pdf)."
+supply_voltage_v = "MAX4465-MAX4469 Datasheet Rev. 2 p. 2, electrical characteristics supply voltage range."
+active_current_ma = "MAX4465-MAX4469 Datasheet Rev. 2 p. 2: typical supply current 24 uA / 1000."
+sleep_current_ma = "MAX4465-MAX4469 Datasheet Rev. 2 pp. 1-2: MAX4466 has no shutdown; remains at typical 24 uA in system sleep."
+
+[[parts]]
+id = "BME280"
+function = "environment_sensor"
+approved = true
+mass_g = 0.05
+size_mm = [2.5, 2.5, 0.93]
+supply_voltage_v = [1.71, 3.6]
+active_current_ma = 0.0034
+sleep_current_ma = 0.0001
+source = "Bosch BME280 Datasheet BST-BME280-DS002 pp. 11-14 (electrical characteristics) and pp. 28-29, 47 (pinout and mechanical data); Engenia README.md p. 1 mass allowance (not a manufacturer mass)."
+[parts.sources]
+mass_g = "Engenia deck-sensor README.md p. 1: 0.05 g conservative procurement allowance for the LGA-8 device; provisional engineering assumption, not measured or vendor specified."
+size_mm = "Bosch BME280 Datasheet BST-BME280-DS002 mechanical data: 2.5 x 2.5 mm LGA-8 footprint, 0.93 mm maximum height with metal lid."
+supply_voltage_v = "Bosch BME280 Datasheet BST-BME280-DS002 electrical characteristics: operating range VDDIO and VDD 1.71-3.6 V."
+active_current_ma = "Bosch BME280 Datasheet BST-BME280-DS002 electrical characteristics: average current 3.4 uA at 1 Hz normal mode with temperature, humidity and pressure enabled; forced single-shot sampling averaged the same way."
+sleep_current_ma = "Bosch BME280 Datasheet BST-BME280-DS002 electrical characteristics: 0.1 uA in sleep mode."
+
+[[parts]]
+id = "S7V8F3"
+function = "regulator"
+approved = true
+mass_g = 0.6
+size_mm = [16.51, 11.43, 2.54]
+supply_voltage_v = [2.7, 11.8]
+output_voltage_v = 3.3
+active_current_ma = 0.1
+sleep_current_ma = 0.1
+source = "Pololu S7V8F3 product datasheet, Specifications web page (single page), Dimensions and General specifications; README.md p. 1."
+[parts.sources]
+mass_g = "Pololu S7V8F3 Specifications, Dimensions: 0.6 g without optional headers (https://www.pololu.com/product/2122/specs)."
+size_mm = "Pololu S7V8F3 Specifications, Dimensions: 0.65 x 0.45 x 0.1 inches, multiplied by exact 25.4 mm/in."
+supply_voltage_v = "Pololu S7V8F3 Specifications, General specifications: minimum 2.7 V, maximum 11.8 V."
+output_voltage_v = "Pololu S7V8F3 Specifications, General specifications: fixed output 3.3 V."
+active_current_ma = "Pololu S7V8F3 Specifications: maximum enabled no-load quiescent current 0.1 mA. Conversion loss accounted separately."
+sleep_current_ma = "Pololu S7V8F3 Specifications: same 0.1 mA enabled quiescent current; regulator remains enabled during system sleep."
+
+[[parts]]
+id = "LP402030"
+function = "battery"
+approved = true
+mass_g = 3.8
+size_mm = [31.0, 20.5, 4.3]
+supply_voltage_v = [2.75, 4.2]
+active_current_ma = 0.0
+sleep_current_ma = 0.0
+capacity_mah = 180.0
+nominal_voltage_v = 3.7
+source = "EEMB LP402030 Specification ZJQM-RD-SPC-H2213 (2022-08-09), pp. 3-4; passive-cell current convention in README.md p. 1."
+[parts.sources]
+mass_g = "EEMB LP402030 Specification p. 3 section 2.4: approximate mass 3.8 g."
+size_mm = "EEMB LP402030 Specification pp. 3-4 sections 2.6 and 3: maximum body dimensions (tabs covered by assembly clearance)."
+supply_voltage_v = "EEMB LP402030 Specification p. 3 sections 2.7-2.8: nominal charge limit and discharge cut-off."
+active_current_ma = "EEMB LP402030 Specification p. 3 bare cell; README.md p. 1: zero parasitic load, externally drawn load computed from consumers."
+sleep_current_ma = "EEMB LP402030 Specification p. 5 retention; README.md p. 1: zero electronic parasitic load; retention covered by capacity derating."
+capacity_mah = "EEMB LP402030 Specification p. 3 section 2.2: minimum capacity 180 mAh, not typical 190 mAh."
+nominal_voltage_v = "EEMB LP402030 Specification p. 3 section 2.3: 3.7 V."
+
+[[parts]]
+id = "LP503450"
+function = "battery"
+approved = true
+mass_g = 19.0
+size_mm = [52.0, 34.5, 5.3]
+supply_voltage_v = [2.75, 4.2]
+active_current_ma = 0.0
+sleep_current_ma = 0.0
+capacity_mah = 900.0
+nominal_voltage_v = 3.7
+source = "EEMB LP503450 Specification ZJQM-RD-SPC-H0750 (2021-07-01), pp. 3-4; passive-cell current convention in README.md p. 1."
+[parts.sources]
+mass_g = "EEMB LP503450 Specification p. 3 section 2.4: approximate mass 19 g."
+size_mm = "EEMB LP503450 Specification pp. 3-4 sections 2.6 and 3: maximum body dimensions."
+supply_voltage_v = "EEMB LP503450 Specification p. 3 sections 2.7-2.8: nominal charge limit and discharge cut-off."
+active_current_ma = "EEMB LP503450 Specification p. 3 bare cell; README.md p. 1: zero parasitic electronic load."
+sleep_current_ma = "EEMB LP503450 Specification p. 5 retention; README.md p. 1: zero parasitic electronic load; retention covered by derating."
+capacity_mah = "EEMB LP503450 Specification p. 3 section 2.2: minimum capacity 900 mAh."
+nominal_voltage_v = "EEMB LP503450 Specification p. 3 section 2.3: 3.7 V."
+
+[[parts]]
+id = "LP505464"
+function = "battery"
+approved = true
+mass_g = 36.0
+size_mm = [65.0, 54.5, 5.3]
+supply_voltage_v = [2.75, 4.2]
+active_current_ma = 0.0
+sleep_current_ma = 0.0
+capacity_mah = 1700.0
+nominal_voltage_v = 3.7
+source = "EEMB LP505464 Specification ZJQM-RD-SPC-H2072 (2022-02-12), pp. 3-4; passive-cell current convention in README.md p. 1."
+[parts.sources]
+mass_g = "EEMB LP505464 Specification p. 3 section 2.4: approximate mass 36 g."
+size_mm = "EEMB LP505464 Specification pp. 3-4 sections 2.6 and 3: maximum body dimensions."
+supply_voltage_v = "EEMB LP505464 Specification p. 3 sections 2.7-2.8: nominal charge limit and discharge cut-off."
+active_current_ma = "EEMB LP505464 Specification p. 3 bare cell; README.md p. 1: zero parasitic electronic load."
+sleep_current_ma = "EEMB LP505464 Specification p. 5 retention; README.md p. 1: zero parasitic electronic load; retention covered by derating."
+capacity_mah = "EEMB LP505464 Specification p. 3 section 2.2: minimum capacity 1700 mAh."
+nominal_voltage_v = "EEMB LP505464 Specification p. 3 section 2.3: 3.7 V."

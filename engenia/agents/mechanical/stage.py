@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import logging
 import math
@@ -30,6 +31,33 @@ from packs.buoy.templates.hull import HullParams, build_hull
 
 params = HullParams(**yaml.safe_load(Path(__file__).with_name("params.yaml").read_text()))
 hull, lid = build_hull(params)
+'''
+
+
+# A pack template module exposes Params, propose(...), build(params) -> {name: Shape},
+# analysis_solids(params), hardware(params) and extra_facts(params); see
+# packs/pressure_housing/templates/sensor_pod.py. The worker exports every part it returns.
+TEMPLATE_MODEL = '''"""Generated mechanical source: all dimensions in mm."""
+from pathlib import Path
+
+import yaml
+
+from {module} import (
+    Params,
+    analysis_solids,
+    build,
+    extra_facts,
+    hardware,
+)
+
+params = Params(**yaml.safe_load(Path(__file__).with_name("params.yaml").read_text()))
+parts = build(params)
+analysis = analysis_solids(params)
+hardware_g = hardware(params)
+extra = extra_facts(params)
+
+contract_version = {contract_version}
+template = {template!r}
 '''
 
 
@@ -93,6 +121,39 @@ def propose_params(contract: Contract | dict, requirements: list[Requirement]) -
 
 def _pack_file(ctx: StageContext, name: str) -> Path:
     return pack_file(ctx, name)
+
+
+def _template_module(name: str):
+    """A pack template module such as packs.pressure_housing.templates.sensor_pod."""
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    return importlib.import_module(name)
+
+
+def _generate_from_template(
+    ctx: StageContext, contract: Contract, requirements: list[Requirement], pack: dict,
+    template: str, module_name: str,
+) -> None:
+    """Pack-owned templates: the module sizes the part (`propose`) and says why, and the
+    generated model.py builds it. The stage adds nothing pack-specific."""
+    module = _template_module(module_name)
+    try:
+        params, decisions = module.propose(
+            contract, requirements, pack, _pack_file(ctx, "pack.yaml").parent
+        )
+    except ValueError as exc:
+        required, available = getattr(exc, "required", None), getattr(exc, "available", None)
+        if required is not None and available is not None:
+            _request_budget(ctx, "budgets.mechanical.outer_envelope_mm", required, str(exc))
+        raise
+    for decision in decisions:
+        events.emit_decision(ctx.root, ctx.stage, **decision)
+    params["infill_factor"] = pack.get("printing", {}).get("infill_factor", 1.0)
+    ctx.src_dir.mkdir(parents=True, exist_ok=True)
+    _write_src(ctx, "params.yaml", yaml.safe_dump(params, sort_keys=True))
+    _write_src(ctx, "model.py", TEMPLATE_MODEL.format(
+        module=module_name, contract_version=contract.version, template=template,
+    ))
 
 
 def _request_budget(ctx: StageContext, path: str, requested, reason: str) -> None:
@@ -199,6 +260,12 @@ class MechanicalStage:
             Requirement.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
             for path in sorted(ctx.spec_dir.glob("R-*.yaml"))
         ]
+        if templates[template].get("module"):
+            self.checks = list(templates[template]["checks"])
+            _generate_from_template(
+                ctx, contract, requirements, pack, template, templates[template]["module"]
+            )
+            return
         try:
             params = propose_mechanical_params(ctx, contract, requirements, propose_params)
         except EnvelopeBudgetError as exc:

@@ -1,0 +1,45 @@
+# Pressure-housing product pack: a watertight cylindrical sensor pod, a printed PETG tube
+# closed by two plug end caps that seal on NBR O-rings. A project selects it with
+# `pack: pressure_housing` in projects/<p>/project.yaml.
+materials: {PETG: {density_g_cm3: 1.27}}
+# Infill 1.0 means solid walls.
+printing: {infill_factor: 1.0, bed_mm: [220, 220, 250]}
+templates:
+  sensor_pod:
+    module: packs.pressure_housing.templates.sensor_pod
+    checks: [mass_budget, buoyancy_margin, print_bed_fit, wall_thickness_min]
+firmware:
+  detector: tone  # the pod carries a hydrophone channel, so the tone detector family.
+# Material and load model for the structure solver (engenia.sim.structure). The numbers are the
+# buoy pack's PETG assumptions; the solver reads this block from the project's own pack.
+structure:
+  youngs_modulus_mpa: 2100  # Assumption: representative printed PETG elastic modulus.
+  poisson_ratio: 0.38  # Assumption: isotropic PETG Poisson ratio.
+  allowable_stress_mpa: 35  # Assumption: PETG yield-based allowable stress.
+  printed_knock_down_factor: 0.60  # Assumption: reduction for layer bonding and defects.
+  mesh_size_mm: 3.0  # Finer than the buoy hull: the pod wall is only a few millimetres thick.
+  # Red-team scenarios that carry a depth factor or water density govern the safety factor:
+  # the published number is the worst of the design depth and each scenario.
+  scenarios_govern: true
+# Inputs the deterministic proposer sizes the pod from. Every number here is a rule, not a
+# dimension: the dimensions come out of the contract and the requirements.
+pod:
+  bay_clearance_mm: 1.5  # radial gap between the electronics bay corners and the bore.
+  axial_clearance_mm: 2.0  # end gap between the bay and each cap plug.
+  fit_gap_mm: 0.15  # radial gap between a printed plug and the bore.
+  wall_step_mm: 0.4  # walls are rounded up to a whole nozzle line width.
+  stress_margin: 1.3  # on top of the thin-wall hoop estimate; covers cap-junction stress.
+  buckling_safety: 2.0  # collapse pressure of a long tube over the design pressure.
+  min_wall_mm: 2.4  # six perimeter lines; the smallest wall the pack prints.
+  flange_ratio: 1.5  # cap flange thickness as a multiple of the tube wall.
+  o_ring:
+    squeeze: 0.20  # static radial seal, target compression of the ring cross-section.
+    stretch_max: 0.05  # ring stretched over the groove root by at most 5 %.
+    stretch_min: 0.005
+    groove_width_ratio: 1.4  # groove width as a multiple of the ring cross-section.
+    land_mm: 2.5  # solid plug material before the groove and behind it.
+  cable_gland: true  # the pod leads a sensor cable out through the rear cap.
+  gland:
+    thread_mm: 12.5  # PG7 thread major diameter: the clearance hole for the gland.
+    boss_height_mm: 7.0
+    mass_g: 4.0  # allowance for a nylon PG7 gland with lock nut; not a vendor figure.

@@ -1,0 +1,11 @@
+id: R-005
+statement: The electronics assembly shall fit the pod's electronics bay, which is
+  sized for a sensor board of up to 60 mm.
+value: 1
+unit: ratio
+verify:
+  method: analysis
+  check: bay_fit
+  limit: {equals: 1}
+affects: [electronics, mechanical]
+status: approved

@@ -1,0 +1,66 @@
+# Deterministic intake for the pressure_housing pack (used when no design model is configured).
+# Same shape as packs/buoy/intake.yaml. Two optional rule keys:
+#   limit:  the bound the requirement carries, when it is not the number the request gave
+#           (the request gives a depth; the limit is the pack's safety factor).
+#   {captured} in a statement is the number the pattern found; {value} is the limit.
+requirements:
+  - name: mass
+    pattern: '(?:mass|weigh\w*|under|below|less than|lighter than)\D{0,40}?(\d+(?:\.\d+)?)\s*(?:g|grams?)\b'
+    statement: The total mass of the pod shall not exceed {value} g.
+    unit: g
+    method: analysis
+    check: mass_budget
+    bound: max
+    affects: [mechanical, electronics]
+  - name: depth_stress
+    pattern: '(?:surviv\w*|withstand\w*|rated|depth|dive\w*|submerg\w*)\D{0,30}?(\d+(?:\.\d+)?)\s*(?:m|metres?|meters?)\b(?!m)'
+    statement: The pod shall keep a stress safety factor of at least {value} at {captured} m depth.
+    unit: ratio
+    method: simulation
+    check: stress_safety_factor
+    bound: min
+    limit: 1.5
+    affects: [simulation]
+  - name: wall_thickness
+    pattern: 'wall\D{0,60}?(\d+(?:\.\d+)?)\s*mm\b'
+    statement: The pod shall have a minimum wall thickness of at least {value} mm.
+    unit: mm
+    method: analysis
+    check: wall_thickness_min
+    bound: min
+    affects: [mechanical]
+  - name: buoyancy_margin
+    pattern: 'buoyancy\s+margin\D{0,20}?(-?\d*\.?\d+)'
+    statement: The pod shall have a buoyancy margin of at least {value}.
+    unit: ratio
+    method: analysis
+    check: buoyancy_margin
+    bound: min
+    affects: [mechanical]
+  - name: near_neutral
+    pattern: '^(?!.*buoyancy margin).*(?:near\W+neutral|neutral(?:ly)?\W+buoyan\w*)'
+    statement: The pod shall stay near neutral buoyancy, with a buoyancy margin of at least {value}.
+    unit: ratio
+    method: analysis
+    check: buoyancy_margin
+    bound: min
+    value: -0.05
+    affects: [mechanical]
+  - name: sensor_fit
+    pattern: 'fit\w*\D{0,20}?(\d+(?:\.\d+)?)\s*mm\s+sensor'
+    statement: The electronics assembly shall fit the pod's electronics bay, which is sized for a sensor board of up to {captured} mm.
+    unit: ratio
+    method: analysis
+    check: bay_fit
+    bound: equals
+    value: 1
+    affects: [electronics, mechanical]
+  - name: print_bed_fit
+    pattern: '(?:print\w*|3d)\W+(?:bed|printer)|fit\w*\W+(?:on|in|within)\W+(?:the\W+|a\W+)?(?:print\w*|3d)'
+    statement: The pod shall fit within the print bed.
+    unit: ratio
+    method: analysis
+    check: print_bed_fit
+    bound: equals
+    value: 1
+    affects: [mechanical]

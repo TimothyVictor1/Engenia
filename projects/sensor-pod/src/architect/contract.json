@@ -1,0 +1,54 @@
+{
+  "version": 2,
+  "budgets": {
+    "mechanical": {
+      "mass_g": 171.0,
+      "outer_envelope_mm": [
+        80,
+        80,
+        140
+      ]
+    },
+    "electronics": {
+      "mass_g": 54.0,
+      "bay_mm": [
+        64,
+        36,
+        22
+      ],
+      "energy_mwh_per_day": 150
+    },
+    "firmware": {
+      "flash_kb": 512,
+      "ram_kb": 64
+    }
+  },
+  "interfaces": {
+    "pin_map": {
+      "HYDROPHONE_ADC": "GPIO34"
+    },
+    "mounts": {
+      "board_holes_mm": [
+        [
+          3,
+          3
+        ],
+        [
+          61,
+          3
+        ],
+        [
+          3,
+          33
+        ],
+        [
+          61,
+          33
+        ]
+      ]
+    }
+  },
+  "totals": {
+    "mass_g_max": 250.0
+  }
+}

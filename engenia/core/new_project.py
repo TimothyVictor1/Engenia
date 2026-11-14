@@ -36,7 +36,10 @@ from engenia.core.intake_run import (
 from engenia.core.lint import Severity, lint_spec_dir
 from engenia.core.release import ReleaseError, release
 
-PACKS = ("buoy", "enclosure")
+PACKS = ("buoy", "enclosure", "pressure_housing")
+# Packs whose project.yaml `engenia new` writes, so the stages build from the pack. The
+# enclosure pack predates this: its projects add project.yaml by hand.
+STAGE_PACKS = ("pressure_housing",)
 Confirm = Callable[[str, list[str]], bool]  # (question, lines to show) -> approved?
 
 
@@ -82,6 +85,8 @@ def _create(project: str, root: Path, pack: str) -> None:
             f"(use `engenia intake` and `engenia run` on an existing one)"
         )
     (directory / "spec").mkdir(parents=True)
+    if pack in STAGE_PACKS:
+        (directory / "project.yaml").write_text(f"pack: {pack}\n", encoding="utf-8")
     contract = _pack_contract(root, pack)
     if contract is not None:
         (directory / "contract").mkdir()
@@ -118,7 +123,7 @@ def new_project(
     report = NewReport(project, pack)
     _create(project, root, pack)
     echo(f"1. created projects/{project} ({pack} pack)")
-    if pack != "buoy":
+    if pack not in ("buoy", *STAGE_PACKS):
         report.notes.append(
             f"the {pack} pack has no stage support yet: the stages still build with the buoy "
             "templates and parts (see packs/enclosure/README.md)"

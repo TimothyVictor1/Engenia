@@ -20,8 +20,76 @@ STL_TOLERANCE_MM = 0.01
 STL_ANGULAR_TOLERANCE = 0.1
 
 
+def _export(solid, name: str, build_dir: Path, *, stl: bool) -> None:
+    # Stream export avoids absolute output paths in FILE_NAME; timestamp
+    # fixes the kernel's date field before writing rather than patching it.
+    step = BytesIO()
+    if not export_step(solid, step, timestamp=STEP_TIMESTAMP):
+        raise RuntimeError(f"STEP export failed: {name}")
+    (build_dir / f"{name}.step").write_bytes(step.getvalue())
+    if not stl:
+        return
+    stl_path = build_dir / f"{name}.stl"
+    if not export_stl(
+        solid, stl_path, tolerance=STL_TOLERANCE_MM, angular_tolerance=STL_ANGULAR_TOLERANCE,
+        ascii_format=False,
+    ):
+        raise RuntimeError(f"STL export failed: {name}")
+    data = stl_path.read_bytes()
+    stl_path.write_bytes(b"Engenia deterministic STL (mm)".ljust(80, b"\0") + data[80:])
+
+
+def _build_parts(model: dict, build_dir: Path, density_g_cm3: float) -> None:
+    """A pack template that returns its printed parts by name (see TEMPLATE_MODEL in stage.py).
+
+    Every part gets a STEP and an STL; the template's analysis solids get a STEP only. The dry
+    mass is the printed volume x density x infill plus the template's bought hardware, and the
+    interface lists each part's mass so a reader can see where it goes.
+    """
+    parts, params = model["parts"], model["params"]
+    build_dir.mkdir(parents=True, exist_ok=True)
+    artifacts = []
+    for name, solid in parts.items():
+        _export(solid, name, build_dir, stl=True)
+        artifacts += [f"{name}.step", f"{name}.stl"]
+    for name, solid in model.get("analysis", {}).items():
+        _export(solid, name, build_dir, stl=False)
+        artifacts.append(f"{name}.step")
+    assembly = Compound(children=list(parts.values()))
+    size, centre = assembly.bounding_box().size, assembly.center(CenterOf.MASS)
+    part_mass = {
+        name: round(solid.volume / 1000 * density_g_cm3 * params.infill_factor, 6)
+        for name, solid in parts.items()
+    }
+    hardware = {name: round(mass, 6) for name, mass in model["hardware_g"].items()}
+    facts = {
+        "contract_version": model["contract_version"],
+        "dry_mass_g": round(sum(part_mass.values()) + sum(hardware.values()), 6),
+        "printed_mass_g": round(sum(part_mass.values()), 6),
+        "hardware_mass_g": round(sum(hardware.values()), 6),
+        "part_mass_g": part_mass,
+        "hardware_g": hardware,
+        "parts": sorted(parts),
+        "bbox_mm": [round(v, 6) for v in size],
+        "centre_of_mass_mm": [round(v, 6) for v in centre],
+        **model["extra"],
+    }
+    digest = hashlib.sha256(json.dumps(facts, sort_keys=True).encode())
+    for name in artifacts:
+        digest.update(name.encode())
+        digest.update((build_dir / name).read_bytes())
+    interface = Interface(stage="mechanical", key=f"sha256:{digest.hexdigest()}", facts=facts)
+    (build_dir / "interface.json").write_text(
+        json.dumps(interface.model_dump(mode="json"), sort_keys=True, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 def build(src_dir: Path, build_dir: Path, density_g_cm3: float) -> None:
     model = runpy.run_path(str(src_dir / "model.py"))
+    if "parts" in model:
+        _build_parts(model, build_dir, density_g_cm3)
+        return
     enclosure = model.get("template") == "deck_enclosure"
     hull, lid, params = model["body" if enclosure else "hull"], model["lid"], model["params"]
     build_dir.mkdir(parents=True, exist_ok=True)

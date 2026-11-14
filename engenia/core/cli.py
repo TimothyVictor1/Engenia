@@ -165,7 +165,9 @@ def intake(
 def new(
     request: str = typer.Argument(..., help="The product request, in plain language."),
     project: str = typer.Option(..., "--project", "-p", help="Name of the new project."),
-    pack: str = typer.Option("buoy", "--pack", help="Product pack: buoy or enclosure."),
+    pack: str = typer.Option(
+        "buoy", "--pack", help="Product pack: buoy, enclosure or pressure_housing."
+    ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Approve every step without asking."),
     workers: int = typer.Option(default_workers(), "--workers", "-j", min=1),
 ) -> None:

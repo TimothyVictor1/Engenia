@@ -17,6 +17,19 @@ worker, exports four CAD artifacts, and publishes a schema-valid
 `build/mechanical/interface.json`. `interface()` returns its facts for the core
 scheduler. Run from a repository checkout so the pack templates are available.
 
+Pack-owned templates
+--------------------
+
+A template entry in `pack.yaml` with `module: packs.<pack>.templates.<name>` is sized and built
+by that module (the pressure_housing `sensor_pod` is the first). The module exposes `Params`,
+`propose(contract, requirements, pack, pack_dir) -> (params, decisions)`, `build(params) ->
+{name: Shape}`, `analysis_solids(params)`, `hardware(params)` and `extra_facts(params)`. The
+stage logs each decision, writes `params.yaml` and a generated `model.py`; the CAD worker exports
+every part as STEP and STL (analysis solids as STEP only) and publishes `dry_mass_g` as printed
+volume x density x infill plus the bought hardware, with a per-part mass table. An envelope that
+is too small raises the same change request as the hull. No model is asked: the module's
+`propose` is the proposer.
+
 Geometry and facts
 ------------------
 

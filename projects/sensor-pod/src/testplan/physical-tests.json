@@ -1,0 +1,124 @@
+{
+  "not_covered": [
+    {
+      "check": "stress_safety_factor",
+      "reason": "needs a pressure rig and a destructive test, not a bench measurement",
+      "requirement": "R-002"
+    },
+    {
+      "check": "wall_thickness_min",
+      "reason": "needs a cut section of the print; measure it from a sacrificial part",
+      "requirement": "R-003"
+    }
+  ],
+  "project": "sensor-pod",
+  "tests": [
+    {
+      "check": "mass_budget",
+      "expected": {
+        "text": "<= 250 g",
+        "unit": "g",
+        "value": 250.0
+      },
+      "id": "T-001",
+      "instrument": "Digital scale, 0.1 g resolution or better, calibrated with a known mass",
+      "limit": {
+        "max": 250.0
+      },
+      "measure_option": "--mass-g",
+      "measurement_key": "mass_g",
+      "pass_rule": "Pass when the measured value is <= 250 g.",
+      "procedure": [
+        "Assemble the prototype as it will be deployed: hull, lid, electronics, battery, seals.",
+        "Zero the scale. Place the assembled prototype on it and wait for a stable reading.",
+        "Record the mass in grams. Repeat three times, removing the prototype each time.",
+        "Use the mean of the three readings as the measured mass.",
+        "Record it with `engenia measure <project> --mass-g <value> --waterline-mm <value>`."
+      ],
+      "quantity": "mass",
+      "requirement": "R-001",
+      "statement": "The total mass of the pod shall not exceed 250 g.",
+      "title": "Mass of the assembled prototype"
+    },
+    {
+      "check": "buoyancy_margin",
+      "expected": {
+        "text": ">= -0.05 ratio",
+        "unit": "ratio",
+        "value": -0.05
+      },
+      "id": "T-004",
+      "instrument": "Digital scale (0.1 g), vessel big enough to submerge the prototype, thermometer, hydrometer",
+      "limit": {
+        "min": -0.05
+      },
+      "measure_option": null,
+      "measurement_key": null,
+      "pass_rule": "Pass when the measured value is >= -0.05 ratio.",
+      "procedure": [
+        "Weigh the assembled, sealed prototype dry: total mass m in grams.",
+        "Fill the vessel with water and measure its density in g/cm3 (hydrometer).",
+        "Put the vessel on the scale and zero it. Push the prototype fully under water with a thin rod, without touching the vessel. Do not let it touch the bottom.",
+        "Read the scale: the added grams divided by the water density is the displaced volume V in cm3.",
+        "Compute margin = (V x density - m) / m. Repeat three times and use the mean.",
+        "Keep the prototype under water for 10 minutes and check the inside for leaks."
+      ],
+      "quantity": "buoyancy",
+      "requirement": "R-004",
+      "statement": "The pod shall stay near neutral buoyancy, with a buoyancy margin of at least -0.05.",
+      "title": "Buoyancy margin"
+    },
+    {
+      "check": "bay_fit",
+      "expected": {
+        "text": "= 1 ratio",
+        "unit": "ratio",
+        "value": 1.0
+      },
+      "id": "T-005",
+      "instrument": "Calipers, 0.1 mm resolution; the printed hull and the real board and battery",
+      "limit": {
+        "equals": 1.0
+      },
+      "measure_option": null,
+      "measurement_key": null,
+      "pass_rule": "Pass when the measured value is = 1 ratio.",
+      "procedure": [
+        "Measure the bay in the printed hull, and the board and the battery, in millimetres.",
+        "Place the board, then the battery, in the bay in the orientation used in the design. Check that nothing is forced and the lid closes.",
+        "Compare the sorted dimensions of each part with the sorted dimensions of the bay.",
+        "Record the result as 1 (both fit) or 0 (either does not), with the dimensions."
+      ],
+      "quantity": "fit",
+      "requirement": "R-005",
+      "statement": "The electronics assembly shall fit the pod's electronics bay, which is sized for a sensor board of up to 60 mm.",
+      "title": "Electronics and battery fit the bay"
+    },
+    {
+      "check": "print_bed_fit",
+      "expected": {
+        "text": "= 1 ratio",
+        "unit": "ratio",
+        "value": 1.0
+      },
+      "id": "T-006",
+      "instrument": "Calipers or steel ruler, 0.1 mm resolution; the printer's stated bed size",
+      "limit": {
+        "equals": 1.0
+      },
+      "measure_option": null,
+      "measurement_key": null,
+      "pass_rule": "Pass when the measured value is = 1 ratio.",
+      "procedure": [
+        "Measure the printed hull's three bounding dimensions in millimetres. Do this on the printed part, not on the CAD file.",
+        "Sort the three dimensions and the three bed dimensions in ascending order.",
+        "The part fits if each sorted dimension is no larger than the matching bed dimension.",
+        "Record the result as 1 (fits) or 0 (does not fit), with the dimensions."
+      ],
+      "quantity": "fit",
+      "requirement": "R-006",
+      "statement": "The pod shall fit within the print bed.",
+      "title": "Printed hull fits the print bed"
+    }
+  ]
+}
